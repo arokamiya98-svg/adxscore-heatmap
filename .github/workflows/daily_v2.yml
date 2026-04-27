@@ -7,7 +7,7 @@ on:
   workflow_dispatch:          # 手動実行ボタン
 
 permissions:
-  contents: write   # data/scores.json と docs/index.html をコミット
+  contents: write
 
 jobs:
   update:
@@ -24,11 +24,26 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      # ── v1 + v3 スコア計算（日次）──
+      # ── 日次スコア計算（v1 + v3）──
       - name: Fetch & Calculate ADX Score (v1 + v3)
         env:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
         run: python scripts/fetch_and_calc_v2.py
+
+      # ── 週次CSV生成（金曜のみ）──
+      # adx_weekly_xau.csv に v1+v3 週次データを出力
+      # generate_html.py が adx_weekly.csv と adx_weekly_xau.csv を両方読んでマージする
+      - name: Generate Weekly CSV (Fri only)
+        env:
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+        run: |
+          DAY=$(date -u +%u)
+          if [ "$DAY" = "5" ]; then
+            echo "金曜: weekly_csv_fetch.py 実行"
+            python scripts/weekly_csv_fetch.py
+          else
+            echo "平日($DAY): 週次CSVスキップ"
+          fi
 
       # ── HTML レポート生成 ──
       - name: Generate HTML Report
@@ -39,7 +54,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/scores.json data/adx_weekly.csv docs/index.html
+          git add data/scores.json data/adx_weekly.csv data/adx_weekly_xau.csv docs/index.html
           git diff --cached --quiet || git commit -m "chore: daily ADX score update $(date +'%Y-%m-%d')"
           git push
 
