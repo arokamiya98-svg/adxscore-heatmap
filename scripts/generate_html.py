@@ -11,7 +11,8 @@ MT5出力CSV → 多銘柄ヒートマップHTML生成
 import json, os, csv, io, math
 from datetime import datetime, timezone, timedelta
 
-CSV_PATH  = "data/adx_weekly.csv"
+CSV_PATH_MANUAL = "data/adx_weekly.csv"      # MT5手動投入（v1列のみ）
+CSV_PATH_AUTO   = "data/adx_weekly_xau.csv"   # weekly_csv_fetch.py自動生成（v1+v3列）
 DATA_PATH = "data/scores.json"
 HTML_PATH = "docs/index.html"
 JST       = timezone(timedelta(hours=9))
@@ -44,19 +45,28 @@ def score_grade(s):
     return             ("⬛ 見送り",  "#0c1018", "#2a3a48")
 
 
-# ── CSV読み込み ──────────────────────────────────────
+# ── CSV読み込み（エンコーディング自動判定 + v3対応）──
 def load_csv(path):
     if not os.path.exists(path):
         print(f"[WARN] CSV未検出: {path}")
         return {}
     with open(path, "rb") as f:
         raw = f.read()
-    try:
-        text = raw.decode("utf-16-le", errors="replace").lstrip("\ufeff")
-    except Exception:
+    text = None
+    for enc in ("utf-16", "utf-16-le", "utf-8-sig", "utf-8"):
+        try:
+            decoded = raw.decode(enc, errors="strict")
+            if "Week" in decoded:
+                text = decoded.lstrip("\ufeff")
+                print(f"  CSV encoding: {enc}")
+                break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    if text is None:
         text = raw.decode("utf-8", errors="replace").lstrip("\ufeff")
+        print("  CSV encoding: fallback utf-8")
 
-    raw_data = {}   # {sym: {week: {ws,h1a,h4p20,h4p30,score}}}
+    raw_data = {}
     reader = csv.DictReader(io.StringIO(text))
     for row in reader:
         sym  = row.get("Symbol","").strip()
@@ -64,19 +74,34 @@ def load_csv(path):
         ws   = row.get("WeekStart","").strip()
         if not sym or not week: continue
         try:
-            h1a   = float(row.get("H1_AvgADX",     0))
-            h4p20 = float(row.get("H4_Pct_Above20",0))
-            h4p30 = float(row.get("H4_Pct_Above30",0))
+            h1a   = float(row.get("H1_AvgADX",      0) or 0)
+            h4p20 = float(row.get("H4_Pct_Above20", 0) or 0)
+            h4p30 = float(row.get("H4_Pct_Above30", 0) or 0)
         except (ValueError, TypeError):
             continue
         score = calc_score(h1a, h4p20, h4p30)
+        # v3フィールド（weekly_csv_fetch.py出力時のみ存在）
+        sv3_s   = (row.get("ADX_Score_v3","") or "").strip()
+        vel_s   = (row.get("H4_Vel_Pos_Pct","") or "").strip()
+        try:
+            sv3 = round(float(sv3_s), 1) if sv3_s else None
+            vel = round(float(vel_s), 1) if vel_s else None
+        except ValueError:
+            sv3 = vel = None
         raw_data.setdefault(sym, {})[week] = {
-            "ws": ws, "h1a": round(h1a,2),
-            "h4p20": round(h4p20,1), "h4p30": round(h4p30,1),
+            "ws":    ws,
+            "h1a":   round(h1a, 2),
+            "h4p20": round(h4p20, 1),
+            "h4p30": round(h4p30, 1),
             "score": score,
+            "sv3":   sv3,
+            "band":  (row.get("Score_Band_v3","") or "").strip(),
+            "phase": (row.get("ATR_Phase","") or "").strip(),
+            "vel":   vel,
         }
     for sym, wks in raw_data.items():
-        print(f"  {sym}: {len(wks)}週")
+        v3c = sum(1 for w in wks.values() if w["sv3"] is not None)
+        print(f"  {sym}: {len(wks)}週 (v3: {v3c}週)")
     return raw_data
 
 
@@ -211,9 +236,20 @@ def generate_html(raw_data, recent5):
         sym_data = raw_data.get(sym, {})
         sc = SYM_COLORS.get(sym, "#aaa")
 
+        # v3バンド → 色マップ
+        BAND_BG = {"OPTIMAL":"#00c853","GOOD":"#69f0ae","WATCH":"#ffd740","CAUTION":"#ff5252"}
+        BAND_TX = {"OPTIMAL":"#001a0a","GOOD":"#001a0a","WATCH":"#1a1000","CAUTION":"#1a0000"}
+        PHASE_SHORT = {
+            "BOTTOM_CONT":"収束底","NORMAL_FLAT":"ATR安定","BOTTOM_TURN":"底立上",
+            "BOTTOM":"底待機","PEAK_CONT":"高ボラ継","NORMAL_FALL":"収縮中",
+            "HIGH_FALL":"高収縮","PEAK_FALL":"過熱落","HIGH_CONT":"過熱",
+            "NORMAL_RISE":"ATR急拡","N/A":"不明",
+        }
+
         # スコア行
         score_cells = []
         h1_cells, h4p20_cells, h4p30_cells = [], [], []
+        v3_score_cells, v3_phase_cells = [], []
         for wk in all_weeks:
             r = sym_data.get(wk)
             is_yr = wk.endswith("W01")
@@ -257,12 +293,66 @@ def generate_html(raw_data, recent5):
                         f'style="background:{pbg};width:24px;height:20px;text-align:center;'
                         f'font-size:7px;color:{ptx};font-weight:600;border-radius:2px;{bl}">'
                         f'{int(round(val))}</td>')
+
+                # v3スコア行
+                sv3  = r.get("sv3")
+                band = r.get("band","")
+                if sv3 is not None:
+                    vbg = BAND_BG.get(band,"#1a2a20")
+                    vtx = BAND_TX.get(band,"#88ccaa")
+                    v3_score_cells.append(
+                        f'<td class="cell" data-sym="{sym}" data-wk="{wk}" '
+                        f'style="background:{vbg};width:24px;height:22px;text-align:center;'
+                        f'font-size:7px;color:{vtx};font-weight:700;border-radius:2px;{bl}{latest_outline}">'
+                        f'{int(round(sv3))}</td>')
+                else:
+                    v3_score_cells.append(f'<td style="width:24px;height:22px;background:#0d1a14;{bl}"></td>')
+
+                # ATRフェーズ行
+                phase     = r.get("phase","")
+                vel       = r.get("vel")
+                ph_short  = PHASE_SHORT.get(phase,"")
+                ph_colors = {
+                    "BOTTOM_CONT":"#00c853","NORMAL_FLAT":"#69f0ae",
+                    "BOTTOM_TURN":"#ffd740","BOTTOM":"#ffd740","PEAK_CONT":"#ffd740",
+                    "NORMAL_FALL":"#ff9100","HIGH_FALL":"#ff9100",
+                    "HIGH_CONT":"#ff5252","NORMAL_RISE":"#ff5252","PEAK_FALL":"#ff5252",
+                }
+                ph_c = ph_colors.get(phase,"#2a4a3a")
+                if ph_short:
+                    v3_phase_cells.append(
+                        f'<td class="cell" data-sym="{sym}" data-wk="{wk}" '
+                        f'style="background:#0d1a14;width:24px;height:18px;text-align:center;'
+                        f'font-size:6px;color:{ph_c};font-weight:600;border-radius:2px;{bl}" '
+                        f'title="{phase}">'
+                        f'{ph_short[:3]}</td>')
+                else:
+                    v3_phase_cells.append(f'<td style="width:24px;height:18px;background:#060b10;{bl}"></td>')
             else:
                 empty = (f'<td style="width:24px;height:{{h}}px;background:#060b10;{bl}"></td>')
                 score_cells.append(empty.format(h=28))
                 h1_cells.append(empty.format(h=20))
                 h4p20_cells.append(empty.format(h=20))
                 h4p30_cells.append(empty.format(h=20))
+                v3_score_cells.append(empty.format(h=22))
+                v3_phase_cells.append(empty.format(h=18))
+
+        # v3 AVG
+        v3_vals = [sym_data[w]["sv3"] for w in all_weeks if w in sym_data and sym_data[w]["sv3"] is not None]
+        if v3_vals:
+            v3_avg = sum(v3_vals)/len(v3_vals)
+            v3_avg_band = ("OPTIMAL" if v3_avg>=75 else "GOOD" if v3_avg>=60 else "WATCH" if v3_avg>=45 else "CAUTION")
+            v3_avg_cell = (
+                f'<td style="text-align:center;font-size:10px;font-weight:700;padding-left:8px;'
+                f'border-left:1px solid #1a2000;background:{BAND_BG.get(v3_avg_band,"#1a2a20")};'
+                f'color:{BAND_TX.get(v3_avg_band,"#88ccaa")};'
+                f'position:sticky;right:0;z-index:1;border-radius:2px;height:22px;">'
+                f'{int(round(v3_avg))}</td>')
+        else:
+            v3_avg_cell = f'<td style="width:46px;height:22px;background:#060b10;position:sticky;right:0;z-index:1;"></td>'
+
+        v3_score_row = "\n".join(v3_score_cells)
+        v3_phase_row = "\n".join(v3_phase_cells)
 
         # AVG列
         vals = [sym_data[w]["score"] for w in all_weeks if w in sym_data]
@@ -315,6 +405,17 @@ def generate_html(raw_data, recent5):
       {h4p30_row}
       {avg_cell(h4p30_cells)}
     </tr>
+    <tr><td style="height:4px;background:#060b10;" colspan="{n_weeks+2}"></td></tr>
+    <tr style="border-top:1px solid #1a2a1a;">
+      <td style="font-size:9px;font-weight:700;color:#69f0ae;padding-right:6px;padding-left:4px;white-space:nowrap;position:sticky;left:0;background:#060b10;z-index:2;">⚡ v3適正</td>
+      {v3_score_row}
+      {v3_avg_cell}
+    </tr>
+    <tr>
+      <td style="font-size:9px;color:#3a7a5a;padding-right:6px;padding-left:4px;white-space:nowrap;position:sticky;left:0;background:#060b10;z-index:2;">ATRフェーズ</td>
+      {v3_phase_row}
+      {avg_cell([])}
+    </tr>
   </tbody>
   </table>
 </div>"""
@@ -327,9 +428,15 @@ def generate_html(raw_data, recent5):
     for sym in all_syms:
         for wk, r in raw_data.get(sym, {}).items():
             tooltip.setdefault(wk, {})[sym] = {
-                "ws": r["ws"], "h1a": r["h1a"],
-                "h4p20": r["h4p20"], "h4p30": r["h4p30"],
-                "s": r["score"],
+                "ws":    r["ws"],
+                "h1a":   r["h1a"],
+                "h4p20": r["h4p20"],
+                "h4p30": r["h4p30"],
+                "s":     r["score"],
+                "sv3":   r.get("sv3"),
+                "band":  r.get("band",""),
+                "phase": r.get("phase",""),
+                "vel":   r.get("vel"),
             }
     tooltip_json = json.dumps(tooltip, ensure_ascii=False)
     weeks_json   = json.dumps(all_weeks, ensure_ascii=False)
@@ -575,6 +682,19 @@ document.addEventListener('mouseover', function(e) {{
     [38,"✅ 良い"],[27,"🔹 OK"],[18,"⬜ 様子見"],[10,"⬛ 弱い"],[0,"⬛ 見送り"]
   ];
   var grade = lbl_map.find(([th])=>t.s>=th)[1];
+  var bmap = {{OPTIMAL:'#00c853',GOOD:'#69f0ae',WATCH:'#ffd740',CAUTION:'#ff5252'}};
+  var btxm = {{OPTIMAL:'#001a0a',GOOD:'#001a0a',WATCH:'#1a1000',CAUTION:'#1a0000'}};
+  var v3part = '';
+  if(t.sv3 != null) {{
+    var bc  = bmap[t.band]||'#333';
+    var btc = btxm[t.band]||'#fff';
+    var velStr = t.vel != null ? '  vel '+t.vel+'%' : '';
+    v3part =
+      '<span style="color:#3a5a70;">│</span>' +
+      '<span style="background:'+bc+';color:'+btc+';font-weight:700;font-size:12px;padding:1px 6px;border-radius:3px;">⚡ '+t.sv3+'</span>' +
+      '<span style="color:'+(bmap[t.band]||'#69f0ae')+';font-size:10px;"> '+t.band+'</span>' +
+      '<span style="color:#3a7a5a;font-size:9px;"> '+t.phase+velStr+'</span>';
+  }}
   document.getElementById('tip').innerHTML =
     '<div style="display:flex;gap:10px;background:#0a1520;border:1px solid #122030;' +
     'border-radius:6px;padding:5px 14px;flex-wrap:wrap;align-items:center;">' +
@@ -588,6 +708,7 @@ document.addEventListener('mouseover', function(e) {{
     '<span>H4≥20: <b style="color:#ffcc44;">'+(t.h4p20).toFixed(1)+'%</b></span>' +
     '<span>H4≥30: <b style="color:#ff88cc;">'+(t.h4p30).toFixed(1)+'%</b>' +
     ' <span style="font-size:9px;color:#3a5070;">(x'+bonus+')</span></span>' +
+    v3part +
     '</div>';
 }});
 
@@ -610,7 +731,11 @@ window.onload = function() {{
 
 def main():
     print("=== generate_html.py v3 開始 ===")
-    raw_data = load_csv(CSV_PATH)
+    # 手動CSV（v1のみ）と自動CSV（v3含む）をマージ：自動CSVの週が優先
+    raw_data = load_csv(CSV_PATH_MANUAL)
+    auto_data = load_csv(CSV_PATH_AUTO)
+    for sym, weeks in auto_data.items():
+        raw_data.setdefault(sym, {}).update(weeks)  # 同一週は自動CSVで上書き
     recent5  = load_recent5(DATA_PATH)
     print(f"日次スコア: {len(recent5)}件")
     os.makedirs("docs", exist_ok=True)
