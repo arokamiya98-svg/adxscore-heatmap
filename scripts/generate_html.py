@@ -731,11 +731,21 @@ window.onload = function() {{
 
 def main():
     print("=== generate_html.py v3 開始 ===")
-    # 手動CSV（v1のみ）と自動CSV（v3含む）をマージ：自動CSVの週が優先
-    raw_data = load_csv(CSV_PATH_MANUAL)
+    # 手動CSV（v1）と自動CSV（v3）をマージ
+    # v1フィールド（score/h4p20/h4p30）は手動CSV優先、v3フィールドのみxauから補完
+    raw_data  = load_csv(CSV_PATH_MANUAL)
     auto_data = load_csv(CSV_PATH_AUTO)
+    V3_FIELDS = ("sv3", "band", "phase", "vel")
     for sym, weeks in auto_data.items():
-        raw_data.setdefault(sym, {}).update(weeks)  # 同一週は自動CSVで上書き
+        raw_data.setdefault(sym, {})
+        for wk, auto_r in weeks.items():
+            if wk in raw_data[sym]:
+                # 既存週：v3フィールドだけ上書き（v1スコアは手動CSV維持）
+                for f in V3_FIELDS:
+                    raw_data[sym][wk][f] = auto_r[f]
+            else:
+                # 新規週（手動CSVにない週）：auto丸ごと追加
+                raw_data[sym][wk] = auto_r
     recent5  = load_recent5(DATA_PATH)
     print(f"日次スコア: {len(recent5)}件")
     os.makedirs("docs", exist_ok=True)
