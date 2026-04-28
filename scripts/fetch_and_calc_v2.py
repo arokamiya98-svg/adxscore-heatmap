@@ -55,7 +55,76 @@ def fetch_ohlcv(interval: str, outputsize: int) -> list[dict]:
     return data["values"]
 
 
-# ── Wilder ADX ───────────────────────────────────────
+# ── Twelve Data 技術指標API（H4専用）────────────────
+def fetch_h4_adx(outputsize: int = 200) -> list[dict]:
+    """
+    H4 ADX(30) を Twelve Data 公式APIで取得。
+    自前Wilder計算ではなくサーバー側計算を使うことで
+    H4バー区切りの差異による誤差を排除する。
+    返値: [{"datetime": ..., "adx": ..., "plus_di": ..., "minus_di": ...}, ...]
+    """
+    url = "https://api.twelvedata.com/adx"
+    params = {
+        "symbol":      SYMBOL,
+        "interval":    "4h",
+        "time_period": ADX_PERIOD_H4,
+        "outputsize":  outputsize,
+        "apikey":      API_KEY,
+        "order":       "ASC",
+    }
+    resp = requests.get(url, params=params, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    if "values" not in data:
+        raise ValueError(f"H4 ADX API error: {data}")
+    out = []
+    for v in data["values"]:
+        try:
+            out.append({
+                "datetime":  v["datetime"],
+                "adx":       round(float(v["adx"]),      4),
+                "plus_di":   round(float(v["plus_di"]),  4),
+                "minus_di":  round(float(v["minus_di"]), 4),
+            })
+        except (KeyError, ValueError):
+            continue
+    print(f"  H4 ADX API: {len(out)}本 ({out[0]['datetime'][:10]} 〜 {out[-1]['datetime'][:10]})")
+    return out
+
+
+def fetch_h4_atr(outputsize: int = 200) -> list[dict]:
+    """
+    H4 ATR(14) を Twelve Data 公式APIで取得。
+    返値: [{"datetime": ..., "atr": ...}, ...]
+    """
+    url = "https://api.twelvedata.com/atr"
+    params = {
+        "symbol":      SYMBOL,
+        "interval":    "4h",
+        "time_period": ATR_PERIOD,
+        "outputsize":  outputsize,
+        "apikey":      API_KEY,
+        "order":       "ASC",
+    }
+    resp = requests.get(url, params=params, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    if "values" not in data:
+        raise ValueError(f"H4 ATR API error: {data}")
+    out = []
+    for v in data["values"]:
+        try:
+            out.append({
+                "datetime": v["datetime"],
+                "atr":      round(float(v["atr"]), 4),
+            })
+        except (KeyError, ValueError):
+            continue
+    print(f"  H4 ATR API: {len(out)}本 ({out[0]['datetime'][:10]} 〜 {out[-1]['datetime'][:10]})")
+    return out
+
+
+# ── Wilder ADX（H1専用）─────────────────────────────
 def calc_adx(bars: list[dict], period: int) -> list[dict]:
     n = len(bars)
     H = [float(b["high"])  for b in bars]
@@ -226,8 +295,7 @@ def calc_scores_5days(
     h1_adx: list[dict],
     h4_adx: list[dict],
     h4_atr: list[dict],
-    h4_bars: list[dict],      # raw H4バー（velの元データ）
-) -> list[dict]:
+) -> list[dict]:  # h4_bars不要（velはh4_adxから計算済み）
 
     # H1: 日付ごとにグループ
     h1_by_date: dict[str, list[float]] = {}
@@ -409,20 +477,19 @@ def main():
     h1_bars = fetch_ohlcv("1h", H1_BARS)
     print(f"  → {len(h1_bars)}本")
 
-    print(f"\n[2/4] H4データ取得 ({H4_BARS}本)...")
-    h4_bars_raw = fetch_ohlcv("4h", H4_BARS)
-    print(f"  → {len(h4_bars_raw)}本")
+    print(f"\n[2/4] H4 ADX / ATR取得（公式API）...")
+    h4_adx = fetch_h4_adx(H4_BARS)   # 公式ADX API（MT5準拠）
+    h4_atr = fetch_h4_atr(H4_BARS)   # 公式ATR API
+    h4_bars_raw = []                   # velはh4_adxから計算するため不要
 
-    print("\n[3/4] ADX / ATR計算中...")
-    h1_adx = calc_adx(h1_bars,     ADX_PERIOD_H1)
-    h4_adx = calc_adx(h4_bars_raw, ADX_PERIOD_H4)
-    h4_atr = calc_atr(h4_bars_raw, ATR_PERIOD)
+    print("\n[3/4] H1 ADX計算中...")
+    h1_adx = calc_adx(h1_bars, ADX_PERIOD_H1)
     print(f"  H1 ADX: {len(h1_adx)}本 / H4 ADX: {len(h4_adx)}本 / H4 ATR: {len(h4_atr)}本")
     validate_adx(h1_adx, "H1(28)")
-    validate_adx(h4_adx, "H4(30)")
+    validate_adx(h4_adx, "H4(30) 公式API")
 
     print("\n[4/4] スコア計算中（直近5営業日）...")
-    new_scores = calc_scores_5days(h1_adx, h4_adx, h4_atr, h4_bars_raw)
+    new_scores = calc_scores_5days(h1_adx, h4_adx, h4_atr)
 
     if not new_scores:
         print("[WARN] スコアが空です")
