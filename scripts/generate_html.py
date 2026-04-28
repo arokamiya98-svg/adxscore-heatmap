@@ -211,23 +211,40 @@ def generate_html(raw_data, recent5):
     # 週ヘッダー（年ラベル・月ラベル）
     def week_header_cells():
         cells = []
+        sym0  = all_syms[0] if all_syms else ""
+        prev_mon = None
         for i, wk in enumerate(all_weeks):
-            is_yr = wk.endswith("W01")
-            ws = raw_data.get(all_syms[0] if all_syms else "", {}).get(wk, {}).get("ws","")
-            mon = int(ws[5:7])-1 if ws else 0
-            ml  = ["J","F","M","A","M","J","J","A","S","O","N","D"]
-            if is_yr:
-                lbl = f"'{wk[2:4]}"
+            is_yr   = wk.endswith("W01")
+            is_last = (wk == all_weeks[-1])
+            ws = raw_data.get(sym0, {}).get(wk, {}).get("ws", "")
+            try:
+                mon = int(ws[5:7]) - 1  # 0-indexed
+            except (ValueError, IndexError):
+                mon = prev_mon or 0
+            ml = ["Jan","Feb","Mar","Apr","May","Jun",
+                  "Jul","Aug","Sep","Oct","Nov","Dec"]
+            ml_s = ["J","F","M","A","M","J","J","A","S","O","N","D"]
+
+            if is_last:
+                # 最新週：▼マーカー（金色）
+                lbl   = "▼"
+                style = "font-size:8px;color:#ffd700;font-weight:700;"
+                bl    = ""
+            elif is_yr:
+                lbl   = f"\'{wk[2:4]}"
                 style = "font-size:7px;color:#8a9a60;font-weight:700;"
-                bl = "border-left:1px solid #2a3010;"
-            elif i % 4 == 0:
-                lbl = ml[mon]
-                style = "font-size:7px;color:#3a4020;"
-                bl = ""
+                bl    = "border-left:1px solid #2a3010;"
+            elif mon != prev_mon and prev_mon is not None:
+                # 月変わり：月名を表示
+                lbl   = ml_s[mon]
+                style = "font-size:7px;color:#4a5a30;"
+                bl    = ""
             else:
-                lbl = ""
+                lbl   = ""
                 style = ""
-                bl = ""
+                bl    = ""
+
+            prev_mon = mon
             cells.append(f'<td style="width:24px;text-align:center;{style}{bl}padding-bottom:4px;">{lbl}</td>')
         return "\n".join(cells)
 
@@ -501,7 +518,13 @@ input[type=range]::-webkit-slider-thumb{{-webkit-appearance:none;width:16px;heig
 
 <!-- 最新週バナー -->
 <div style="background:#0a1520;border-bottom:1px solid #122030;padding:10px 18px;">
-  <div style="font-size:10px;color:#3a5a70;margin-bottom:8px;">📊 最新週スコア ({last_wk} / {last_ws}) — スコア降順</div>
+  <div style="font-size:10px;color:#3a5a70;margin-bottom:8px;">
+    📊 最新週スコア
+    <span style="color:#ffd700;font-weight:700;">▼ {last_wk}</span>
+    <span style="color:#4a6a50;">({last_ws}週)</span>
+    — スコア降順
+    <span style="font-size:9px;color:#2a3a28;margin-left:8px;">※データは週次更新（金曜以降反映）</span>
+  </div>
   <div id="latest-banner" style="display:flex;gap:8px;flex-wrap:wrap;">{banner_cards}</div>
 </div>
 
