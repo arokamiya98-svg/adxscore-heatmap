@@ -58,9 +58,8 @@ def fetch_ohlcv(interval: str, outputsize: int) -> list[dict]:
 # ── Twelve Data 技術指標API（H4専用）────────────────
 def fetch_h4_adx(outputsize: int = 200) -> list[dict]:
     """
-    H4 ADX(30) を Twelve Data 公式APIで取得。
-    自前Wilder計算ではなくサーバー側計算を使うことで
-    H4バー区切りの差異による誤差を排除する。
+    H4 ADX(30) を Twelve Data 公式APIで取得（DESCで取得してreverse）。
+    失敗時は None を返す（呼び出し元でフォールバック処理）。
     返値: [{"datetime": ..., "adx": ..., "plus_di": ..., "minus_di": ...}, ...]
     """
     url = "https://api.twelvedata.com/adx"
@@ -70,31 +69,41 @@ def fetch_h4_adx(outputsize: int = 200) -> list[dict]:
         "time_period": ADX_PERIOD_H4,
         "outputsize":  outputsize,
         "apikey":      API_KEY,
-        "order":       "ASC",
+        # 技術指標APIはASC未対応 → DESCで取得してreverseする
     }
-    resp = requests.get(url, params=params, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
-    if "values" not in data:
-        raise ValueError(f"H4 ADX API error: {data}")
-    out = []
-    for v in data["values"]:
-        try:
-            out.append({
-                "datetime":  v["datetime"],
-                "adx":       round(float(v["adx"]),      4),
-                "plus_di":   round(float(v["plus_di"]),  4),
-                "minus_di":  round(float(v["minus_di"]), 4),
-            })
-        except (KeyError, ValueError):
-            continue
-    print(f"  H4 ADX API: {len(out)}本 ({out[0]['datetime'][:10]} 〜 {out[-1]['datetime'][:10]})")
-    return out
+    try:
+        resp = requests.get(url, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        if "values" not in data:
+            print(f"  [WARN] H4 ADX API: {data.get('message', data)}")
+            return None
+        out = []
+        for v in data["values"]:
+            try:
+                out.append({
+                    "datetime":  v["datetime"],
+                    "adx":       round(float(v["adx"]),      4),
+                    "plus_di":   round(float(v["plus_di"]),  4),
+                    "minus_di":  round(float(v["minus_di"]), 4),
+                })
+            except (KeyError, ValueError):
+                continue
+        if not out:
+            print("  [WARN] H4 ADX API: 空レスポンス")
+            return None
+        out.reverse()   # DESC → ASC に変換
+        print(f"  H4 ADX 公式API: {len(out)}本 ({out[0]['datetime'][:10]} 〜 {out[-1]['datetime'][:10]})")
+        return out
+    except Exception as e:
+        print(f"  [WARN] H4 ADX API失敗: {e}")
+        return None
 
 
 def fetch_h4_atr(outputsize: int = 200) -> list[dict]:
     """
-    H4 ATR(14) を Twelve Data 公式APIで取得。
+    H4 ATR(14) を Twelve Data 公式APIで取得（DESCで取得してreverse）。
+    失敗時は None を返す。
     返値: [{"datetime": ..., "atr": ...}, ...]
     """
     url = "https://api.twelvedata.com/atr"
@@ -104,24 +113,32 @@ def fetch_h4_atr(outputsize: int = 200) -> list[dict]:
         "time_period": ATR_PERIOD,
         "outputsize":  outputsize,
         "apikey":      API_KEY,
-        "order":       "ASC",
     }
-    resp = requests.get(url, params=params, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
-    if "values" not in data:
-        raise ValueError(f"H4 ATR API error: {data}")
-    out = []
-    for v in data["values"]:
-        try:
-            out.append({
-                "datetime": v["datetime"],
-                "atr":      round(float(v["atr"]), 4),
-            })
-        except (KeyError, ValueError):
-            continue
-    print(f"  H4 ATR API: {len(out)}本 ({out[0]['datetime'][:10]} 〜 {out[-1]['datetime'][:10]})")
-    return out
+    try:
+        resp = requests.get(url, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        if "values" not in data:
+            print(f"  [WARN] H4 ATR API: {data.get('message', data)}")
+            return None
+        out = []
+        for v in data["values"]:
+            try:
+                out.append({
+                    "datetime": v["datetime"],
+                    "atr":      round(float(v["atr"]), 4),
+                })
+            except (KeyError, ValueError):
+                continue
+        if not out:
+            print("  [WARN] H4 ATR API: 空レスポンス")
+            return None
+        out.reverse()
+        print(f"  H4 ATR 公式API: {len(out)}本 ({out[0]['datetime'][:10]} 〜 {out[-1]['datetime'][:10]})")
+        return out
+    except Exception as e:
+        print(f"  [WARN] H4 ATR API失敗: {e}")
+        return None
 
 
 # ── Wilder ADX（H1専用）─────────────────────────────
@@ -477,16 +494,30 @@ def main():
     h1_bars = fetch_ohlcv("1h", H1_BARS)
     print(f"  → {len(h1_bars)}本")
 
-    print(f"\n[2/4] H4 ADX / ATR取得（公式API）...")
-    h4_adx = fetch_h4_adx(H4_BARS)   # 公式ADX API（MT5準拠）
-    h4_atr = fetch_h4_atr(H4_BARS)   # 公式ATR API
-    h4_bars_raw = []                   # velはh4_adxから計算するため不要
+    print(f"\n[2/4] H4データ取得...")
+    # まず公式ADX/ATR APIを試みる（MT5準拠のADX値）
+    h4_adx = fetch_h4_adx(H4_BARS)
+    h4_atr = fetch_h4_atr(H4_BARS)
+
+    # 公式APIが使えない場合はOHLCVから自前計算にフォールバック
+    if h4_adx is None or h4_atr is None:
+        print("  → 公式API不可。OHLCV自前計算にフォールバック")
+        h4_bars_raw = fetch_ohlcv("4h", H4_BARS)
+        print(f"  H4 OHLCV: {len(h4_bars_raw)}本")
+        if h4_adx is None:
+            h4_adx = calc_adx(h4_bars_raw, ADX_PERIOD_H4)
+            print(f"  H4 ADX（自前）: {len(h4_adx)}本")
+        if h4_atr is None:
+            h4_atr = calc_atr(h4_bars_raw, ATR_PERIOD)
+            print(f"  H4 ATR（自前）: {len(h4_atr)}本")
+    else:
+        h4_bars_raw = []
 
     print("\n[3/4] H1 ADX計算中...")
     h1_adx = calc_adx(h1_bars, ADX_PERIOD_H1)
     print(f"  H1 ADX: {len(h1_adx)}本 / H4 ADX: {len(h4_adx)}本 / H4 ATR: {len(h4_atr)}本")
     validate_adx(h1_adx, "H1(28)")
-    validate_adx(h4_adx, "H4(30) 公式API")
+    validate_adx(h4_adx, "H4(30)")
 
     print("\n[4/4] スコア計算中（直近5営業日）...")
     new_scores = calc_scores_5days(h1_adx, h4_adx, h4_atr)
