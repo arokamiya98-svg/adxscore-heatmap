@@ -1,15 +1,25 @@
 """
 fetch_and_calc_v2.py
-XAUUSD H1/H4 ADXスコア計算 → data/scores.json に追記
+XAUUSD H1/H4/D1 ADXスコア計算 → data/scores.json に追記
 
 【計算スコア】
   v1スコア: 既存設計（H1avg × H4_pct20/30 幾何平均方式）
   v3スコア: 適正状態評価（vel山型 + ATRフェーズ + ADX強度）
+  tier:    フェーズTier（D1×H4波形×ATR CONTRACT組み合わせ）
 
 【v3日次近似】
   軸A: H4 vel_pos_pct（当日の H4バー中でvel>0の割合）
   軸B: ATRフェーズ  （当日のATR ratio × 前日比delta）
   軸C: ADX強度      （H4 avg + H1 above20 avg）
+
+【Tier判定】
+  D1フェーズ × H4波形 × ATR状態（CONTRACT/NEUTRAL/EXPAND）
+  S: D1=BU H4=BU ATR=CONTRACT  WR 89.7%  PF 14.1
+  A: D1=BU H4=BU ATR=NEUTRAL   WR 70.0%  PF  4.8
+  A*:D1=PD H4=NONE ATR=CONTRACT WR 65.0% PF  2.9
+  B: BU期 その他                WR 51.0%  PF  2.4
+  C: PD ATR=CONTRACT            WR 44.0%  PF  1.4
+  D: PD ATR非CONTRACT           WR 39.0%  PF  0.9
 """
 
 import os
@@ -26,15 +36,26 @@ DATA_PATH = "data/scores.json"
 
 ADX_PERIOD_H1  = 28
 ADX_PERIOD_H4  = 30
+ADX_PERIOD_D1  = 22   # D1 ADX（FractalWaveLog adx22 準拠）
 ATR_PERIOD     = 14
-H4_VEL_PERIOD  = 5    # H4 vel計算バー数（5本前比較 = 20時間前）
-ATR_MED_WEEKS  = 8    # ATR中央値の基準週数（週末ATRを8週分）
+H4_VEL_PERIOD  = 5
+ATR_MED_WEEKS  = 8
 
-# ウォームアップを十分確保
 H1_BARS = 400
 H4_BARS = 200
+D1_BARS = 80          # D1 ウォームアップ込み
 
 JST = timezone(timedelta(hours=9))
+
+# ── Tier定義 ─────────────────────────────────────────
+TIER_DEF = {
+    "S":  {"wr": 89.7, "pf": 14.1, "note": "BU×BU×CONTRACT 黄金期"},
+    "A":  {"wr": 70.0, "pf":  4.8, "note": "BU×BU×NEUTRAL  強い"},
+    "A*": {"wr": 65.0, "pf":  2.9, "note": "PD×NONE×CONTRACT 逆張り特効"},
+    "B":  {"wr": 51.0, "pf":  2.4, "note": "BU期 観察 環境待ち"},
+    "C":  {"wr": 44.0, "pf":  1.4, "note": "PD CONTRACT 慎重"},
+    "D":  {"wr": 39.0, "pf":  0.9, "note": "PD×非CONTRACT 回避"},
+}
 
 
 # ── Twelve Data 取得 ──────────────────────────────────
@@ -216,7 +237,6 @@ def calc_atr(bars: list[dict], period: int) -> list[dict]:
         tr = max(H[i]-L[i], abs(H[i]-C[i-1]), abs(L[i]-C[i-1]))
         tr_list.append((D[i], tr))
 
-    # Wilder EMA
     if len(tr_list) < period:
         return []
     atr_val = sum(t for _, t in tr_list[:period]) / period
@@ -240,18 +260,16 @@ def calc_score_v1(h1_avg: float, h4_pct20: float, h4_pct30: float) -> float:
 
 # ── v3 軸スコア計算 ──────────────────────────────────
 def axis_a_vel(pos_pct: float) -> float:
-    """vel山型スコア（最大40点）"""
     if 60 <= pos_pct <= 80: return 40.0
     if 50 <= pos_pct < 60:  return 33.0
     if 80 < pos_pct <= 90:  return 28.0
     if 40 <= pos_pct < 50:  return 25.0
     if 20 <= pos_pct < 40:  return 22.0
     if pos_pct > 90:        return 15.0
-    return 10.0  # <20%
+    return 10.0
 
 
 def atr_phase(ratio: float, delta_pct: float) -> str:
-    """ATRフェーズ判定"""
     if ratio <= 0: return "N/A"
     if ratio < 0.75:   return "BOTTOM"
     elif ratio < 0.90: return "BOTTOM_TURN" if delta_pct > 5 else "BOTTOM_CONT"
@@ -271,19 +289,16 @@ PHASE_SCORE = {
 
 
 def axis_b_atr(phase: str) -> float:
-    """ATRフェーズスコア（最大35点）"""
     return float(PHASE_SCORE.get(phase, 15))
 
 
 def axis_c_adx(h4_avg: float, h1_s20_avg: float) -> float:
-    """ADX強度スコア（最大25点）"""
     h4n = max(0.0, min(1.0, (h4_avg - 15.0) / 25.0)) * 12.0
     h1n = max(0.0, min(1.0, (h1_s20_avg - 20.0) / 20.0)) * 13.0 if h1_s20_avg > 0 else 0.0
     return h4n + h1n
 
 
 def calc_score_v3(vel_pos_pct: float, phase: str, h4_avg: float, h1_s20_avg: float) -> float:
-    """v3総合スコア（最大100点）"""
     a = axis_a_vel(vel_pos_pct)
     b = axis_b_atr(phase)
     c = axis_c_adx(h4_avg, h1_s20_avg)
@@ -307,11 +322,55 @@ def comment_v3(score: float, prev_score: float, phase: str, vel_neg_pct: float) 
     return "NORMAL"
 
 
+# ── D1/H4フェーズ + Tier判定 ─────────────────────────
+def atr_to_class(atr_ratio: float) -> str:
+    """ATR ratioをCONTRACT/NEUTRAL/EXPANDに変換"""
+    if atr_ratio < 0.90:    return "CONTRACT"
+    elif atr_ratio <= 1.10: return "NEUTRAL"
+    else:                   return "EXPAND"
+
+
+def detect_di_phase(adx_series: list[dict], date_str: str, lookback: int) -> tuple[str, float]:
+    """
+    DI+とDI-の平均比較からBU/PD/NONEを判定
+    adx_series は datetime キーを持つリスト（時系列順）
+    Returns: (phase, di_spread)
+    """
+    eligible = [r for r in adx_series if r["datetime"][:10] <= date_str]
+    if not eligible:
+        return "UNKNOWN", 0.0
+    recent   = eligible[-lookback:]
+    di_plus  = sum(r["plus_di"]  for r in recent) / len(recent)
+    di_minus = sum(r["minus_di"] for r in recent) / len(recent)
+    spread   = round(di_plus - di_minus, 1)
+    if spread > 3:  return "BU", spread
+    if spread < -3: return "PD", spread
+    return "NONE", spread
+
+
+def calc_tier(d1_phase: str, h4_wave: str, atr_class: str) -> str:
+    """フェーズTier計算（phase_analysis_dashboard.html 準拠）"""
+    if d1_phase == "BU" and h4_wave == "BU":
+        if atr_class == "CONTRACT": return "S"
+        if atr_class == "NEUTRAL":  return "A"
+        return "B"                          # EXPAND
+    if d1_phase == "PD" and h4_wave == "NONE" and atr_class == "CONTRACT":
+        return "A*"
+    if d1_phase == "BU" and atr_class == "CONTRACT":
+        return "B"                          # BU期 H4波不明/PD
+    if d1_phase == "BU":
+        return "B"
+    if d1_phase == "PD" and atr_class == "CONTRACT":
+        return "C"
+    return "D"
+
+
 # ── 日次スコア計算（直近5営業日）────────────────────
 def calc_scores_5days(
-    h1_adx: list[dict],
-    h4_adx: list[dict],
-    h4_atr: list[dict],
+    h1_adx:  list[dict],
+    h4_adx:  list[dict],
+    h4_atr:  list[dict],
+    d1_adx:  list[dict],   # D1 ADX（DI+/DI- 含む）
 ) -> list[dict]:  # h4_bars不要（velはh4_adxから計算済み）
 
     # H1: 日付ごとにグループ
@@ -326,14 +385,13 @@ def calc_scores_5days(
         d = row["datetime"][:10]
         h4_adx_by_date.setdefault(d, []).append(row["adx"])
 
-    # H4 ATR: 日付ごと（最後のバーを当日ATRとして使う）
+    # H4 ATR: 日付ごと
     h4_atr_by_date: dict[str, list[float]] = {}
     for row in h4_atr:
         d = row["datetime"][:10]
         h4_atr_by_date.setdefault(d, []).append(row["atr"])
 
-    # H4 vel計算（H4 ADX系列全体で一括計算）
-    # h4_adx は時系列順（古い→新しい）
+    # H4 vel計算
     h4_adx_vals  = [r["adx"]      for r in h4_adx]
     h4_adx_dts   = [r["datetime"] for r in h4_adx]
     h4_vel_by_date: dict[str, list[float]] = {}
@@ -346,19 +404,16 @@ def calc_scores_5days(
             h4_vel_by_date.setdefault(d, []).append(vel)
 
     # ATR中央値（直近8週の週末ATR）
-    # 週末 = 金曜日のATR末尾値を蓄積
     atr_week_buf: deque[float] = deque(maxlen=ATR_MED_WEEKS)
-    atr_end_by_date: dict[str, float] = {}  # 各日のATR末尾値（当日最終バー）
+    atr_end_by_date: dict[str, float] = {}
     for d in sorted(h4_atr_by_date.keys()):
         vals = h4_atr_by_date[d]
         if vals:
             atr_end = vals[-1]
             atr_end_by_date[d] = atr_end
-            # 金曜の場合は週末バッファに追加
             if datetime.strptime(d, "%Y-%m-%d").weekday() == 4:
                 atr_week_buf.append(atr_end)
 
-    # 有効日付
     def is_weekday(d: str) -> bool:
         return datetime.strptime(d, "%Y-%m-%d").weekday() < 5
 
@@ -368,14 +423,12 @@ def calc_scores_5days(
     )
     recent_5 = all_dates[-5:]
 
-    # 前日ATR（delta計算用）
     sorted_atr_dates = sorted(atr_end_by_date.keys())
     prev_atr_end: dict[str, float] = {}
     for i, d in enumerate(sorted_atr_dates):
         if i > 0:
             prev_atr_end[d] = atr_end_by_date[sorted_atr_dates[i - 1]]
 
-    # 前スコア（コメント計算用）
     prev_v3_score: dict[str, float] = {}
 
     scores = []
@@ -393,23 +446,22 @@ def calc_scores_5days(
             print(f"  [SKIP] H1バー不足: {date_str} ({len(h1_vals)}本)")
             continue
 
-        # v1用
+        # v1
         h1_avg   = sum(h1_vals) / len(h1_vals)
         h4_pct20 = 100 * sum(1 for v in h4_vals if v >= 20) / len(h4_vals)
         h4_pct30 = 100 * sum(1 for v in h4_vals if v >= 30) / len(h4_vals)
         score_v1 = calc_score_v1(h1_avg, h4_pct20, h4_pct30)
 
-        # v3用
+        # v3
         h1_s20_avg   = (sum(v for v in h1_vals if v >= 20) / sum(1 for v in h1_vals if v >= 20)
                         if any(v >= 20 for v in h1_vals) else 0.0)
         h4_avg       = sum(h4_vals) / len(h4_vals)
         vel_pos_pct  = (100 * sum(1 for v in vel_vals if v > 0) / len(vel_vals)
-                        if vel_vals else 50.0)  # データなし時は中立
+                        if vel_vals else 50.0)
         vel_neg_pct  = 100 - vel_pos_pct
 
-        # ATR ratio
-        atr_med = (sorted(atr_week_buf)[len(atr_week_buf)//2]
-                   if len(atr_week_buf) >= 4 else atr_end)
+        atr_med      = (sorted(atr_week_buf)[len(atr_week_buf)//2]
+                        if len(atr_week_buf) >= 4 else atr_end)
         atr_ratio    = atr_end / atr_med if atr_med > 0 else 1.0
         prev_atr     = prev_atr_end.get(date_str, atr_end)
         atr_delta    = (atr_end - prev_atr) / prev_atr * 100 if prev_atr > 0 else 0.0
@@ -418,13 +470,18 @@ def calc_scores_5days(
         score_v3_val = calc_score_v3(vel_pos_pct, phase, h4_avg, h1_s20_avg)
         band         = band_v3(score_v3_val)
 
-        # 前日スコア取得
         prev_idx  = all_dates.index(date_str) - 1
         prev_date = all_dates[prev_idx] if prev_idx >= 0 else None
         prev_s    = prev_v3_score.get(prev_date, -1.0) if prev_date else -1.0
 
         cmt = comment_v3(score_v3_val, prev_s, phase, vel_neg_pct)
         prev_v3_score[date_str] = score_v3_val
+
+        # ── D1 / H4フェーズ + Tier ──────────────────────
+        d1_phase, d1_di_spread = detect_di_phase(d1_adx,  date_str, lookback=3)
+        h4_wave,  h4_di_spread = detect_di_phase(h4_adx,  date_str, lookback=5)
+        atr_class              = atr_to_class(atr_ratio)
+        tier                   = calc_tier(d1_phase, h4_wave, atr_class)
 
         scores.append({
             "date":          date_str,
@@ -433,7 +490,7 @@ def calc_scores_5days(
             "h1_avg_adx":   round(h1_avg, 2),
             "h4_pct20":     round(h4_pct20, 1),
             "h4_pct30":     round(h4_pct30, 1),
-            "score":        score_v1,          # v1スコア（既存キー維持）
+            "score":        score_v1,
             "h1_bars":      len(h1_vals),
             "h4_bars":      len(h4_vals),
             # v3
@@ -447,6 +504,13 @@ def calc_scores_5days(
             "score_v3":     score_v3_val,
             "band_v3":      band,
             "comment_v3":   cmt,
+            # tier
+            "d1_phase":     d1_phase,
+            "d1_di_spread": d1_di_spread,
+            "h4_wave":      h4_wave,
+            "h4_di_spread": h4_di_spread,
+            "atr_class":    atr_class,
+            "tier":         tier,
         })
     return scores
 
@@ -510,17 +574,21 @@ def main():
         if h4_atr is None:
             h4_atr = calc_atr(h4_bars_raw, ATR_PERIOD)
             print(f"  H4 ATR（自前）: {len(h4_atr)}本")
-    else:
-        h4_bars_raw = []
 
-    print("\n[3/4] H1 ADX計算中...")
+    print(f"\n[3/4] D1データ取得 ({D1_BARS}本)...")
+    d1_bars_raw = fetch_ohlcv("1day", D1_BARS)
+    print(f"  → {len(d1_bars_raw)}本")
+    d1_adx = calc_adx(d1_bars_raw, ADX_PERIOD_D1)
+
+    print("\n[4/4] H1 ADX計算中...")
     h1_adx = calc_adx(h1_bars, ADX_PERIOD_H1)
-    print(f"  H1 ADX: {len(h1_adx)}本 / H4 ADX: {len(h4_adx)}本 / H4 ATR: {len(h4_atr)}本")
+    print(f"  H1 ADX: {len(h1_adx)}本 / H4 ADX: {len(h4_adx)}本 / D1 ADX: {len(d1_adx)}本")
     validate_adx(h1_adx, "H1(28)")
     validate_adx(h4_adx, "H4(30)")
+    validate_adx(d1_adx, "D1(22)")
 
-    print("\n[4/4] スコア計算中（直近5営業日）...")
-    new_scores = calc_scores_5days(h1_adx, h4_adx, h4_atr)
+    print("\n[5/4] スコア計算中（直近5営業日）...")
+    new_scores = calc_scores_5days(h1_adx, h4_adx, h4_atr, d1_adx)
 
     if not new_scores:
         print("[WARN] スコアが空です")
@@ -528,11 +596,15 @@ def main():
 
     print("\n  --- スコアサマリー ---")
     for s in new_scores:
-        print(f"  {s['date']}:"
-              f"  v1={s['score']:5.1f}"
-              f"  v3={s['score_v3']:5.1f} [{s['band_v3']:7s}] {s['comment_v3']}"
-              f"  phase={s['atr_phase']}"
-              f"  vel_pos={s['vel_pos_pct']:.0f}%")
+        print(
+            f"  {s['date']}:"
+            f"  v3={s['score_v3']:5.1f} [{s['band_v3']:7s}]"
+            f"  TIER={s.get('tier','?'):2s}"
+            f"  D1={s.get('d1_phase','?'):4s}"
+            f"  H4w={s.get('h4_wave','?'):4s}"
+            f"  ATR={s.get('atr_class','?'):8s}"
+            f"  {s['comment_v3']}"
+        )
 
     existing = load_scores()
     save_scores(existing + new_scores)

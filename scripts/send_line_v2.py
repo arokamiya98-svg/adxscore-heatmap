@@ -21,7 +21,8 @@ from datetime import datetime, timezone, timedelta
 DATA_PATH    = "data/scores.json"
 LINE_TOKEN   = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
 LINE_USER_ID = os.environ["LINE_USER_ID"]
-PAGES_URL    = os.environ.get("PAGES_URL", "https://your-user.github.io/your-repo/")
+# Secret名は PAGES_URL（GITHUB_PAGES_URL ではない）
+PAGES_URL    = os.environ.get("PAGES_URL", "") or os.environ.get("GITHUB_PAGES_URL", "")
 
 JST = timezone(timedelta(hours=9))
 
@@ -104,6 +105,29 @@ def v1_score_label(score: float) -> str:
     elif score >= 40: return "普通 🔶"
     elif score >= 24: return "様子見 ⚠️"
     else:             return "NG ❌"
+
+
+# ── フッター生成（URLある時だけボタン表示）────────────
+def build_footer() -> dict:
+    base = {
+        "type": "box",
+        "layout": "vertical",
+        "backgroundColor": "#0d1117",
+        "paddingAll": "10px",
+    }
+    if PAGES_URL and PAGES_URL.startswith("http"):
+        base["contents"] = [
+            {"type": "button",
+             "action": {"type": "uri", "label": "📊 週次レポートを見る",
+                        "uri": PAGES_URL},
+             "style": "primary", "color": "#d4af37", "height": "sm"},
+        ]
+    else:
+        base["contents"] = [
+            {"type": "text", "text": "ARO-ADX Score System",
+             "size": "xs", "color": "#444444", "align": "center"},
+        ]
+    return base
 
 
 # ── Page1: v3スコア Bubble ────────────────────────────
@@ -236,18 +260,7 @@ def build_bubble_v3(records: list[dict]) -> dict:
                 *history_rows,
             ],
         },
-        "footer": {
-            "type": "box",
-            "layout": "vertical",
-            "backgroundColor": "#0d1117",
-            "paddingAll": "10px",
-            "contents": [
-                {"type": "button",
-                 "action": {"type": "uri", "label": "📊 週次レポートを見る",
-                            "uri": PAGES_URL},
-                 "style": "primary", "color": "#d4af37", "height": "sm"},
-            ],
-        },
+        "footer": build_footer(),
     }
     return bubble
 
@@ -365,18 +378,7 @@ def build_bubble_v1(records: list[dict]) -> dict:
                 *history_rows,
             ],
         },
-        "footer": {
-            "type": "box",
-            "layout": "vertical",
-            "backgroundColor": "#0d1117",
-            "paddingAll": "10px",
-            "contents": [
-                {"type": "button",
-                 "action": {"type": "uri", "label": "📊 週次レポートを見る",
-                            "uri": PAGES_URL},
-                 "style": "primary", "color": "#d4af37", "height": "sm"},
-            ],
-        },
+        "footer": build_footer(),
     }
     return bubble
 
