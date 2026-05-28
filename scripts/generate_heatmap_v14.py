@@ -1,0 +1,516 @@
+#!/usr/bin/env python3
+"""
+generate_heatmap_v14.py
+────────────────────────
+v14デザイン（Claude Chat製）を使って weekly_waves.json + scores.json から
+docs/heatmap_v14.html を動的生成する。
+
+v14の特徴:
+  - JetBrains Mono フォント
+  - D1 Fibo Zone / D1 Phase / H4 Wave / H4 ADX×DIマトリクス / H1 Score+TIER
+  - ADX<20 = off（枠線なし）/ ADX≥20 = on（下枠線）
+  - H4 ADX×DI: RNG灰 / MID(20-35)明色 / HOT(≥35)沈み色
+  - スパンセル（同じ状態が続く間はcolspan）
+"""
+
+import json, os
+from datetime import datetime
+from collections import defaultdict, Counter
+
+BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WAVES_JSON  = os.path.join(BASE_DIR, "data", "weekly_waves.json")
+SCORES_JSON = os.path.join(BASE_DIR, "data", "scores.json")
+OUT_HTML    = os.path.join(BASE_DIR, "docs", "heatmap_v14.html")
+
+def load_json(path):
+    if not os.path.exists(path): return []
+    with open(path, encoding="utf-8") as f: return json.load(f)
+
+def aggregate_scores(records):
+    weeks = defaultdict(list)
+    for r in records:
+        dt  = datetime.strptime(r["date"], "%Y-%m-%d")
+        iso = dt.isocalendar()
+        wk  = f"{iso.year}-W{iso.week:02d}"
+        weeks[wk].append(r)
+    result = {}
+    for wk, recs in weeks.items():
+        scores = [r.get("score_v3", r.get("score", 0)) for r in recs]
+        h1adxs = [r.get("h1_avg_adx", 0) for r in recs]
+        def mc(lst):
+            lst = [x for x in lst if x]
+            return Counter(lst).most_common(1)[0][0] if lst else "—"
+        result[wk] = {
+            "score_v3":  round(sum(scores)/len(scores), 1),
+            "h1_adx":    round(sum(h1adxs)/len(h1adxs), 1),
+            "band_v3":   mc([r.get("band_v3") for r in recs]),
+            "atr_phase": mc([r.get("atr_phase") for r in recs]),
+        }
+    return result
+
+def merge_data(wave_data, score_data):
+    result = {}
+    wave_by_wk = {w["week"]: w for w in wave_data}
+    all_weeks = set(w["week"] for w in wave_data) | set(score_data.keys())
+    for wk in sorted(all_weeks):
+        w = wave_by_wk.get(wk, {})
+        s = score_data.get(wk, {})
+        result[wk] = {
+            "week":          wk,
+            "fib_zone":      w.get("fib_zone", "—"),
+            "fib_pos":       w.get("fib_pos"),
+            "fib_days_to_end": w.get("fib_days_to_end"),
+            "fib_anchor":    w.get("fib_anchor", "—"),
+            "d1_pattern":    w.get("d1_pattern", "—"),
+            "d1_adx22":      w.get("d1_adx22"),
+            "d1_di_dir":     w.get("d1_di_dir", "—"),
+            "d1_di_plus":    w.get("d1_di_plus"),
+            "d1_di_minus":   w.get("d1_di_minus"),
+            "d1_di_spread":  w.get("d1_di_spread"),
+            "d1_atr_trend":  w.get("d1_atr_trend", "—"),
+            "h4_pattern":    w.get("h4_pattern", "—"),
+            "h4_adx46":      w.get("h4_adx46"),
+            "h4_di_dir":     w.get("h4_di_dir", "—"),
+            "h4_di_plus":    w.get("h4_di_plus"),
+            "h4_di_minus":   w.get("h4_di_minus"),
+            "h4_di_spread":  w.get("h4_di_spread"),
+            "h4_atr_cross":  w.get("h4_atr_cross", "—"),
+            "atr_class":     w.get("atr_class", "—"),
+            "atr_phase":     s.get("atr_phase") or w.get("d1_atr_zone", "—"),
+            "tier":          w.get("tier", "—"),
+            "phase_align":   w.get("phase_align", "—"),
+            # ADXスコア（MT5直接 / ADX_Weekly_Above_v4.csv由来）
+            "adx_score":     w.get("adx_score"),
+            "h1_avg_adx":    w.get("h1_avg_adx"),
+            "h4_pct20":      w.get("h4_pct20"),
+            "h4_pct25":      w.get("h4_pct25"),
+            "h1_pct20":      w.get("h1_pct20"),
+        }
+    return result
+
+def current_iso_week():
+    iso = datetime.now().isocalendar()
+    return f"{iso.year}-W{iso.week:02d}"
+
+def generate_html(merged: dict) -> str:
+    all_weeks = sorted(merged.keys())
+    # 2024年以降のみ表示
+    weeks = [wk for wk in all_weeks if wk >= "2024-W01"]
+    data_js = json.dumps([merged[w] for w in weeks], ensure_ascii=False)
+    cur_week = current_iso_week()
+    # curが範囲内になければ最新週
+    if cur_week not in merged:
+        cur_week = weeks[-1] if weeks else "2026-W01"
+
+    return f"""<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>XAUUSD マルチレイヤー 状態遷移マップ v14</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+*{{box-sizing:border-box;margin:0;padding:0;}}
+:root{{
+  --bg:#05090f;--bg2:#080d16;--bg3:#0a1020;
+  --bdr:#0b1825;--bdr2:#162844;
+  --dim:#2a4a6a;--mid:#4a7aaa;--hi:#8abaee;
+  --now:#FFD700;
+}}
+body{{
+  font-family:'JetBrains Mono','Noto Sans JP',monospace;
+  background:var(--bg);color:var(--hi);
+  min-height:100vh;padding:14px 10px;
+}}
+.hdr h1{{font-size:1.0rem;font-weight:700;color:#5a9adf;letter-spacing:.05em;text-transform:uppercase;}}
+.hdr .sub{{font-size:.6rem;color:var(--dim);margin-top:2px;margin-bottom:12px;}}
+
+.cards{{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}}
+.card{{background:var(--bg2);border:1px solid var(--bdr2);border-radius:6px;padding:7px 11px;min-width:82px;text-align:center;}}
+.card .lb{{font-size:.5rem;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;}}
+.card .vl{{font-size:1.1rem;font-weight:700;margin-top:2px;}}
+.card .nt{{font-size:.52rem;color:var(--mid);margin-top:1px;}}
+
+.scroll{{overflow-x:auto;-webkit-overflow-scrolling:touch;}}
+.hm{{border-collapse:collapse;min-width:max-content;font-size:.65rem;}}
+.hm th,.hm td{{border:1px solid var(--bdr);white-space:nowrap;vertical-align:middle;}}
+.hm .rl{{position:sticky;left:0;z-index:10;min-width:108px;padding:4px 8px;text-align:left;font-size:.56rem;font-weight:700;letter-spacing:.04em;border-right:2px solid var(--bdr2);}}
+
+.yr-l{{background:var(--bg);color:var(--dim);}}
+.yr{{background:var(--bg);color:var(--dim);font-size:.54rem;text-align:center;padding:2px;min-width:50px;}}
+.yr.hy{{color:#3a6aaa;border-left:1px solid #1a3a5a;}}
+.yr.nw{{color:var(--now);border-left:1px solid #FFD70044;border-right:1px solid #FFD70044;}}
+
+.wl{{background:#050a14;border-bottom:2px solid var(--bdr2);}}
+.wk{{background:#050a14;color:#3a6aaa;font-size:.56rem;font-weight:600;text-align:center;padding:3px 2px;min-width:50px;line-height:1.3;}}
+.wk.nw{{background:#1a1400;color:var(--now);border-left:2px solid #FFD70044!important;border-right:2px solid #FFD70044!important;}}
+
+.c{{padding:4px 2px;text-align:center;cursor:default;transition:filter .1s;line-height:1.25;min-width:50px;}}
+.c:hover{{filter:brightness(1.5);}}
+.c.nw{{border-left:2px solid #FFD70033!important;border-right:2px solid #FFD70033!important;}}
+.cm{{font-size:.68rem;font-weight:700;padding:4px 5px;letter-spacing:.02em;}}
+
+/* ═══ FibTZ 予測 (BU/PD) ═══ */
+.ft-BU{{background:#001a38;color:#5ab8ff;border-color:#1a5090;font-weight:700;letter-spacing:.04em;}}
+.ft-PD{{background:#1e0410;color:#f07080;border-color:#601828;font-weight:700;letter-spacing:.04em;}}
+.ft-X {{background:#050a14;color:#1e3a5f;}}
+
+/* ═══ D1 PHASE ═══ */
+.d-BU-on {{background:#001835;color:#64b5f6;border-color:#1a4a8a;border-bottom:3px solid #4a9aff!important;}}
+.d-BU-off{{background:#000e1a;color:#1e4a6a;border-color:#0a2040;}}
+.d-PD-on {{background:#200008;color:#ef6060;border-color:#5a0a0a;border-bottom:3px solid #ef4040!important;}}
+.d-PD-off{{background:#100004;color:#4a1515;border-color:#280006;}}
+.d-X     {{background:#050a14;color:#1e3a5f;}}
+
+/* ═══ H4 WAVE ═══ */
+.h-BU-on {{background:#001e10;color:#4dffa0;border-color:#0a4025;border-bottom:3px solid #00e676!important;}}
+.h-BU-off{{background:#001208;color:#1a5a30;border-color:#063020;}}
+.h-PD-on {{background:#1a0630;color:#b07af8;border-color:#3a1060;border-bottom:3px solid #9050f0!important;}}
+.h-PD-off{{background:#0d0320;color:#301050;border-color:#1a0840;}}
+.h-X     {{background:#050a0e;color:#122820;}}
+
+/* ═══ H4 ADX×DI マトリクス ═══ */
+.ax-RNG     {{background:#0a1018;color:#5a6a7a;border-color:#1a2030;}}
+.ax-MID-up  {{background:#0a3a8a;color:#9ecbff;border-color:#3a7ad0;box-shadow:inset 0 0 8px rgba(80,160,255,.35);font-weight:800;}}
+.ax-MID-dn  {{background:#7a0e1e;color:#ffb0b0;border-color:#c93040;box-shadow:inset 0 0 8px rgba(255,100,100,.35);font-weight:800;}}
+.ax-MID-flat{{background:#202028;color:#a0a8b0;border-color:#3a3a48;font-weight:800;}}
+.ax-HOT-up  {{background:#002060;color:#70b8ff;border-color:#2070c8;border-top:2px solid #ffa726!important;box-shadow:inset 0 0 10px rgba(60,130,255,.45);font-weight:800;}}
+.ax-HOT-dn  {{background:#620018;color:#ff8898;border-color:#aa2035;border-top:2px solid #ffa726!important;box-shadow:inset 0 0 10px rgba(255,80,100,.45);font-weight:800;}}
+.ax-HOT-flat{{background:#181825;color:#a0a0b8;border-color:#28283a;border-top:2px solid #ffa72666!important;font-weight:800;}}
+.ax-warn{{font-size:.44rem;color:#ffa726;line-height:1;}}
+.ax-X       {{background:#050a0e;color:#122820;}}
+
+/* ═══ H1 SCORE ═══ */
+.s-hot {{background:#1e1600;color:#FFD700;}}
+.s-good{{background:#001e08;color:#69F0AE;}}
+.s-ok  {{background:#001428;color:#82AAFF;}}
+.s-low {{background:#1e0e00;color:#FFA726;}}
+.s-cold{{background:#120404;color:#6a3030;}}
+.s-X   {{background:#050a0e;color:#122820;}}
+
+.bt{{display:inline-block;padding:1px 5px;border-radius:3px;font-size:.5rem;font-weight:700;margin-bottom:1px;}}
+.bt-S{{background:#2a1f00;color:#FFD700;}}
+.bt-A{{background:#003320;color:#00E676;}}
+.bt-Ax{{background:#002b33;color:#00BCD4;}}
+.bt-B{{background:#001533;color:#42A5F5;}}
+.bt-C{{background:#2d1700;color:#FFA726;}}
+.bt-D{{background:#200404;color:#ef6060;}}
+
+.bn-GOOD{{color:#FFD700;font-weight:700;font-size:.48rem;}}
+.bn-WATCH{{color:#FFA726;font-size:.48rem;}}
+.bn-CAUTION{{color:#ef9a9a;font-size:.48rem;}}
+
+tr.ld .rl{{background:#060c1a;border-right-color:#1a3a6a;color:#3a6aaa;}}
+tr.lh .rl{{background:#050f0a;border-right-color:#0a3a1a;color:#2a7a3a;}}
+tr.l1 .rl{{background:#0d0c04;border-right-color:#3a2a00;color:#7a6a00;}}
+tr.la .rl{{background:#060c12;border-right-color:#0a2a3a;color:#2a6a8a;}}
+
+.leg{{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;padding:10px 12px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:8px;}}
+.leg-s h3{{font-size:.52rem;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}}
+.leg-r{{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:2px;}}
+.lc{{padding:2px 7px;border-radius:3px;font-size:.58rem;font-weight:700;}}
+.ld2{{font-size:.52rem;color:var(--dim);line-height:1.6;}}
+
+::-webkit-scrollbar{{height:4px;}}
+::-webkit-scrollbar-track{{background:var(--bg);}}
+::-webkit-scrollbar-thumb{{background:#1a3a5a;border-radius:2px;}}
+.upd{{font-size:.5rem;color:var(--dim);margin-top:6px;text-align:right;}}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>XAUUSD マルチレイヤー 状態遷移マップ <span style="color:#1e4a8a">v14</span></h1>
+  <div class="sub">H4 ADXマトリクス：MID(&lt;20)=レンジ帯 / HIGH(20-35)=スイートスポット（青=DI+ 赤=DI−）/ <span style="color:#ffa726">⚠ HOT(≥35)=加熱帯・逆行リスク</span></div>
+</div>
+
+<div class="cards" id="cards"></div>
+
+<div class="scroll">
+  <table class="hm" id="hm"></table>
+</div>
+
+<div class="leg">
+  <div class="leg-s">
+    <h3>🌀 FibTZ 予測</h3>
+    <div class="leg-r">
+      <span class="lc ft-BU">BU</span>
+      <span class="lc ft-PD">PD</span>
+    </div>
+    <div class="ld2">収束点からの予測BU/PD期（整合率88%）<br>D1 Phaseとのズレが確認ポイント</div>
+  </div>
+  <div class="leg-s">
+    <h3>🌍 D1 Phase</h3>
+    <div class="leg-r">
+      <span class="lc d-BU-on" style="border-bottom:3px solid #4a9aff">BU ON</span>
+      <span class="lc d-BU-off">BU off</span>
+      <span class="lc d-PD-on" style="border-bottom:3px solid #ef4040">PD ON</span>
+      <span class="lc d-PD-off">PD off</span>
+    </div>
+    <div class="ld2">下枠線=ADX(22)≥20 → トレンドON</div>
+  </div>
+  <div class="leg-s">
+    <h3>📈 H4 Wave</h3>
+    <div class="leg-r">
+      <span class="lc h-BU-on" style="border-bottom:3px solid #00e676">BU ON</span>
+      <span class="lc h-BU-off">BU off</span>
+      <span class="lc h-PD-on" style="border-bottom:3px solid #9050f0">PD ON</span>
+      <span class="lc h-PD-off">PD off</span>
+      <span class="lc h-X">—</span>
+    </div>
+    <div class="ld2">下枠線=ADX(46)≥20 → トレンドON</div>
+  </div>
+  <div class="leg-s">
+    <h3>📊 H4 ADX×DI マトリクス</h3>
+    <div class="leg-r">
+      <span class="lc ax-RNG">MID&lt;20</span>
+      <span class="lc ax-MID-up">HIGH DI+</span>
+      <span class="lc ax-MID-dn">HIGH DI−</span>
+      <span class="lc ax-HOT-up">HOT DI+</span>
+      <span class="lc ax-HOT-dn">HOT DI−</span>
+    </div>
+    <div class="ld2">MID(&lt;20)=レンジ帯・方向なし ／ HIGH(20-35)=スイートスポット ／ <span style="color:#ffa726">⚠ HOT(≥35)=加熱帯・逆行リスク上昇</span><br>青=DI+優勢(BUY) ／ 赤=DI−優勢(SELL)</div>
+  </div>
+  <div class="leg-s">
+    <h3>⚡ ADX Score（結果評価）</h3>
+    <div class="leg-r">
+      <span class="lc s-hot" style="font-size:.65rem;font-weight:900;padding:2px 7px">≥75</span>
+      <span class="lc s-good" style="padding:2px 6px">≥60</span>
+      <span class="lc s-ok" style="padding:2px 6px">≥45</span>
+      <span class="lc s-low" style="padding:2px 6px">≥30</span>
+      <span class="lc s-cold" style="padding:2px 6px">&lt;30</span>
+    </div>
+    <div class="ld2">H1_AvgADX × H4_Pct≥20 幾何平均 × H4_Pct≥25ボーナス<br>週次トレンド強度の背景フィルター（MT5直接・過去BTとの照合用）<br>※ H4 ADX(46)は平滑化強いため閾値25を採用</div>
+  </div>
+  <div class="leg-s">
+    <h3>🎯 適正スコア（先行指標）</h3>
+    <div class="leg-r">
+      <span class="lc bt bt-S" style="font-size:.6rem">S</span>
+      <span class="lc bt bt-A" style="font-size:.6rem">A</span>
+      <span class="lc bt bt-Ax" style="font-size:.6rem">A*</span>
+      <span class="lc bt bt-B" style="font-size:.6rem">B</span>
+      <span class="lc bt bt-C" style="font-size:.6rem">C</span>
+      <span class="lc bt bt-D" style="font-size:.6rem">D</span>
+    </div>
+    <div class="ld2">D1局面 × H4波形 × ATRクラスで決まるTier<br>ATRの落ち着き状態を見るエントリー先行指標（ADXスコアとは独立）</div>
+  </div>
+</div>
+<div class="upd" id="upd"></div>
+
+<script>
+const W={data_js};
+const CUR="{cur_week}";
+
+function w2m(wk){{const[y,w]=wk.split('-W').map(Number);const j4=new Date(y,0,4);const d=j4.getDay()||7;const m=new Date(j4.getTime()-(d-1)*86400000);return new Date(m.getTime()+(w-1)*7*86400000);}}
+function fd(d){{return`${{d.getMonth()+1}}/${{d.getDate()}}`;}}
+
+// FibTZ: 予測BU/PD判定（BU_EARLY/BU_LATE/BU_CONT=BU、それ以外=PD）
+function fibtzClass(zone){{
+  if(!zone||zone==='—')return{{cls:'ft-X',lbl:'—'}};
+  const isBU=['BU_EARLY','BU_LATE','BU_CONT'].includes(zone);
+  return{{cls:isBU?'ft-BU':'ft-PD',lbl:isBU?'BU':'PD'}};
+}}
+const TIER_C={{S:'bt-S',A:'bt-A','A*':'bt-Ax',B:'bt-B',C:'bt-C',D:'bt-D'}};
+
+function diTag(pat,sp){{
+  if(!pat||pat==='—')return'—';
+  const a=sp!=null?Math.abs(sp):0;
+  return(pat==='BU'?'↑':'↓')+(a>15?'強':a>7?'中':'弱');
+}}
+
+function h4AdxClass(adx,diPlus,diMinus){{
+  if(adx==null)return{{cls:'ax-X',lbl:'—'}};
+  let dir='flat';
+  if(diPlus!=null&&diMinus!=null){{
+    const sp=diPlus-diMinus;
+    if(Math.abs(sp)<=2)dir='flat';
+    else dir=sp>0?'up':'dn';
+  }}
+  if(adx<20)return{{cls:'ax-RNG',lbl:'MID'}};
+  const zone=adx<35?'HIGH':'HOT';
+  const cls=adx<35?`ax-MID-${{dir}}`:`ax-HOT-${{dir}}`;
+  return{{cls,lbl:zone}};
+}}
+
+function runs(arr,fn){{
+  const r=[];let i=0;
+  while(i<arr.length){{
+    const v=fn(arr[i]);let j=i+1;
+    while(j<arr.length&&fn(arr[j])===v)j++;
+    r.push({{s:i,e:j-1,v,n:j-i}});i=j;
+  }}
+  return r;
+}}
+function spanMap(rns,N){{
+  const m=new Array(N).fill(null);
+  rns.forEach(r=>{{for(let i=r.s;i<=r.e;i++){{m[i]=i===r.s?{{sp:r.n,r}}:'X';}}
+  }});
+  return m;
+}}
+
+function buildCards(){{
+  const c=W.find(w=>w.week===CUR)||W[W.length-1];
+  const el=document.getElementById('cards');
+  const ti={{S:{{f:'#FFD700',b:'#1e1600',n:'WR89%'}},A:{{f:'#00E676',b:'#003320',n:'WR70%'}},'A*':{{f:'#00BCD4',b:'#002b33',n:'WR65%'}},B:{{f:'#42A5F5',b:'#001533',n:'WR51%'}},C:{{f:'#FFA726',b:'#1e0e00',n:'WR44%'}},D:{{f:'#ef6060',b:'#120404',n:'WR39%'}}}};
+  const t=ti[c.tier]||{{f:'#4a7aaa',b:'#080d16',n:'—'}};
+  const ax=h4AdxClass(c.h4_adx46,c.h4_di_plus,c.h4_di_minus);
+  const axFg=ax.cls==='ax-RNG'?'#5a6a7a':ax.cls==='ax-MID-up'?'#9ecbff':ax.cls==='ax-MID-dn'?'#ffb0b0':ax.cls==='ax-HOT-up'?'#70b8ff':ax.cls==='ax-HOT-dn'?'#ff8898':'#a0a0b8';
+  const axBg=ax.cls==='ax-RNG'?'#0a1018':ax.cls==='ax-MID-up'?'#0a3a8a':ax.cls==='ax-MID-dn'?'#7a0e1e':ax.cls==='ax-HOT-up'?'#002060':ax.cls==='ax-HOT-dn'?'#620018':'#181825';
+  [
+    {{lb:'現在週',v:CUR.replace('-W',' W'),n:'',f:'#7ab8ff',b:'#080d16'}},
+    {{lb:'TIER',v:c.tier||'—',n:t.n,f:t.f,b:t.b}},
+    {{lb:'D1 Phase',v:c.d1_pattern||'—',n:`ADX${{c.d1_adx22!=null?c.d1_adx22.toFixed(0):'?'}} ${{c.d1_adx22>=20?'ON':'off'}}`,f:c.d1_pattern==='BU'?'#64b5f6':'#ef6060',b:c.d1_pattern==='BU'?'#001835':'#200008'}},
+    {{lb:'H4 Wave',v:c.h4_pattern||'—',n:`ADX${{c.h4_adx46!=null?c.h4_adx46.toFixed(0):'?'}}`,f:c.h4_pattern==='BU'?'#4dffa0':'#b07af8',b:c.h4_pattern==='BU'?'#001e10':'#1a0630'}},
+    {{lb:'H4 ADX×DI',v:(ax.lbl==='HOT'?'⚠ ':'')+ax.lbl,n:c.h4_adx46!=null?`${{c.h4_adx46.toFixed(0)}} DI±${{c.h4_di_plus?.toFixed(0)}}/${{c.h4_di_minus?.toFixed(0)}}`:'—',f:axFg,b:axBg}},
+    {{lb:'ADX Score',v:c.adx_score!=null?c.adx_score:'—',n:c.h1_avg_adx!=null?`H1ADX ${{c.h1_avg_adx.toFixed(1)}} / H4≥25:${{c.h4_pct25?.toFixed(0)}}%`:'MT5データ待ち',f:c.adx_score>=75?'#FFD700':c.adx_score>=60?'#69F0AE':c.adx_score>=45?'#82AAFF':c.adx_score>=30?'#FFA726':'#6a3030',b:c.adx_score>=75?'#1e1600':c.adx_score>=60?'#001e08':'#001428'}},
+  ].forEach(x=>{{
+    const d=document.createElement('div');d.className='card';
+    d.style.background=x.b;d.style.borderColor=(x.f||'#1e3d70')+'44';
+    d.innerHTML=`<div class="lb">${{x.lb}}</div><div class="vl" style="color:${{x.f}}">${{x.v}}</div><div class="nt">${{x.n}}</div>`;
+    el.appendChild(d);
+  }});
+}}
+
+function buildTable(){{
+  const t=document.getElementById('hm');
+  const N=W.length;
+  // FibTZ: "-"週は後続の値で前向き埋め（節目扱い）
+  const _fza=W.map(w=>w.fib_zone||'');
+  for(let i=_fza.length-2;i>=0;i--){{if(!_fza[i]||_fza[i]==='—')_fza[i]=_fza[i+1]||'';}}
+  const fibFilled={{}};W.forEach((w,i)=>{{fibFilled[w.week]=_fza[i];}});
+  const fibM=spanMap(runs(W,w=>fibtzClass(fibFilled[w.week]).cls),N);
+  const d1M=spanMap(runs(W,w=>w.d1_pattern+'|'+(w.d1_adx22!=null&&w.d1_adx22>=20?'1':'0')),N);
+  const h4M=spanMap(runs(W,w=>(w.h4_pattern||'—')+'|'+(w.h4_adx46!=null&&w.h4_adx46>=20?'1':'0')),N);
+  const axM=spanMap(runs(W,w=>h4AdxClass(w.h4_adx46,w.h4_di_plus,w.h4_di_minus).cls),N);
+  function mk(tag,cls){{const e=document.createElement(tag);if(cls)e.className=cls;return e;}}
+
+  // 年行
+  {{const tr=mk('tr');tr.appendChild(Object.assign(mk('th','rl yr-l'),{{textContent:''}}));
+   W.forEach((w,i)=>{{
+     const yr=w.week.split('-W')[0];const py=i>0?W[i-1].week.split('-W')[0]:null;
+     const nw=w.week===CUR;
+     const td=mk('td','yr'+(yr!==py?' hy':'')+(nw?' nw':''));
+     if(yr!==py)td.textContent=yr;
+     tr.appendChild(td);
+   }});t.appendChild(tr);}}
+
+  // 週行
+  {{const tr=mk('tr');tr.appendChild(Object.assign(mk('th','rl wl'),{{textContent:'週'}}));
+   W.forEach(w=>{{
+     const nw=w.week===CUR;const td=mk('td','wk'+(nw?' nw':''));
+     const m=w2m(w.week);td.innerHTML=`W${{w.week.split('-W')[1]}}<br><span style="font-size:.48rem">${{fd(m)}}</span>`;
+     tr.appendChild(td);
+   }});t.appendChild(tr);}}
+
+  const ROWS=[
+    {{key:'fib',lb:'🌀 FibTZ 予測',rc:'ld',sm:fibM,fn(w){{
+      const zone=fibFilled[w.week];
+      const r=fibtzClass(zone);
+      const pos=w.fib_pos!=null?w.fib_pos.toFixed(2):'—';
+      return{{cls:'c cm '+r.cls,
+        html:r.lbl,
+        tip:`FibTZ予測:${{r.lbl}} raw:${{zone||'—'}} pos:${{pos}} anchor:${{w.fib_anchor||'—'}}`}};}} }},
+    {{key:'d1',lb:'🌍 D1 Phase',rc:'ld',sm:d1M,fn(w){{
+      const on=w.d1_adx22!=null&&w.d1_adx22>=20;
+      const p=w.d1_pattern;
+      const cl=p==='BU'?(on?'d-BU-on':'d-BU-off'):p==='PD'?(on?'d-PD-on':'d-PD-off'):'d-X';
+      const adx=w.d1_adx22!=null?w.d1_adx22.toFixed(0):'?';
+      return{{cls:'c cm '+cl,
+        html:`${{p||'—'}}<br><span style="font-size:.48rem;opacity:.7">${{adx}} ${{diTag(p,w.d1_di_spread)}}</span>`,
+        tip:`D1:${{p}} ADX${{adx}} DI+${{w.d1_di_plus?.toFixed(1)}} DI-${{w.d1_di_minus?.toFixed(1)}}`}};}} }},
+    {{key:'h4',lb:'📈 H4 Wave',rc:'lh',sm:h4M,fn(w){{
+      const on=w.h4_adx46!=null&&w.h4_adx46>=20;
+      const p=w.h4_pattern;
+      const cl=(!p||p==='—')?'h-X':p==='BU'?(on?'h-BU-on':'h-BU-off'):(on?'h-PD-on':'h-PD-off');
+      const adx=w.h4_adx46!=null?w.h4_adx46.toFixed(0):'—';
+      return{{cls:'c cm '+cl,
+        html:`${{p||'—'}}<br><span style="font-size:.48rem;opacity:.7">${{adx}} ${{diTag(p,w.h4_di_spread)}}</span>`,
+        tip:`H4:${{p}} ADX${{adx}} DI+${{w.h4_di_plus?.toFixed(1)}} DI-${{w.h4_di_minus?.toFixed(1)}}`}};}} }},
+    {{key:'ax',lb:'📊 H4 ADX×DI',rc:'lh',sm:axM,fn(w){{
+      const r=h4AdxClass(w.h4_adx46,w.h4_di_plus,w.h4_di_minus);
+      const adx=w.h4_adx46!=null?w.h4_adx46.toFixed(0):'—';
+      const dp=w.h4_di_plus!=null?w.h4_di_plus.toFixed(0):'?';
+      const dm=w.h4_di_minus!=null?w.h4_di_minus.toFixed(0):'?';
+      const hot=r.lbl==='HOT';
+      const warn=hot?`<span class="ax-warn">⚠ 加熱</span><br>`:'';
+      return{{cls:'c cm '+r.cls,
+        html:`${{warn}}${{r.lbl}}<br><span style="font-size:.48rem;opacity:.7">${{adx}} +${{dp}}/-${{dm}}</span>`,
+        tip:`H4 ADX:${{adx}} DI+${{dp}} DI-${{dm}} zone:${{r.lbl}}${{hot?' ⚠逆行リスク上昇(ADX≥35)':''}}`}};}} }},
+    {{key:'adx',lb:'⚡ ADX Score',rc:'l1',sm:null,fn(w){{
+      const s=w.adx_score;
+      if(s==null)return{{cls:'c s-X',html:'—',tip:''}};
+      const sc=s>=75?'s-hot':s>=60?'s-good':s>=45?'s-ok':s>=30?'s-low':'s-cold';
+      let sz,fw,glow;
+      if(s>=75){{sz='1.0rem';fw='900';glow='text-shadow:0 0 10px #FFD70077;';}}
+      else if(s>=60){{sz='.78rem';fw='800';glow='';}}
+      else if(s>=45){{sz='.65rem';fw='700';glow='';}}
+      else if(s>=30){{sz='.58rem';fw='600';glow='';}}
+      else{{sz='.5rem';fw='400';glow='';}}
+      const h1a=w.h1_avg_adx!=null?w.h1_avg_adx.toFixed(1):'—';
+      const p20=w.h4_pct20!=null?w.h4_pct20.toFixed(0):'—';
+      const p25=w.h4_pct25!=null?w.h4_pct25.toFixed(0):'—';
+      return{{cls:'c '+sc,
+        html:`<span style="font-size:${{sz}};font-weight:${{fw}};${{glow}}">${{s}}</span>`,
+        tip:`${{w.week}} ADXスコア:${{s}} H1ADX:${{h1a}} H4≥20:${{p20}}% H4≥25:${{p25}}%（週次トレンド強度・結果評価用）`}};}} }},
+    {{key:'apt',lb:'🎯 適正スコア',rc:'la',sm:null,fn(w){{
+      const tier=w.tier;const atr=w.atr_class||'—';
+      if(!tier||tier==='—')return{{cls:'c s-X',html:'—',tip:''}};
+      const tc=TIER_C[tier]||'';
+      return{{cls:'c',
+        html:`<span class="bt ${{tc}}" style="font-size:.62rem;padding:2px 7px;letter-spacing:.04em">${{tier}}</span><br><span style="font-size:.42rem;opacity:.6;letter-spacing:.02em">${{atr}}</span>`,
+        tip:`${{w.week}} TIER:${{tier}} ATRクラス:${{atr}} D1:${{w.d1_pattern||'—'}} H4:${{w.h4_pattern||'—'}}（ATR落ち着き状態・エントリー先行指標）`}};}} }},
+  ];
+
+  ROWS.forEach(row=>{{
+    const tr=mk('tr',row.rc);
+    const lbl=mk('th','rl');lbl.textContent=row.lb;tr.appendChild(lbl);
+    if(row.sm){{
+      W.forEach((w,i)=>{{
+        const e=row.sm[i];
+        if(e==='X')return;
+        let spanHasNow=false;
+        if(e&&e.sp>1){{for(let k=e.r.s;k<=e.r.e;k++){{if(W[k].week===CUR){{spanHasNow=true;break;}}}}}}
+        else spanHasNow=(w.week===CUR);
+        const{{cls,html,tip}}=row.fn(w);
+        const td=mk('td',cls+(spanHasNow?' nw':''));
+        if(e&&e.sp>1)td.setAttribute('colspan',e.sp);
+        td.innerHTML=html;if(tip)td.title=tip;
+        tr.appendChild(td);
+      }});
+    }} else {{
+      W.forEach(w=>{{
+        const nw=w.week===CUR;
+        const{{cls,html,tip}}=row.fn(w);
+        const td=mk('td',cls+(nw?' nw':''));
+        td.innerHTML=html;if(tip)td.title=tip;
+        tr.appendChild(td);
+      }});
+    }}
+    t.appendChild(tr);
+  }});
+}}
+
+buildCards();
+buildTable();
+document.getElementById('upd').textContent=`${{W.length}}週 ／ ${{CUR}} ／ v14 生成:${{new Date().toLocaleDateString('ja-JP')}}`;
+setTimeout(()=>{{document.querySelector('.scroll').scrollLeft=99999;}},80);
+</script>
+</body>
+</html>"""
+
+def main():
+    print("📂 Loading data...")
+    wave_data = load_json(WAVES_JSON)
+    score_raw  = load_json(SCORES_JSON)
+    score_data = aggregate_scores(score_raw) if isinstance(score_raw, list) else score_raw
+
+    merged = merge_data(wave_data, score_data)
+    html   = generate_html(merged)
+
+    os.makedirs(os.path.dirname(OUT_HTML), exist_ok=True)
+    with open(OUT_HTML, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"✅ {OUT_HTML}  ({len(html):,} bytes)")
+
+if __name__ == "__main__":
+    main()
