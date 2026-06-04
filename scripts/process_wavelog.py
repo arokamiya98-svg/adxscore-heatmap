@@ -27,6 +27,7 @@ D1_CSV      = os.path.join(BASE_DIR, "mt5_data", "FractalWaveLog_D1_v3_1.csv")
 D1_WEEKLY   = os.path.join(BASE_DIR, "mt5_data", "FractalWaveLog_D1_weekly.csv")
 H4_CSV      = os.path.join(BASE_DIR, "mt5_data", "FractalWaveLog_H4_XAU.csv")
 H4_WEEKLY   = os.path.join(BASE_DIR, "mt5_data", "FractalWaveLog_H4_weekly.csv")
+H4_PHASE_AUTO_CSV = os.path.join(BASE_DIR, "mt5_data", "H4PhaseAuto_weekly.csv")  # v2 5段階
 ADX_WEEKLY  = os.path.join(BASE_DIR, "mt5_data", "ADX_Weekly_Above_v4.csv")
 ADX_WEEKLY_FALLBACK = os.path.join(BASE_DIR, "mt5_data", "ADX_Weekly_Above_v3.csv")
 OUT_JSON    = os.path.join(BASE_DIR, "data", "weekly_waves.json")
@@ -77,6 +78,52 @@ def atr_to_class(ratio: float) -> str:
     if ratio < 0.90:  return "CONTRACT"
     if ratio <= 1.10: return "NEUTRAL"
     return "EXPAND"
+
+# ── ATR 3区分ゾーン（カイ閾値・状態ラベル / 数値ではない） ────────────
+# D1: 凪 ≤0.95 / 中 0.95〜1.10 / 拡張 >1.10
+# H4: 凪 ≤0.97 / 中 0.97〜1.10 / 拡張 >1.10
+# 根拠: data/bt/PATTERN_REGIME_MAP_v2_AtrRatioDist.md（カイ分析）
+def atr_zone3(ratio, tf: str = "D1") -> str:
+    if ratio is None:
+        return "—"
+    threshold_low  = 0.95 if tf == "D1" else 0.97
+    threshold_high = 1.10
+    if ratio <= threshold_low:  return "凪"
+    if ratio >  threshold_high: return "拡張"
+    return "中"
+
+# ── H4 Phase Auto v2（5段階） ────────────────────────────────────────
+# 仕様: data/bt/h4_phase_auto_spec.md
+# 入力:
+#   atr_ratio  = ATR8 / ATR46
+#   cross_dir  = "BU" / "PD" / "NONE"（mq5側で BU/PD に統一済み）
+#   atr_diff   = ATR8 - ATR46（生値）
+# 出力: "BU" / "PD" / "凪" / "収束底" / "凪離脱" / "—"
+#
+# 凪帯（ratio ≤ 0.97）を diff で3層に細分:
+#   diff < -1.0 → 収束底 (PF 2.50 N=82, ボトムアウト前で両方向強い)
+#   diff > +1.0 → 凪離脱 (PF 0.49 N=40, ★フェイク警告)
+#   それ以外    → 凪    (PF 1.20 N=87, 中立)
+# 拡張帯（ratio > 0.97）: cross_dir に従って BU / PD（NONE は "—"）
+NAGI_RATIO_THRESH = 0.97
+NAGI_DIFF_THRESH  = 1.0
+
+def h4_phase_auto(atr_ratio, cross_dir, atr_diff):
+    if atr_ratio is None or atr_ratio <= 0:
+        return "—"
+    # 凪帯
+    if atr_ratio <= NAGI_RATIO_THRESH:
+        if atr_diff is None:
+            return "凪"
+        if atr_diff < -NAGI_DIFF_THRESH:
+            return "収束底"
+        if atr_diff >  NAGI_DIFF_THRESH:
+            return "凪離脱"
+        return "凪"
+    # 拡張帯
+    if cross_dir == "BU": return "BU"
+    if cross_dir == "PD": return "PD"
+    return "—"  # NONE
 
 # ── D1 weekly CSV 読み込み（v3.2スクリプト出力） ─────────────────────
 def load_d1_weekly(path: str) -> dict:
@@ -158,6 +205,53 @@ def load_h4_weekly(path: str) -> dict:
             "h4_atr_ratio":  atr_ratio,
             "h4_atr_class":  atr_to_class(atr_ratio) if atr_ratio is not None else "—",
             "h4_ma46_side":  safe_str(r.get("price_vs_ma46")),
+        }
+    return result
+
+# ── H4 Phase Auto CSV 読み込み（mq5 ARO_H4PhaseAuto_v1 出力） ─────────
+def load_h4_phase_auto(path: str) -> dict:
+    """
+    H4PhaseAuto_weekly.csv を読んで {iso_week: {h4_phase_auto, h4_cross_dir, h4_atr_diff, ...}} を返す。
+    エンコーディング: UTF-16（mq5 FILE_UNICODE）。
+    フィールド:
+      Week, WeekEndTime, H4_BarTime,
+      H4_ATR_Short, H4_ATR_Long, H4_ATR_Ratio, H4_ATR_Diff,
+      H4_Cross_Bars, H4_Cross_Dir, H4_Phase_Auto
+    """
+    if not os.path.exists(path):
+        return {}
+    rows = []
+    for enc in ("utf-16", "utf-8-sig", "utf-8"):
+        try:
+            with open(path, encoding=enc) as f:
+                rows = list(csv.DictReader(f))
+            break
+        except UnicodeError:
+            continue
+        except Exception:
+            continue
+    result = {}
+    for r in rows:
+        wk = r.get("Week", "").strip()
+        if not wk or not wk.startswith("20"):
+            continue
+        ratio = safe_float(r.get("H4_ATR_Ratio"))
+        diff  = safe_float(r.get("H4_ATR_Diff"))
+        cross_dir = safe_str(r.get("H4_Cross_Dir"), default="NONE")
+        # mq5 側で既に判定済みの Phase Auto を採用（再計算はせず信用）
+        # ただし py 側でも算出して整合確認できるよう、再計算結果も保持しておく
+        phase_mq5 = safe_str(r.get("H4_Phase_Auto"), default="—")
+        phase_recalc = h4_phase_auto(ratio, cross_dir, diff)
+        # 整合確認: 不一致時はログだけ出して mq5 値を優先
+        if phase_mq5 not in ("—", "") and phase_recalc != phase_mq5:
+            print(f"   ⚠️ Phase Auto mismatch [{wk}]: mq5={phase_mq5} py={phase_recalc} (ratio={ratio} diff={diff} cross={cross_dir})")
+        phase_final = phase_mq5 if phase_mq5 not in ("—", "") else phase_recalc
+        result[wk] = {
+            "h4_phase_auto":      phase_final,
+            "h4_cross_dir":       cross_dir,
+            "h4_atr_diff":        diff,
+            "h4_atr_ratio_auto":  ratio,   # 比較用（既存 h4_atr_ratio と並列保持）
+            "h4_cross_bars":      safe_float(r.get("H4_Cross_Bars")),
         }
     return result
 
@@ -300,6 +394,7 @@ def map_waves_to_weeks(d1_waves: list, h4_waves: list) -> dict:
             "d1_di_spread":  d1["di_spread"]    if d1 else None,
             "d1_atr_ratio":  d1["atr22_ratio"]  if d1 else None,
             "d1_atr_zone":   d1["atr22_zone"]   if d1 else "—",
+            "d1_atr_zone3":  atr_zone3(d1["atr22_ratio"] if d1 else None, "D1"),
             "d1_atr_trend":  d1["atr_trend"]    if d1 else "—",
             "atr_class":     atr_class,
             "phase_align":   d1["phase_align"]  if d1 else "—",
@@ -318,7 +413,9 @@ def map_waves_to_weeks(d1_waves: list, h4_waves: list) -> dict:
             "h4_di_plus":    h4["h4_di_plus"]     if h4 else None,
             "h4_di_minus":   h4["h4_di_minus"]    if h4 else None,
             "h4_di_spread":  h4["h4_di_spread"]   if h4 else None,
+            "h4_atr_ratio":  h4["atr8_ratio_end"] if h4 else None,
             "h4_atr_class":  atr_to_class(h4["atr8_ratio_end"]) if (h4 and h4["atr8_ratio_end"] is not None) else "—",
+            "h4_atr_zone3":  atr_zone3(h4["atr8_ratio_end"] if h4 else None, "H4"),
             "h4_atr_cross":  h4_atr_cross,
             "h4_ma46_side":  h4["price_vs_ma"] if h4 else "—",
             # ── TIER計算 ──
@@ -448,6 +545,7 @@ def merge_weekly_with_waves(weekly_d1: dict, d1_waves: list, h4_waves: list) -> 
             "d1_di_spread":  wd.get("d1_di_spread"),
             "d1_atr_ratio":  wd.get("d1_atr_ratio"),
             "d1_atr_zone":   d1w["atr22_zone"]  if d1w else "—",
+            "d1_atr_zone3":  atr_zone3(wd.get("d1_atr_ratio"), "D1"),
             "d1_atr_trend":  d1w["atr_trend"]   if d1w else "—",
             "atr_class":     atr_class,
             "phase_align":   d1w["phase_align"] if d1w else "—",
@@ -466,7 +564,9 @@ def merge_weekly_with_waves(weekly_d1: dict, d1_waves: list, h4_waves: list) -> 
             "h4_di_plus":    h4["h4_di_plus"]     if h4 else None,
             "h4_di_minus":   h4["h4_di_minus"]    if h4 else None,
             "h4_di_spread":  h4["h4_di_spread"]   if h4 else None,
+            "h4_atr_ratio":  h4["atr8_ratio_end"] if h4 else None,
             "h4_atr_class":  atr_to_class(h4["atr8_ratio_end"]) if (h4 and h4["atr8_ratio_end"] is not None) else "—",
+            "h4_atr_zone3":  atr_zone3(h4["atr8_ratio_end"] if h4 else None, "H4"),
             "h4_atr_cross":  h4_atr_cross,
             "h4_ma46_side":  h4["price_vs_ma"] if h4 else "—",
             # ── TIER ──
@@ -495,6 +595,11 @@ def merge_weekly_with_waves_h4(base_result: dict, h4_weekly: dict) -> dict:
         r["h4_di_plus"]   = h4w.get("h4_di_plus")   if h4w.get("h4_di_plus")  is not None else r["h4_di_plus"]
         r["h4_di_minus"]  = h4w.get("h4_di_minus")  if h4w.get("h4_di_minus") is not None else r["h4_di_minus"]
         r["h4_di_spread"] = h4w.get("h4_di_spread") if h4w.get("h4_di_spread") is not None else r["h4_di_spread"]
+        # H4 ATR ratio（週次CSV値で上書き、ない場合は据置）→ zone3 再評価
+        h4_ratio_new = h4w.get("h4_atr_ratio")
+        if h4_ratio_new is not None:
+            r["h4_atr_ratio"] = h4_ratio_new
+            r["h4_atr_zone3"] = atr_zone3(h4_ratio_new, "H4")
         r["h4_atr_class"] = h4w.get("h4_atr_class", "—") if h4w.get("h4_atr_class") not in ("—", "") else r["h4_atr_class"]
         r["h4_ma46_side"] = h4w.get("h4_ma46_side", "—") if h4w.get("h4_ma46_side") not in ("—", "") else r["h4_ma46_side"]
         # TIERも再計算
@@ -536,6 +641,36 @@ def main():
     else:
         print(f"\n⚠️  H4 週次CSVなし → H4は波形レベル値を使用")
         print("   ※ ARO_FractalWaveLog_H4_XAU_v3_1.mq5 をH4チャートで実行してください")
+
+    # ── H4 Phase Auto CSV があれば新フィールドをマージ（v2 5段階） ──────
+    h4_phase_data = load_h4_phase_auto(H4_PHASE_AUTO_CSV)
+    if h4_phase_data:
+        print(f"\n✅ H4 Phase Auto CSV: {os.path.basename(H4_PHASE_AUTO_CSV)} → 5段階Phase付与")
+        print(f"   {len(h4_phase_data)} weeks")
+        matched_pa = 0
+        for wk, row in weekly.items():
+            if wk in h4_phase_data:
+                pa = h4_phase_data[wk]
+                row["h4_phase_auto"] = pa["h4_phase_auto"]
+                row["h4_cross_dir"]  = pa["h4_cross_dir"]
+                row["h4_atr_diff"]   = pa["h4_atr_diff"]
+                # h4_atr_ratio が欠落していた週への補完（auto側 = 自動取得で確実）
+                if row.get("h4_atr_ratio") is None and pa.get("h4_atr_ratio_auto") is not None:
+                    row["h4_atr_ratio"] = pa["h4_atr_ratio_auto"]
+                    row["h4_atr_zone3"] = atr_zone3(pa["h4_atr_ratio_auto"], "H4")
+                matched_pa += 1
+            else:
+                row.setdefault("h4_phase_auto", "—")
+                row.setdefault("h4_cross_dir",  "—")
+                row.setdefault("h4_atr_diff",   None)
+        print(f"   マッチ: {matched_pa} weeks")
+    else:
+        print(f"\n⚠️  H4 Phase Auto CSV なし → 5段階Phaseは欠落")
+        print(f"   ※ ARO_H4PhaseAuto_v1.mq5 をH4チャートで実行してください")
+        for row in weekly.values():
+            row.setdefault("h4_phase_auto", "—")
+            row.setdefault("h4_cross_dir",  "—")
+            row.setdefault("h4_atr_diff",   None)
 
     print(f"\n   {len(weekly)} weeks generated")
 

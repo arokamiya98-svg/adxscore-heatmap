@@ -1,7 +1,7 @@
 # CLAUDE.md — ARO Trading Support Project
 
 > このファイルはClaude Codeが毎セッション自動参照するコンテキストファイルです。
-> 最終更新: 2026-05-28 (Handover v10 準拠 + ADXSCORE実装情報追記 + ADX_Weekly/WaveLog体制更新)
+> 最終更新: 2026-06-01 (v11: フェーズ転換明示 / 3層モデル / メンタル研究トラック追加 / MT5環境刷新 Wine 11.1)
 
 ---
 
@@ -140,28 +140,50 @@ def adx_score(h1_avg_adx, h4_pct_above20, h4_pct_above25):
 
 ## 6. プロジェクト内ファイル一覧
 
-### MQL5スクリプト（現行）
+### MQL5 収集スクリプト（mt5_data/ にCSV出力）
 
 **週次パイプライン用（毎週実行）**
 
 | ファイル | 役割 | 状態 |
 |---------|------|------|
-| `ARO_FractalWaveLog_D1_v3_1.mq5` | D1 波形レベル収集 | ✅ 現行 |
-| `ARO_FractalWaveLog_D1_v3_2.mq5` | D1 週次時系列収集（金曜サンプリング） | ✅ 現行 |
+| `ARO_FractalWaveLog_D1_v3_2.mq5` | D1 波形レベル + 週次時系列（v3_1から統合）| ✅ 現行 |
 | `ARO_FractalWaveLog_H4_XAU_v3_1.mq5` | H4 週次時系列収集 | ✅ 現行 |
-| `ADX_Weekly_Above_v4.mq5` | H1/H4 ADX週次集計 → ADX_Weekly_Above_v4.csv（H1=32, H4=46, 2027末まで対応）| ✅ 現行 |
-| `ADX_Weekly_Above_v3a.mq5` | H1/H4 ADX週次集計 旧版（H1=28, H4=30 → 周期ズレあり） | ⚠️ 旧版 |
-| `ATR_WidthSignal_v3.mq5` | H1適正スコア表示 | ✅ 現行 |
+| `ADX_Weekly_Above_v4.mq5` | H1/H4 ADX週次集計（H1=32, H4=46, 2027末まで対応）| ✅ 現行 |
+| `ADX_Weekly_Above_v3a.mq5` | 旧版（H1=28, H4=30 周期ズレ）| ⚠️ 旧版 |
 
 **データ分析用（不定期・個別実行）**
 
 | ファイル | 役割 | 状態 |
 |---------|------|------|
 | `WaveLog_Export_v1_6.mq5` | H1 波形ログ全量エクスポート（457波, 125列）| 🔬 分析用 |
-| `ATR_Velocity_Rhythm_D1_v1.mq5` | D1 ATRリズム | ✅ |
 | `ATR_BottomOut_SLTP_Design.html` | SL/TP設計UI | ✅ |
 
 > ⚠️ **WaveLog_Export_v1_6.mq5** は週次パイプラインに組み込まない。MFE/MAE・DI動態・ATR比率などのデータ分析専用。
+
+### 現用シグナル/インジ mq5（signals/ にミラー）
+
+| ファイル | チャート | 役割 | 状態 |
+|---------|---------|------|------|
+| `ATR_WidthSignal_v3bywavelog.mq5` | H1メイン | エントリーシグナル本体（wavelog参照型）| ✅ 現用 |
+| `ATR_Velocity_Rhythm_v2_NoBG.mq5` | H1 sub | ATR速度/リズム（2026-06-02 H1ADX32/H4ADX46へ更新）| ✅ 現用 |
+| `ATR_Velocity_Rhythm_D1_v1.mq5` | H4/D1 sub | ATR Vel Rhythm D1 | ✅ 現用 |
+| `ATR_Dual_v1.mq5` | 全TF sub | ATR短期×長期二本表示 | ✅ 現用 |
+| `BarCount_Drawing_v1.mq5` | 補助 | バーカウント描画 | ✅ 現用 |
+
+> オリジナルは `MT5/MQL5/Indicators/Free Indicators/` 配下。
+> 詳細・周期パラメータは `data/INVENTORY.md` 参照。
+
+### BT 関連 (data/bt/)
+
+| ファイル | 内容 | 状態 |
+|---------|------|------|
+| `data/bt/SPEC_new_BT.md` | 新規BT仕様書（v3bywavelogベース・フラット記録）| 🟢 B/C確定済 |
+| `data/bt/SLTP_design.html` | SL/TP最適解（SL=ATR_Avg×2.0, TP=SL×1.6, RR1:1.6）| 🟢 思想継承（旧周期版） |
+| `data/bt/ATR_WidthSignal_BT_v3bywavelog.mq5` | BTソース（Script型、71列）| 🟢 世代1完了 |
+| `data/bt/ATR_WidthSignal_BT_NEW.csv` | BT結果（UTF-16, 947件）| 🟢 2024-01〜2026-06 |
+| `data/bt/PATTERN_REGIME_MAP_v1.md` | 構造分析マップ（暫定v1）| 🟢 機能/死亡パターン整理 |
+
+> ⚠️ 旧BT資産（ATR_WidthSignal_BT_v3 / v3wavelog 系）は 2026-06-02 に参照禁止ゾーン `ADX２８検証ファイル/legacy_ATR_WidthSignal_BT/` へ隔離済み。新規BTは類似名コードを真似ず、[[memory: bt-analysis-principles]] に従ってゼロベースで組む（結果フィッティング禁止・構造分析優先）。BT世代1の発見は [[memory: bt-v1-findings-2026-06]] と `data/bt/PATTERN_REGIME_MAP_v1.md`。
 
 ### MT5出力CSV（→ ADXSCORE/mt5_data/ に同期）
 
@@ -212,9 +234,14 @@ ADXSCORE/
 │   ├── FractalWaveLog_H4_weekly.csv
 │   └── ADX_Weekly_Above_v4.csv        ← ADXスコア計算元（H1=32, H4=46, 閾値25）
 ├── data/
+│   ├── INVENTORY.md                   ← データ索引（鮮度・信頼度・由来）★参照ゾーン入口
+│   ├── bt/                            ← BT結果CSV + BT mq5 ソース
+│   ├── forward/                       ← 手動フォワードテスト記録
 │   └── weekly_waves.json              ← process_wavelog.py の出力（ADXスコア含む）
+├── signals/                           ← 現用シグナル/インジ mq5 ミラー（MT5本体側からコピー）
 ├── docs/
-│   └── heatmap_v14.html               ← 最終出力（GitHub Pages公開）
+│   └── heatmap_v14.html               ← 最終出力（GitHub Pages公開 / Widget Webで表示）
+├── retrospect/                        ← トレード振り返り記録
 └── scripts/
     ├── sync_mt5_data.sh               ← MT5→mt5_data/ 同期
     ├── process_wavelog.py             ← CSV→weekly_waves.json 変換（ADXスコア計算込み）
@@ -236,10 +263,9 @@ ADXSCORE/
 
 | # | チャート | スクリプト | 出力CSV |
 |---|---------|-----------|---------|
-| 1 | D1 XAUUSD | `ARO_FractalWaveLog_D1_v3_1` | FractalWaveLog_D1_v3_1.csv（波形レベル） |
-| 2 | D1 XAUUSD | `ARO_FractalWaveLog_D1_v3_2` | FractalWaveLog_D1_weekly.csv（週次時系列） |
-| 3 | H4 XAUUSD | `ARO_FractalWaveLog_H4_XAU_v3_1` | FractalWaveLog_H4_XAU.csv + H4_weekly.csv |
-| 4 | H1 XAUUSD | `ADX_Weekly_Above_v4` | ADX_Weekly_Above_v4.csv（ADXスコア元） |
+| 1 | D1 XAUUSD | `ARO_FractalWaveLog_D1_v3_2` | FractalWaveLog_D1_v3_1.csv（波形レベル）+ FractalWaveLog_D1_weekly.csv（週次時系列）|
+| 2 | H4 XAUUSD | `ARO_FractalWaveLog_H4_XAU_v3_1` | FractalWaveLog_H4_XAU.csv + H4_weekly.csv |
+| 3 | H1 XAUUSD | `ADX_Weekly_Above_v4` | ADX_Weekly_Above_v4.csv（ADXスコア元） |
 
 **Mac側：1コマンドで完結**
 
@@ -250,33 +276,86 @@ ADXSCORE/
 
 ---
 
-## 8. 現在の開発ロードマップ（v10時点）
+## 8. 現在の開発ロードマップ（v11：フェーズ転換明示）
 
-### Stage 1（最優先）: ヒートマップへのD1ラベル統合 ✅ 進行中
-- D1 Layer A/B/C ラベラー（Python試作済み）をヒートマップに統合
-- 可変幅セルでのD1ラベル描画
-- 色分けロジック：🟦（ADX強+DI+）/ 🟥（ADX強+DI-）/ ⬜（ADX弱）
-- **週次データ基盤**: D1_v3_2 / H4_v3_1 スクリプト完成・動作確認済み ✅
+### 8.0 フェーズ転換マップ（2026-06-01 明示）
 
-### Stage 2: 日次配信化
-- MT5スクリプト → CSV → LINE配信
-- 通知ロジック（クロス接近・過加熱・シグナル）
+```
+【フェーズ1：感覚での認識ツール構築】 ← 完了 ✅
+- 感覚でデータ分析 → 戦略構築 → heatmap_v14完成
+- "主観の可視化"として十分機能してきた
 
-### Stage 3: H4ラベラー拡張
+         ▼ フェーズの境目（2026-06-01）
+
+【フェーズ2：感覚をロジック化】 ← 着手中
+1. 生データ → 自動抽出ロジック化（手動トレンドライン依存からの脱却）
+2. リアルタイム化
+3. 細分化：H1目線のトレード優位性・期待値・方向性算出
+4. "感覚の可視化"をデータ収集ロジックとして再現できるかの検証
+5. 取得データのフォワードテスト
+6. ロジック・シグナル生成最適化
+```
+
+### 8.1 全体構造（3層モデル）
+
+```
+外側  ロジック化（感覚 → 自動・リアルタイム）       ← フェーズ2の新規研究トラック
+       ↓
+中間  認識ツール思想（ラベル・点数化禁止）          ← フェーズ1の成果
+       ↓
+内側  メンタル/パフォーマンス維持                  ← メンタル研究トラック（新規）
+```
+
+3つ揃って「ぶれない遂行性」が完成する。
+
+### 8.2 並列研究トラック
+
+- **ロジック化トラック**: フェーズ2の中核。感覚をロジック再現。手動線引きへの依存（[[fwd-data-pipeline-weakness]]）からの脱却。
+- **メンタル研究トラック**: 苫米地・西田・フロー理論を起点に「ぶれない遂行性」を内側から支える。外付けメンタルパートナー（おぱ）と連動して常時最適化。
+- **既存Stage 1〜5**: フェーズ2の構成要素として再解釈（下記）
+
+### 8.3 既存 Stage 1〜5（フェーズ1の到達点）
+
+#### Stage 1: ヒートマップへのD1ラベル統合 ✅ 完了 (2026-06-02時点)
+- `docs/heatmap_v14.html` に多層レイヤー実装：FibTZ予測 / D1 Phase / H4 Wave / H4 ADX×DI / ADX Score / 適正スコア
+- 現在週TIER・ADX Score・FibTZ予測の上部カード化
+- 可変幅セル + 色分けロジック（HIGH/MID/HOT × DI+/DI-）で現用化
+- **週次データ基盤**: D1_v3_2（v3_1から統合済）/ H4_v3_1 スクリプト完成・動作確認済み
+
+#### Stage 2: 日次配信化 ⏸ 保留・再構成予定
+- 元案: MT5スクリプト → CSV → LINE配信
+- 現方針: **フェーズ2「ロジック化トラック」と統合して再設計**
+- 自動データ取得（手動トレンドライン依存からの脱却）が確立してから、日次で配信すべき内容を再定義する
+
+#### Stage 3: H4ラベラー拡張
 - ATR8/46ベースで同思想を適用
 - T1〜T4をラベルとして組み込む
 
-### Stage 4: 既存ツール整合
+#### Stage 4: 既存ツール整合
 - H1適正スコアの更新（D1ラベルとの連携）
 
-### Stage 5: iPhoneウィジェット化（Scriptable）
-- **目的**: 戦略をブラさずに行うための必要な情報を常に参照できるウィジェット
-- **技術**: Scriptable（iOS/iPadOS）＋ iCloud Drive経由でMT5データを受け取る
-- **データフロー**: MT5 → CSV/JSON → iCloud Drive → Scriptable → ホーム画面
-- **2層構造**:
-  - 上段（静的・週次）: D1フェーズラベル、ATRクロス方向、FibTZ状況 → 今週どちら側で戦うかの土台
-  - 下段（動的・MT5連動）: H1 ATRゾーン、ATRパターン、ADXスコア現在値
-- **実装順**: 静的土台から作り → 動的データ連携に拡張
+#### Stage 5: iPhoneウィジェット化 ✅ 完了 (2026-06-02時点、方針転換あり)
+- **当初案**: Scriptable + Twelve Data API (`atr_monitor.js`)
+- **採用案**: **Widget Web** (iOSアプリ) で `heatmap_v14.html` を窓表示
+- **理由**: 週次マクロ前提なら、リアルタイム数値より「HTML丸ごと表示」の方が情報量・運用の楽さで有利
+- **データフロー**: GitHub Pages公開 → Widget Web で表示
+- `scriptable/atr_monitor.js` は廃案（2026-06-02削除）
+
+#### Stage 6: WIDTHSIGNAL v3bywavelog 新規BT構築 ✅ 世代1完了 (2026-06-03)
+- **目的**: 現用フラットセンサーのシグナル反応精度を測り、パターン別構造分析でフィルター候補を抽出
+- **ベース**: `signals/ATR_WidthSignal_v3bywavelog.mq5`（5パターン×BUY/SELL multi-fire）
+- **BT世代1の成果**:
+  - BTソース: `data/bt/ATR_WidthSignal_BT_v3bywavelog.mq5`（Script型、71列フラット記録）
+  - 結果CSV: `data/bt/ATR_WidthSignal_BT_NEW.csv`（947件 → 6hフィルター後481件）
+  - 分析マップ: `data/bt/PATTERN_REGIME_MAP_v1.md`（機能Top15 / 死亡Top6 / 構造的解釈）
+  - 主要発見: XAUUSDの非対称性「買いは押し目、売りは拡張」、Cross=NONE×SELL死亡帯（PF 0.21）
+  - 詳細: [[memory: bt-v1-findings-2026-06]]
+- **次セッション以降の課題**: フィルター実装BT（[[memory: bt-filter-strategy]]）、DI Velocity追加、認識ツール組み込み
+
+#### Stage 7: 構造発見の認識ツール組み込み 🟢 次の主軸
+- BT世代1の発見（PATTERN_REGIME_MAP_v1）を heatmap_v14 等に反映
+- ダメパターン削減ロジックの認識ツール化
+- DN局面サンプル蓄積（フォワード or 過去期間拡張）
 
 ---
 
@@ -295,13 +374,25 @@ ADXSCORE/
 ## 10. 技術スタック
 
 ```
-取引ツール : MetaTrader 5 (MT5) on Mac (Wine)
+取引ツール : MetaTrader 5 (MT5) on Mac (Wine 11.1)
 スクリプト : MQL5
 分析       : Python（pandas, numpy）
 可視化     : HTML / JavaScript（純粋JS、ライブラリなし）
-OS         : Mac
+ウィジェット: Widget Web (iOSアプリ) で heatmap_v14.html を表示
+OS         : Mac (macOS Ventura 13.7.8 / Intel Core m3 / 8GB)
 データ保存 : CSV（MT5 → ファイル出力）→ JSON → HTML
 ```
+
+### 参照ゾーン規約（2026-06-02 確定）
+
+```
+[正規参照]  /Users/aro/Desktop/ADXSCORE/             ← この配下のみが信頼できるソース
+[凍結・参照禁止] /Users/aro/Desktop/ADX２８検証ファイル/  ← ADX28周期の旧検証アーカイブ
+```
+
+- ADX28周期版（H1=28, H4=30）と現行（H1=32, H4=46）の混在を防ぐため、凍結ゾーンは参照しない
+- 新しいBT結果・FW記録・現用シグナルは全て `ADXSCORE/data/` または `signals/` に集約
+- 詳細索引: `data/INVENTORY.md` / マニ運用方針: `memory/project_mani-work-zone.md`
 
 ### MT5 パス（Mac）
 ```
@@ -374,6 +465,11 @@ Wave #12 | BU | 17日 | +4132pips
 15. **確定情報 > 計算予測**
 16. **ある程度の優位性で線引き**（完璧主義禁止）
 17. **配信は週次（俯瞰）と日次（行動）で役割分担**
+18. **全体構造は3層**: 外側=ロジック化／中間=認識ツール／内側=メンタル。3つ揃って「ぶれない遂行性」が完成
+19. **フェーズ転換（2026-06-01）**: フェーズ1=感覚での認識ツール（完了）／フェーズ2=ロジック化（着手）
+20. **おぱは外付けメンタルパートナー**: 結果記録係ではなくフォローアップ役。「意思（内側）+ 外付け（おぱ）」のハイブリッド最適化
+21. **感覚資産を捨てない**: フェーズ2のロジック化は感覚を再現する形で進める（一致率検証→自動化→保持の判別）
+22. **「完璧主義禁止」≠「手抜きOK」**: 不確実領域=方向性軸、確実領域=詰める、の二段構え
 
 ---
 
@@ -384,6 +480,36 @@ Wave #12 | BU | 17日 | +4132pips
 1. このCLAUDE.mdを読み込み済みとしてOK
 2. 最新CSVが渡されたらエンコーディング確認から
 3. 「何から始めますか？」より「Stage 1の〇〇から続きましょうか？」と確認
+
+---
+
+## 14. セッション引き継ぎ運用（2026-06-03導入）
+
+`.claude/hooks/` の Hook と `data/session_state/latest.md` で引き継ぎを強化する仕組み。
+
+### 自動動作（hook）
+- **SessionStart hook** (`session-start.sh`): `data/session_state/latest.md` を読み、`additionalContext` で次セッション Claude に自動投入。前回の引き継ぎ内容が初回応答前に渡る。
+- **SessionEnd hook** (`session-end.sh`): `data/session_state/archive/YYYY-MM-DD_HHMM.md` に自動スナップショット書き出し（git status / 直近変更 / Stage進捗 / 最新コミット）。`latest.md` が無い時のみ自動コピー（既存は触らない）。
+
+### Claude側ルール（手動更新）
+- **重要なセッション終了前**、または「今日はここまで」のタイミングで Claude が `data/session_state/latest.md` を手動更新する
+- 更新内容: 「今日の収穫」「次のアクション候補」「注意点」「未完課題」
+- 自動スナップショットは fallback（書かない場合の保険）
+
+### ファイル構成
+```
+.claude/
+├ settings.json          ← hooks 設定（チーム共有）
+├ settings.local.json    ← permissions（個人）
+└ hooks/
+   ├ session-start.sh    ← latest.md を Claude に注入
+   └ session-end.sh      ← 自動スナップショット書き出し
+
+data/session_state/
+├ latest.md              ← 次セッションへの引き継ぎ（Claude手動更新を推奨）
+└ archive/
+   └ YYYY-MM-DD_HHMM.md  ← 自動スナップショット履歴
+```
 
 ---
 

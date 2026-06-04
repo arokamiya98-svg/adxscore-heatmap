@@ -77,6 +77,15 @@ def merge_data(wave_data, score_data):
             "h4_atr_cross":  w.get("h4_atr_cross", "—"),
             "atr_class":     w.get("atr_class", "—"),
             "atr_phase":     s.get("atr_phase") or w.get("d1_atr_zone", "—"),
+            # ATR 3区分ゾーン（凪/中/拡張）— カイ閾値ラベル
+            "d1_atr_ratio":  w.get("d1_atr_ratio"),
+            "d1_atr_zone3":  w.get("d1_atr_zone3", "—"),
+            "h4_atr_ratio":  w.get("h4_atr_ratio"),
+            "h4_atr_zone3":  w.get("h4_atr_zone3", "—"),
+            # H4 Phase Auto v2（5段階: BU / PD / 凪 / 収束底 / 凪離脱 / —）
+            "h4_phase_auto": w.get("h4_phase_auto", "—"),
+            "h4_cross_dir":  w.get("h4_cross_dir", "—"),
+            "h4_atr_diff":   w.get("h4_atr_diff"),
             "tier":          w.get("tier", "—"),
             "phase_align":   w.get("phase_align", "—"),
             # ADXスコア（MT5直接 / ADX_Weekly_Above_v4.csv由来）
@@ -169,6 +178,25 @@ body{{
 .h-PD-off{{background:#0d0320;color:#301050;border-color:#1a0840;}}
 .h-X     {{background:#050a0e;color:#122820;}}
 
+/* ═══ ATR Zone 3区分（凪 / 中 / 拡張） ═══ */
+.az-nag{{background:#001a38;color:#5ab8ff;border-color:#1a5090;font-weight:600;}}
+.az-mid{{background:#1a1a28;color:#7a8aa0;border-color:#2a3a50;}}
+.az-exp{{background:#280008;color:#ef8080;border-color:#601020;font-weight:600;}}
+.az-X  {{background:#050a14;color:#1e3a5f;}}
+
+/* ═══ H4 Phase Auto v2（5段階: BU / PD / 凪 / 収束底 / 凪離脱 / —） ═══ */
+.hp-BU      {{background:#001a38;color:#5ab8ff;border-color:#1a5090;font-weight:700;letter-spacing:.04em;}}
+.hp-PD      {{background:#200008;color:#ef6060;border-color:#5a0a0a;font-weight:700;letter-spacing:.04em;}}
+.hp-nagi    {{background:#1a1a28;color:#9aaabc;border-color:#2a3a50;letter-spacing:.04em;}}
+.hp-syusoku {{background:#001a14;color:#5affc0;border-color:#1a6048;font-weight:700;letter-spacing:.04em;}}
+.hp-fake    {{background:#280014;color:#ffaa00;border-color:#601830;font-weight:700;letter-spacing:.04em;animation:fake-blink 2s ease-in-out infinite;}}
+.hp-X       {{background:#050a14;color:#1e3a5f;}}
+
+@keyframes fake-blink {{
+  0%,100% {{ opacity:1; }}
+  50%     {{ opacity:0.78; }}
+}}
+
 /* ═══ H4 ADX×DI マトリクス ═══ */
 .ax-RNG     {{background:#0a1018;color:#5a6a7a;border-color:#1a2030;}}
 .ax-MID-up  {{background:#0a3a8a;color:#9ecbff;border-color:#3a7ad0;box-shadow:inset 0 0 8px rgba(80,160,255,.35);font-weight:800;}}
@@ -250,7 +278,32 @@ tr.la .rl{{background:#060c12;border-right-color:#0a2a3a;color:#2a6a8a;}}
     <div class="ld2">下枠線=ADX(22)≥20 → トレンドON</div>
   </div>
   <div class="leg-s">
-    <h3>📈 H4 Wave</h3>
+    <h3>🌊 ATR Zone（凪/中/拡張）</h3>
+    <div class="leg-r">
+      <span class="lc az-nag">凪</span>
+      <span class="lc az-mid">中</span>
+      <span class="lc az-exp">拡張</span>
+      <span class="lc az-X">—</span>
+    </div>
+    <div class="ld2">D1 = ATR22/42（凪≤0.95 / 拡張&gt;1.10）／ H4 = ATR8/46（凪≤0.97 / 拡張&gt;1.10）<br>「凪」連続=フェーズ転換予兆 ／「拡張」連続=トレンド成熟期</div>
+  </div>
+  <div class="leg-s">
+    <h3>🌊 H4 Phase (Auto) ★v2</h3>
+    <div class="leg-r">
+      <span class="lc hp-BU">BU</span>
+      <span class="lc hp-PD">PD</span>
+      <span class="lc hp-nagi">凪</span>
+      <span class="lc hp-syusoku">収束底</span>
+      <span class="lc hp-fake">凪離脱</span>
+      <span class="lc hp-X">—</span>
+    </div>
+    <div class="ld2">ATR8/46 自動判定（5段階）／ 凪帯（ratio≤0.97）を ATR_Diff で細分:<br>
+      <b style="color:#5affc0">収束底</b>: diff&lt;-1.0 = ボトムアウト前（PF 2.50, BUY/SELL方向中立で強い）<br>
+      <b style="color:#ffaa00">凪離脱</b>: diff&gt;+1.0 = フェイクゾーン警告（PF 0.49）<br>
+      拡張帯（ratio&gt;0.97）: ATR8/46 クロス方向で BU/PD（D1 ATR22/42 88%整合のH4版）</div>
+  </div>
+  <div class="leg-s">
+    <h3>📈 H4 Wave (手動)</h3>
     <div class="leg-r">
       <span class="lc h-BU-on" style="border-bottom:3px solid #00e676">BU ON</span>
       <span class="lc h-BU-off">BU off</span>
@@ -380,8 +433,22 @@ function buildTable(){{
   const fibFilled={{}};W.forEach((w,i)=>{{fibFilled[w.week]=_fza[i];}});
   const fibM=spanMap(runs(W,w=>fibtzClass(fibFilled[w.week]).cls),N);
   const d1M=spanMap(runs(W,w=>w.d1_pattern+'|'+(w.d1_adx22!=null&&w.d1_adx22>=20?'1':'0')),N);
+  const d1AzM=spanMap(runs(W,w=>w.d1_atr_zone3||'—'),N);
+  const h4PaM=spanMap(runs(W,w=>w.h4_phase_auto||'—'),N);
+  const h4AzM=spanMap(runs(W,w=>w.h4_atr_zone3||'—'),N);
   const h4M=spanMap(runs(W,w=>(w.h4_pattern||'—')+'|'+(w.h4_adx46!=null&&w.h4_adx46>=20?'1':'0')),N);
   const axM=spanMap(runs(W,w=>h4AdxClass(w.h4_adx46,w.h4_di_plus,w.h4_di_minus).cls),N);
+  // ATR Zone 3区分: ラベル→CSSクラス変換
+  function azClass(z){{ if(z==='凪')return'az-nag'; if(z==='中')return'az-mid'; if(z==='拡張')return'az-exp'; return'az-X'; }}
+  // H4 Phase Auto v2 5段階: ラベル→CSSクラス変換
+  function hpClass(p){{
+    if(p==='BU')return'hp-BU';
+    if(p==='PD')return'hp-PD';
+    if(p==='凪')return'hp-nagi';
+    if(p==='収束底')return'hp-syusoku';
+    if(p==='凪離脱')return'hp-fake';
+    return'hp-X';
+  }}
   function mk(tag,cls){{const e=document.createElement(tag);if(cls)e.className=cls;return e;}}
 
   // 年行
@@ -418,7 +485,30 @@ function buildTable(){{
       return{{cls:'c cm '+cl,
         html:`${{p||'—'}}<br><span style="font-size:.48rem;opacity:.7">${{adx}} ${{diTag(p,w.d1_di_spread)}}</span>`,
         tip:`D1:${{p}} ADX${{adx}} DI+${{w.d1_di_plus?.toFixed(1)}} DI-${{w.d1_di_minus?.toFixed(1)}}`}};}} }},
-    {{key:'h4',lb:'📈 H4 Wave',rc:'lh',sm:h4M,fn(w){{
+    {{key:'d1az',lb:'🌊 D1 ATR Zone',rc:'ld',sm:d1AzM,fn(w){{
+      const z=w.d1_atr_zone3||'—';
+      const cl=azClass(z);
+      const r=w.d1_atr_ratio!=null?w.d1_atr_ratio.toFixed(2):'—';
+      return{{cls:'c cm '+cl,
+        html:z,
+        tip:`D1 ATR22/42 ratio:${{r}} zone:${{z}}（凪≤0.95 / 中 0.95〜1.10 / 拡張>1.10）`}};}} }},
+    {{key:'h4pa',lb:'🌊 H4 Phase (Auto)',rc:'lh',sm:h4PaM,fn(w){{
+      const p=w.h4_phase_auto||'—';
+      const cl=hpClass(p);
+      const r=w.h4_atr_ratio!=null?w.h4_atr_ratio.toFixed(2):'—';
+      const df=w.h4_atr_diff!=null?(w.h4_atr_diff>=0?'+':'')+w.h4_atr_diff.toFixed(2):'—';
+      const cd=w.h4_cross_dir||'—';
+      return{{cls:'c cm '+cl,
+        html:p,
+        tip:`H4 Phase Auto v2:${{p}} ratio:${{r}} diff:${{df}} cross:${{cd}}（凪帯 ratio≤0.97 を diff±1.0 で5段階）`}};}} }},
+    {{key:'h4az',lb:'🌊 H4 ATR Zone',rc:'lh',sm:h4AzM,fn(w){{
+      const z=w.h4_atr_zone3||'—';
+      const cl=azClass(z);
+      const r=w.h4_atr_ratio!=null?w.h4_atr_ratio.toFixed(2):'—';
+      return{{cls:'c cm '+cl,
+        html:z,
+        tip:`H4 ATR8/46 ratio:${{r}} zone:${{z}}（凪≤0.97 / 中 0.97〜1.10 / 拡張>1.10）`}};}} }},
+    {{key:'h4',lb:'📈 H4 Wave (手動)',rc:'lh',sm:h4M,fn(w){{
       const on=w.h4_adx46!=null&&w.h4_adx46>=20;
       const p=w.h4_pattern;
       const cl=(!p||p==='—')?'h-X':p==='BU'?(on?'h-BU-on':'h-BU-off'):(on?'h-PD-on':'h-PD-off');

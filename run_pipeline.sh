@@ -65,7 +65,19 @@ else
 fi
 echo ""
 
-# ── Step 5: ブラウザオープン ──────────────────────────────
+# ── Step 5: GitHub Pages 自動push ────────────────────────
+echo "▶ Step 5: GitHub Pages に自動push"
+cd "$(dirname "$0")"
+if git rev-parse --git-dir > /dev/null 2>&1; then
+  git add docs/heatmap_v14.html data/weekly_waves.json
+  git commit -m "weekly update $(date '+%Y-%m-%d')" 2>/dev/null || echo "  (変更なし)"
+  git push origin main && echo "🚀 GitHub Pages 更新完了！" || echo "⚠️  push 失敗（手動で git push してね）"
+else
+  echo "⚠️  git リポジトリ未設定（スキップ）"
+fi
+echo ""
+
+# ── Step 6: ブラウザオープン ──────────────────────────────
 if [ "$OPEN_BROWSER" = true ]; then
   if [ -f "$HEATMAP_PATH" ]; then
     echo "🌐 ブラウザでオープン中..."

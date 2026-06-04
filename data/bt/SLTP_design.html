@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATR BottomOut | SL/TP 設計書</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;700&display=swap');
+
+  :root {
+    --bg:       #0d1117;
+    --bg2:      #161b22;
+    --bg3:      #1c2330;
+    --border:   #2a3441;
+    --gold:     #e6a817;
+    --gold2:    #f5c842;
+    --aqua:     #4ec9b0;
+    --red:      #e06c75;
+    --white:    #e8edf2;
+    --gray:     #6a7a8a;
+    --win:      rgba(78,201,176,0.08);
+    --loss:     rgba(224,108,117,0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 300;
+    line-height: 1.7;
+    padding: 48px 24px;
+  }
+
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  /* ── ヘッダー ── */
+  .header {
+    border-left: 3px solid var(--gold);
+    padding-left: 20px;
+    margin-bottom: 48px;
+  }
+  .header .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--white);
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  .header .sub {
+    font-size: 13px;
+    color: var(--gray);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── セクション ── */
+  .section {
+    margin-bottom: 40px;
+  }
+  .section-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── カード ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+  }
+  .card.highlight {
+    border-color: var(--gold);
+    background: linear-gradient(135deg, var(--bg2) 0%, rgba(230,168,23,0.05) 100%);
+  }
+
+  /* ── コンセプトボックス ── */
+  .concept {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .concept-item {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+  }
+  .concept-item .icon {
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+  .concept-item .label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--gray);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .concept-item .val {
+    font-size: 13px;
+    color: var(--white);
+    font-weight: 700;
+  }
+  .concept-item .desc {
+    font-size: 11px;
+    color: var(--gray);
+    margin-top: 4px;
+  }
+
+  /* ── 計算式ブロック ── */
+  .formula-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--aqua);
+    border-radius: 4px;
+    padding: 16px 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    line-height: 2;
+    margin: 12px 0;
+  }
+  .formula-block .comment {
+    color: var(--gray);
+    font-size: 11px;
+  }
+  .formula-block .key {
+    color: var(--aqua);
+  }
+  .formula-block .val {
+    color: var(--gold2);
+    font-weight: 700;
+  }
+  .formula-block .note {
+    color: var(--gray);
+  }
+
+  /* ── 比較テーブル ── */
+  .compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-family: 'Space Mono', monospace;
+    margin: 12px 0;
+  }
+  .compare-table th {
+    background: var(--bg3);
+    color: var(--gold);
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .compare-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--white);
+    vertical-align: middle;
+  }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table tr.v1 td { background: var(--loss); }
+  .compare-table tr.v3 td { background: var(--win); }
+  .compare-table .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .badge.win  { background: rgba(78,201,176,0.2); color: var(--aqua); }
+  .badge.loss { background: rgba(224,108,117,0.2); color: var(--red); }
+  .badge.gold { background: rgba(230,168,23,0.2);  color: var(--gold); }
+
+  /* ── 理由ボックス ── */
+  .reason-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .reason-item {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .reason-item .r-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--aqua);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  .reason-item p {
+    font-size: 12px;
+    color: var(--gray);
+    line-height: 1.8;
+  }
+  .reason-item .em {
+    color: var(--white);
+    font-weight: 700;
+  }
+
+  /* ── 結果バナー ── */
+  .result-banner {
+    background: linear-gradient(135deg, rgba(78,201,176,0.1) 0%, rgba(230,168,23,0.05) 100%);
+    border: 1px solid var(--aqua);
+    border-radius: 6px;
+    padding: 20px 24px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    text-align: center;
+  }
+  .result-item .r-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--gray);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .result-item .r-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--aqua);
+  }
+  .result-item .r-val.gold { color: var(--gold2); }
+  .result-item .r-val.small { font-size: 16px; }
+
+  /* ── フッター ── */
+  .footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer .f-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--gray);
+    letter-spacing: 1px;
+  }
+  .footer .stamp {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--gold);
+    border: 1px solid var(--gold);
+    padding: 4px 10px;
+    border-radius: 3px;
+    opacity: 0.7;
+  }
+
+  /* アニメーション */
+  .card, .concept-item, .reason-item {
+    animation: fadeUp 0.4s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(8px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  @media (max-width: 600px) {
+    .concept { grid-template-columns: 1fr; }
+    .reason-grid { grid-template-columns: 1fr; }
+    .result-banner { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <div class="tag">Strategy Design Doc  ·  v3</div>
+    <h1>ATR BottomOut SL/TP 設計書</h1>
+    <div class="sub">XAUUSD H1  ·  ATR LOW Zone × ADX(28) DI Direction  ·  2024.01–2026.05</div>
+  </div>
+
+  <!-- コンセプト -->
+  <div class="section">
+    <div class="section-title">Strategy Concept</div>
+    <div class="concept">
+      <div class="concept-item">
+        <div class="icon">📉</div>
+        <div class="label">Entry Condition</div>
+        <div class="val">ATR LOW Zone</div>
+        <div class="desc">ATR &lt; 中央値 × 0.70<br>エネルギー蓄積期</div>
+      </div>
+      <div class="concept-item">
+        <div class="icon">🧭</div>
+        <div class="label">Direction Filter</div>
+        <div class="val">ADX(28) DI方向</div>
+        <div class="desc">直近28本上昇 + DI優勢方向<br>+DI&gt;-DI → BUY</div>
+      </div>
+      <div class="concept-item">
+        <div class="icon">🎯</div>
+        <div class="label">Core Insight</div>
+        <div class="val">ATR平均ベースSL</div>
+        <div class="desc">低ATRに引っ張られない<br>構造的に適正な幅</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SL設計 -->
+  <div class="section">
+    <div class="section-title">SL Design  ·  ATR Average Base</div>
+    <div class="card highlight">
+      <div class="formula-block">
+        <div><span class="comment">// SL基準: 現在ATRではなく28本平均ATRを使用</span></div>
+        <div><span class="key">ATR_Avg</span>  = <span class="note">AVERAGE( ATR[shift], ATR[shift+1], ... ATR[shift+27] )</span></div>
+        <div>&nbsp;</div>
+        <div><span class="key">SL_dist</span>  = <span class="key">ATR_Avg</span> × <span class="val">2.0</span>  <span class="comment">// デフォルト倍率</span></div>
+        <div><span class="key">SL_price</span> = EntryPrice <span class="note">±</span> <span class="key">SL_dist</span></div>
+      </div>
+      <div style="font-size:12px; color:var(--gray); margin-top:8px; line-height:1.9;">
+        LOWゾーンでは現在ATRが圧縮されているため、そのままSLに使うと<span style="color:var(--red)">構造的に狭すぎて則切りの連続</span>になる。<br>
+        28本平均ATRは「通常時のボラティリティ水準」を表し、LOWゾーン中でも適正なSL幅を確保できる。
+      </div>
+    </div>
+  </div>
+
+  <!-- TP設計 -->
+  <div class="section">
+    <div class="section-title">TP Design  ·  RR 1:1.6</div>
+    <div class="card">
+      <div class="formula-block">
+        <div><span class="comment">// TP: SLを基準にRR倍率で設定</span></div>
+        <div><span class="key">TP_dist</span>  = <span class="key">SL_dist</span> × <span class="val">1.6</span>  <span class="comment">// RR 1:1.6</span></div>
+        <div><span class="key">TP_price</span> = EntryPrice <span class="note">±</span> <span class="key">TP_dist</span></div>
+        <div>&nbsp;</div>
+        <div><span class="comment">// 実測SL・TP幅（参考値）</span></div>
+        <div><span class="note">SL_Pips avg ≈ </span><span class="val">65〜80 pips</span></div>
+        <div><span class="note">TP_Pips avg ≈ </span><span class="val">104〜128 pips</span></div>
+      </div>
+    </div>
+
+    <div class="reason-grid">
+      <div class="reason-item">
+        <div class="r-title">▸ なぜRR 1:1.6か</div>
+        <p>LOWゾーンはトレンド前の<span class="em">蓄積期</span>。爆発的なRRを狙うより、<span class="em">勝率と期待値のバランス</span>を優先。RR 1:2だとTPが遠すぎてレンジで往復される。</p>
+      </div>
+      <div class="reason-item">
+        <div class="r-title">▸ ATR平均を使う理由</div>
+        <p>LOWゾーン = ATRが中央値の<span class="em">70%以下</span>に圧縮された状態。現在ATRをSLにすると<span class="em">則切りが構造的に発生</span>する。平均で通常水準を参照することで解決。</p>
+      </div>
+      <div class="reason-item">
+        <div class="r-title">▸ v1との違い</div>
+        <p>v1: <span class="em" style="color:var(--red)">現在ATR × 1.2</span> → 狭すぎ（avg 78pips SL）<br>v3: <span class="em" style="color:var(--aqua)">ATR_Avg × 2.0</span> → 適正幅でパフォーマンス大幅改善</p>
+      </div>
+      <div class="reason-item">
+        <div class="r-title">▸ 注意点</div>
+        <p>レンジ相場で捕まるシーンは構造上避けられない。<span class="em">トレンド初動を取れた時の利益</span>でカバーする設計。勝率50%前後での期待値プラスを目指す。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- v1 vs v3比較 -->
+  <div class="section">
+    <div class="section-title">Version Comparison</div>
+    <div class="card">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>SL基準</th>
+            <th>SL倍率</th>
+            <th>RR</th>
+            <th>勝率</th>
+            <th>総pips</th>
+            <th>PF</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="v1">
+            <td><span class="badge loss">v1</span></td>
+            <td>現在ATR</td>
+            <td>×1.2</td>
+            <td>1:2.0</td>
+            <td style="color:var(--red)">30.1%</td>
+            <td style="color:var(--aqua)">+436.6</td>
+            <td style="color:var(--red)">0.86</td>
+          </tr>
+          <tr class="v3">
+            <td><span class="badge win">v3</span></td>
+            <td><strong>ATR_Avg(28)</strong></td>
+            <td>×2.0</td>
+            <td>1:1.6</td>
+            <td style="color:var(--aqua)">49.2%</td>
+            <td style="color:var(--aqua)">+4,564.9</td>
+            <td style="color:var(--gold2)">1.92</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="font-size:11px; color:var(--gray); margin-top:10px;">
+        ※ XAUUSD H1, 2024.01–2026.05, 59trades (v3) / 83trades (v1)
+      </div>
+    </div>
+  </div>
+
+  <!-- バックテスト結果 -->
+  <div class="section">
+    <div class="section-title">Backtest Result  ·  v3 Final</div>
+    <div class="result-banner">
+      <div class="result-item">
+        <div class="r-label">Trades</div>
+        <div class="r-val gold small">59</div>
+      </div>
+      <div class="result-item">
+        <div class="r-label">Win Rate</div>
+        <div class="r-val">49.2%</div>
+      </div>
+      <div class="result-item">
+        <div class="r-label">Total Pips</div>
+        <div class="r-val gold small">+4,564.9</div>
+      </div>
+      <div class="result-item">
+        <div class="r-label">Profit Factor</div>
+        <div class="r-val gold small">1.92</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- パラメータ一覧 -->
+  <div class="section">
+    <div class="section-title">Parameters  ·  Default Settings</div>
+    <div class="card">
+      <div class="formula-block">
+        <div><span class="comment">// ATRゾーン</span></div>
+        <div><span class="key">ATR_Period</span>       = <span class="val">14</span></div>
+        <div><span class="key">ATR_Median_Weeks</span> = <span class="val">8</span>     <span class="comment">// 動的中央値の基準週数</span></div>
+        <div><span class="key">ATR_Low_Ratio</span>    = <span class="val">0.70</span>  <span class="comment">// ATR &lt; 中央値×0.70 → LOW判定</span></div>
+        <div>&nbsp;</div>
+        <div><span class="comment">// ADXフィルター</span></div>
+        <div><span class="key">H1_ADX_Period</span>    = <span class="val">28</span></div>
+        <div><span class="key">ADX_Min_Threshold</span>= <span class="val">15.0</span></div>
+        <div><span class="key">ADX_Max_Threshold</span>= <span class="val">36.0</span></div>
+        <div><span class="key">ADX_Rising_Bars</span>  = <span class="val">5</span>     <span class="comment">// 直近5本中過半数が上昇</span></div>
+        <div><span class="key">DI_Spread_Min</span>    = <span class="val">3.0</span>   <span class="comment">// +DI/-DI差の最小値</span></div>
+        <div>&nbsp;</div>
+        <div><span class="comment">// SL/TP  ← ここが設計の核心</span></div>
+        <div><span class="key">ATR_Avg_Period</span>   = <span class="val">28</span>    <span class="comment">// SL基準となるATR平均期間</span></div>
+        <div><span class="key">SL_ATR_Mult</span>      = <span class="val">2.0</span>   <span class="comment">// SL = ATR_Avg × 2.0</span></div>
+        <div><span class="key">RR_Ratio</span>         = <span class="val">1.6</span>   <span class="comment">// TP = SL × 1.6</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <div class="footer">
+    <div class="f-label">ATR_LowZone_DI_BT_v3.mq5  ·  aro strategy lab</div>
+    <div class="stamp">DESIGN DOC v3  ·  2026.05</div>
+  </div>
+
+</div>
+</body>
+</html>
