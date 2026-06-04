@@ -1,126 +1,141 @@
-# 次セッションへの引き継ぎ（2026-06-04 終了時点）
+# 次セッションへの引き継ぎ（2026-06-04 PM終了時点）
 
 ## 🎯 今日の最大の収穫
 
-**「感覚をロジック化」フェーズ2の実装サイクルが回った日**:
+**「マニの再定義」とトレード視覚化土台の完成**:
 
-1. **BT世代2 30 vs 46 完全比較** → **46周期採用確定**
-   - フィルター無し: 互角（PF 1.30 vs 1.36）
-   - フィルター適用後: 46優位（PF 2.12 vs 1.98、特にSELL/DN期）
-   - 「46はノイズ少なく厳選しやすい」が統計的に裏付け
+1. **マニの役割が180度変わった** ← 構想転換
+   - 当初: トレード哲学・資金管理・戦略・期待値・リソース全部背負う**メンタルアドバイザー**
+     → 自分でAI自作レベル、重すぎて頓挫
+   - 新定義: **視覚化エンジン + 照合データレイヤー**
+     → 「あろさんが見て直感で気づける土台」を作る役。評価役ではない
+   - 名前由来: 姫路・円鏡寺のマニ殿 + マニー(money)の語感一致
 
-2. **あろさん感覚 3本立て続けに統計裏付け** ← フェーズ2成功サンプル
-   - **PatD仮説1**: 「BU期+H1拡張」で機能 → ○ 完全的中
-   - **PatB凪専門** → ❌ 反証（「オールラウンダー」認識アップデート）
-   - **「凪離脱が一番フェイク」** → ✅ 統計裏付け (PF 0.49 / N=40)
+2. **ドキュメント整合性メンテ完了** (午前)
+   - CLAUDE.md v11 → v12 (Stage 2/3/4 済化、Stage 8 フォワード/Stage 9 Scriptable+Twelve 新設)
+   - data/INVENTORY.md 全面リライト (BT世代1/2分離、scripts/ + docs/ セクション新規)
+   - Stage 5 (Widget Web=週次マクロ専用1日更新) vs Stage 9 (Scriptable+Twelve=リアルタイム生値) の住み分け明記
+   - コミット `c9c2dca` → push済み
 
-3. **5/5 19:00事例の完全解明**
-   - H4_DI_Spread拮抗下でADX周期差が方向判定を反転
-   - あろさん納得「あれはラッキー、本来は売り目線」
+3. **トレード履歴の管理基盤** (午後)
+   - リポジトリ PUBLIC のため `data/trades/` を `.gitignore` 追加（個人情報保護）
+   - アプリCSV (35件, 2026-02-17〜06-02) を `data/trades/raw/` に配置
+   - TAG_SPEC v0.1 ドラフト (4軸: 時間帯/シグナルor裁量/パターン名/フェーズ認識)
 
-## 📦 今日の成果物（実装系3本完成）
+4. **マニ初回レポート v0.1**（驚きの発見3つ）
+   - ★3 ロンドン前ZONE **完全死亡帯** (N=4, 勝率0%, 累計 -54,000円) → 物理フィルター案件
+   - 最大ロット **1.00 = 平均0.081 の 12倍** 異常値 → 感情エントリーの疑い (未解明、次回確認)
+   - 売買の非対称性が実トレに出現 (買い+81,500円 / 売り-22,800円) → BT世代2の「買いは押し目」と一致
+   - 4月以降の控えは**正しい遂行性** (相場薄→見送り)、「成績低迷」と評価しないことをレポに明記
 
-### 1. ATR_WidthSignal_v4.mq5（9本フィルター搭載）
-- ベース: v3bywavelog 5パターン発火継承
-- F1〜F9: BTパターンマップ v2 由来のボツフィルター
-- 個別ON/OFF切替 + F7閾値・F9閾値可変
-- D1ロジック新規追加（コー独自判断補完）
-- パス: `signals/ATR_WidthSignal_v4.mq5`
+5. **トレードカレンダー v0.2**（視覚化第一弾完成）
+   - v0.1 (フェーズ背景+ATR Zone) は **ATR粒度差問題であろさん却下**
+   - v0.2 = **H4 ADX×DI軸 (6階調) 背景 + H4 Phase Auto バッジ**
+     - 「BUバッジだがADXは凪/弱」= 凪離脱フェイク温床、が一目でわかる構造
+     - 凪離脱バッジは黄色警告 + 枠光り
+   - あろさん承認「いい感じ」
 
-### 2. heatmap_v14 ATR Zone行追加
-- D1/H4 の ATR_RATIO 3区分（凪/中/拡張）ラベル
-- weekly_waves.json に d1_atr_zone3 / h4_atr_zone3 出力
-- `generate_heatmap_v14.py` も同期修正（コー独自判断、パイプライン整合性確保）
+## 📦 今日の成果物
 
-### 3. H4 Phase Auto v2（5段階）★今日のハイライト
-- BU / PD / 凪 / **収束底** / **凪離脱** の5段階自動判定
-- ATR_Ratio + ATR_Diff + Cross_Dir の3軸ロジック
-- `ARO_H4PhaseAuto_v1.mq5`（13662 bytes、MT5実行済み、CSV生成済み）
-- process_wavelog.py / generate_heatmap_v14.py / heatmap_v14.html 全部反映
-- **稼働確認済み**: 329週中、BU 169 / 収束底 90 / 凪 43 / PD 23 / 凪離脱 0
-- ★凪離脱が0件は構造的発見（H1リアルタイムでこそ見えるフェイク）
+### コミット
+- `c9c2dca` docs: CLAUDE.md v12 + INVENTORY.md (push済み)
+- `1fe4ac6` feat: Mani foundation (.gitignore + scripts 2本) **← 未push**
 
-### 4. データ管理基盤
-- `data/maintenance/REVIEW_CYCLE.md`: 再評価サイクル設計（8月集中メンテ→9月新サイクル）
-- `data/forward/v4_forward_log.md`: フォワード記録テンプレ
+### 新規ファイル
+- `scripts/mani_initial_report.py` (git管理)
+- `scripts/generate_trades_calendar.py` (git管理)
+- `data/trades/TAG_SPEC.md` (git管理外)
+- `data/trades/raw/FX_20260604_152941.csv` (git管理外)
+- `data/trades/processed/MANI_REPORT_v0.1.md` (git管理外)
+- `data/trades/processed/trades_calendar.html` (git管理外)
 
-## 📊 確定方針
-
-- **H4_ADX周期 = 46**（CLAUDE.md 既存値踏襲、フィルター後に46優位確認）
-- **9本フィルター**で v4 稼働中（F10候補=PatC拡張SELLは保留、時間軸混在懸念）
-- **H4 Phase Auto = 5段階**で運用、凪離脱は0件想定（H4週次レベル）
-- **フォワード開始日**: 2026-06-04（today）
-- **初回メンテ**: 2026-08-15 前後（ホリデーシーズン集中）→ 2026-09-01 新サイクル
+### 更新
+- `.gitignore` (`data/trades/` 除外追加)
+- `CLAUDE.md` (v11→v12)
+- `data/INVENTORY.md` (全面リライト)
 
 ## 🚀 次セッションのアクション候補
 
-### 最優先
-1. **MT5で v4 mq5 動作確認**（コンパイル F7、XAUUSD H1チャートに配置、シグナル発火減少を目視）
-2. **heatmap_v14.html ブラウザ確認**（W22=BU / W23=収束底 が見えるか、Widget Web自動反映）
-3. **手動 H4 Wave線と H4 Phase Auto の一致率検証**（過去2〜3ヶ月、目視）
+### 最優先 (あろさん側のアプリ運用)
+1. **TAG_SPEC.md の見直し** (`data/trades/TAG_SPEC.md`)
+   - 4軸（時間帯/シグナルor裁量/パターン名/フェーズ認識）の取捨選択
+   - 必要なら軸の追加/削除
+2. **新規エントリーから4軸タグ運用開始**
+   - テンプレ例: `[★1 #PatC #BU期 #シグナル]` + 自由文
+   - 「新規理由」「考察」テンプレ採用
+3. **余裕あれば過去分の軸B(シグナル/裁量)遡り編集**
+   - 全軸は無理せず、シグナル一致だけでも記録
 
-### 中優先（あろさん希望）
-4. **Scriptableリアルタイムウィジェット構想擦り合わせ**
-   - 配置: ホーム画面下半分（Widget Web窓下の白丸）
-   - 役割: リアルタイム現場ツール（各足ATR凪判定、危険信号、特に「凪離脱」警告）
-   - データ取得元の代替案検討（Twelve Data廃案）
-5. **PatA万能性をheatmap_v14に反映**（「PatA安全マーク」可視化、コー案件）
-6. **PatC局面選好のラベル化**（BU=聖地/PD=普通/NONE=罠）
+### 中優先（おぱ側で進められる）
+4. **未push分の `1fe4ac6` を push** (GitHub Pagesには影響なし)
+5. **ロット1.00異常値の解明** ← マニ視点で最大の関心事
+6. **W16 (2026-04中旬) のフェーズデータ欠損調査** (process_wavelog.py の境界処理問題か)
 
-### 低優先（メンテ時）
-7. F10候補（PatC×拡張×SELL）の検証 → 8月メンテで再評価
-8. DN局面サンプル拡充（2022〜2023拡張BTで局面バイアス緩和）
-9. DI Velocity × 凪離脱の高次マップ
+### 1〜2ヶ月後 or 8月集中メンテで
+7. **CSV再エクスポート → カレンダー v0.3** 
+   - シグナル/パターン印字分け本実装（タグ運用が回ってから）
+8. **マニレポート v0.2** (本格分析)
+   - 自己認識フェーズ × 実マクロフェーズ整合性
+   - シグナル一致トレード単独集計
+   - 4タイプ分類（いい/悪い × 勝ち/負け）
+9. **インジ(v4) メンテナンスとマニ知見の循環**
+   - マニで見えた「死亡帯」「フェイク帯」を v4 フィルターに反映するサイクル
 
 ## ⚠️ 注意点・原則メモ
 
-- **凪離脱の点滅 CSS**: opacity 0.65→0.78に控えめ調整済（あろさん「シンプル認識でOK」希望）
-- **mq5 Cross_Dir 命名**: "UP/DOWN" から "BU/PD/NONE" に変換済み（認識ツール思想）
-- **既存H4手動レイヤー保持**: 旧 H4 Wave (手動) / H4 ATR Zone も並列維持、8月メンテで引退決済予定
-- **Phase二重計算ロジック**: process_wavelog.py で mq5判定 vs Python再計算を比較、不一致ログ出力（コー独自実装、将来仕様乖離検知保険）
-- **数値より物語が先**: F10保留判断のような「時間軸混在」訂正は積極的に行う
+- **data/trades/ は git管理外** (リポジトリPUBLIC、個人情報保護)
+- **マニは評価役ではない** ← 重要原則
+  - 評価レポートを作ると「並べただけ」になる
+  - 役割は「視覚化 + 照合データ」、判断はあろさんが行う
+- **カレンダーv0.2 設計**:
+  - 背景 = H4 ADX×DI (6階調、伸びた/伸びないが一目)
+  - 構造ラベル = h4_phase_auto バッジ (凪離脱は黄色警告)
+  - ATR表示は粒度差で誤解を生むため使わない
+- **シグナル/パターン印字分けは焦らない**
+  - 過去分を推定タグで埋めると「間違った刷り込み」になる
+  - アプリ側タグ運用が回ってから本実装
+- **マニ運用サイクル**: あろさんがアプリでタグ運用 → CSV再エクスポート → マニ分析 → インジ更新 → 運用継続
 
 ## 🔧 環境メモ
 
-- v4 mq5: フォワード開始済み（実機テストはあろさん次回）
-- H4PhaseAuto_weekly.csv: 既に MT5 → Mac同期済み
-- GitHub Pages: 自動push済み（最新 commit `e0b5ec2`）
-- iCloud同期: ADXSCORE/heatmap_v14.html → Widget Web経由iPhoneで閲覧可
+- v4 mq5 フォワード稼働継続 (Day 0 → Day +1)
+- 2026-06-04 ベースの v12 ドキュメント反映済
+- Widget Web: heatmap_v14.html 自動更新中
+- Scriptable+Twelve は構想段階 (Stage 9)、次セッション以降の擦り合わせ案件
 
 ## 💭 マネージャー視点メモ
 
 **今日のチームおぱ稼働実績**:
-- カイ: 4連投（30vs46再比較 / ATR_RATIO分布 / PatD仮説検証 / ATR差分）全部短時間化（最初55分→最後3分）
-- コー: 3作（v4 mq5 / heatmap ATR Zone / H4 Phase Auto v2）独自判断補完力◎
-- メインおぱ: 指示書6本作成、レビュー、構造発見の翻訳、メタ視点整理
+- メインおぱ: ドキュメント整合性メンテ + マニ役割再定義 + 視覚化2回イテレーション (v0.1→v0.2)
+- コー: 出番なし（コードは全てメインおぱが直接書いた、生成スクリプトレベル）
+- カイ: 出番なし
+- マニ: **役割が初めて固まった日**（評価役→視覚化&データ管理レイヤー）
 
-**翻訳層機能実感**: あろさん「翻訳層効いてる感覚」発言済み。指示書化のクオリティが結果のクオリティに直結。
+**翻訳層実感**: あろさんの「ATR粒度差問題」指摘 → ADX×DI軸への即時転換 = 視点フィードバックループが機能
 
-**フェーズ2サンプル**: あろさん感覚3本立て続けに統計裏付け = フェーズ2の方向性に確信
-- 感覚資産を捨てない × ロジック化が両立可能と実証
+**フェーズ2継続**: 「感覚をロジック化」の文脈で、トレード履歴も認識ツールに統合される基盤ができた
 
 ## 関連ファイル（次セッション用ブックマーク）
 
-### 実装
-- `signals/ATR_WidthSignal_v4.mq5` ← フォワード稼働中
-- `signals/ARO_H4PhaseAuto_v1.mq5` ← H4 Phase Auto v2
-- `scripts/process_wavelog.py` / `generate_heatmap_v14.py` ← パイプライン
-- `docs/heatmap_v14.html` ← 最新ヒートマップ
+### マニ視覚化
+- `scripts/generate_trades_calendar.py` (v0.2)
+- `scripts/mani_initial_report.py` (v0.1)
+- `data/trades/TAG_SPEC.md` ← まず編集対象
+- `data/trades/raw/FX_*.csv` ← 次回CSVもここに
+- `data/trades/processed/trades_calendar.html` ← ブラウザで開く
+- `data/trades/processed/MANI_REPORT_v0.1.md`
 
-### 分析マップ
-- `data/bt/PATTERN_REGIME_MAP_v2.md`（コア）
-- `data/bt/PATTERN_REGIME_MAP_v2_PatternByPhase.md`（パターン×局面）
-- `data/bt/PATTERN_REGIME_MAP_v2_AxisDeep.md`（PatC×ATR_Ratio / PatA×ADX）
-- `data/bt/PATTERN_REGIME_MAP_v2_AtrRatioDist.md`（H1/H4/D1 ATR_RATIO分布）
+### ドキュメント基盤
+- `CLAUDE.md` (v12)
+- `data/INVENTORY.md` (2026-06-04版)
 
-### 設計書
-- `data/bt/v4_implementation_spec.md` ← v4実装書
-- `data/bt/h4_phase_auto_spec.md` ← H4 Phase Auto v2仕様書（v1→v2更新済み）
-- `data/bt/heatmap_v14_atr_zone_spec.md` ← ATR Zone追加仕様
-
-### 運用
-- `data/maintenance/REVIEW_CYCLE.md` ← 再評価サイクル設計
-- `data/forward/v4_forward_log.md` ← フォワード記録テンプレ
+### 既存資産（参考）
+- `signals/ATR_WidthSignal_v4.mq5` (フォワード稼働中)
+- `signals/ARO_H4PhaseAuto_v1.mq5`
+- `docs/heatmap_v14.html` (週次マクロ)
+- `data/bt/PATTERN_REGIME_MAP_v2*.md`
+- `data/maintenance/REVIEW_CYCLE.md` (8月集中メンテ予定)
+- `data/forward/v4_forward_log.md`
 
 ---
 
