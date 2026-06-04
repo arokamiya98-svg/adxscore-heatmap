@@ -1,7 +1,7 @@
 # CLAUDE.md — ARO Trading Support Project
 
 > このファイルはClaude Codeが毎セッション自動参照するコンテキストファイルです。
-> 最終更新: 2026-06-01 (v11: フェーズ転換明示 / 3層モデル / メンタル研究トラック追加 / MT5環境刷新 Wine 11.1)
+> 最終更新: 2026-06-04 (v12: フェーズ2実装サイクル完走 / v4稼働中 / H4 Phase Auto v2 / Stage 2・4 済化)
 
 ---
 
@@ -90,6 +90,11 @@
 | T4=100%裏切り | T4タイプはBUにならない（ラベルとして保持） |
 | RISING_DECEL最強 | NORMAL帯のRISING_DECEL: 勝率72.4%, PF4.41 |
 | HIGH帯RISING_DECELは罠 | PF 0.59（NORMALと真逆） |
+| XAUUSDの非対称性 | 「買いは押し目、売りは拡張」（BT世代1/2） |
+| Cross=NONE×SELL死亡帯 | PF 0.21、構造的死亡パターン（BT世代1） |
+| H4_ADX=46周期 採用確定 | フィルター後 PF 2.12（30周期=1.98より優位、SELL/DN期で顕著）|
+| 凪離脱が一番フェイク | PF 0.49 / N=40。あろさん感覚の統計裏付け（BT世代2）|
+| PatD仮説1 完全的中 | 「BU期+H1拡張」で機能（BT世代2） |
 
 ---
 
@@ -164,10 +169,13 @@ def adx_score(h1_avg_adx, h4_pct_above20, h4_pct_above25):
 
 | ファイル | チャート | 役割 | 状態 |
 |---------|---------|------|------|
-| `ATR_WidthSignal_v3bywavelog.mq5` | H1メイン | エントリーシグナル本体（wavelog参照型）| ✅ 現用 |
-| `ATR_Velocity_Rhythm_v2_NoBG.mq5` | H1 sub | ATR速度/リズム（2026-06-02 H1ADX32/H4ADX46へ更新）| ✅ 現用 |
+| `ATR_WidthSignal_v4.mq5` | H1メイン | エントリーシグナル本体（**9本フィルター搭載**）| ✅ **フォワード稼働中 2026-06-04〜** |
+| `ATR_WidthSignal_v3bywavelog.mq5` | H1メイン | シグナル前世代（フィルター無し）| 🟡 比較用に保存 |
+| `ARO_H4PhaseAuto_v1.mq5` | H4 | H4 Phase Auto v2（5段階自動判定）| ✅ 現用 |
+| `ATR_Velocity_Rhythm_v2_NoBG.mq5` | H1 sub | ATR速度/リズム（H1ADX32/H4ADX46）| ✅ 現用 |
 | `ATR_Velocity_Rhythm_D1_v1.mq5` | H4/D1 sub | ATR Vel Rhythm D1 | ✅ 現用 |
 | `ATR_Dual_v1.mq5` | 全TF sub | ATR短期×長期二本表示 | ✅ 現用 |
+| `ATR_Ratio_Dual_v1.mq5` | 全TF sub | ATR Ratio 二本表示（2026-06-02 追加）| ✅ 現用 |
 | `BarCount_Drawing_v1.mq5` | 補助 | バーカウント描画 | ✅ 現用 |
 
 > オリジナルは `MT5/MQL5/Indicators/Free Indicators/` 配下。
@@ -175,15 +183,45 @@ def adx_score(h1_avg_adx, h4_pct_above20, h4_pct_above25):
 
 ### BT 関連 (data/bt/)
 
+**設計資産**
+
 | ファイル | 内容 | 状態 |
 |---------|------|------|
 | `data/bt/SPEC_new_BT.md` | 新規BT仕様書（v3bywavelogベース・フラット記録）| 🟢 B/C確定済 |
 | `data/bt/SLTP_design.html` | SL/TP最適解（SL=ATR_Avg×2.0, TP=SL×1.6, RR1:1.6）| 🟢 思想継承（旧周期版） |
+| `data/bt/v4_implementation_spec.md` | v4 mq5 実装仕様（9本フィルター F1〜F9）| 🟢 v4稼働の根拠 |
+| `data/bt/h4_phase_auto_spec.md` | H4 Phase Auto v2 仕様（5段階）| 🟢 v1→v2 更新済 |
+| `data/bt/h4_phase_auto_resume_note.md` | H4 Phase Auto 設計経過メモ | 🟢 コー実装履歴 |
+| `data/bt/heatmap_v14_atr_zone_spec.md` | heatmap_v14 ATR Zone行追加仕様 | 🟢 ATR_RATIO 3区分 |
+
+**BT世代1（2026-06-02実行）**
+
+| ファイル | 内容 | 状態 |
+|---------|------|------|
 | `data/bt/ATR_WidthSignal_BT_v3bywavelog.mq5` | BTソース（Script型、71列）| 🟢 世代1完了 |
 | `data/bt/ATR_WidthSignal_BT_NEW.csv` | BT結果（UTF-16, 947件）| 🟢 2024-01〜2026-06 |
-| `data/bt/PATTERN_REGIME_MAP_v1.md` | 構造分析マップ（暫定v1）| 🟢 機能/死亡パターン整理 |
+| `data/bt/PATTERN_REGIME_MAP_v1.md` | 構造分析マップ（暫定v1）| 🟡 v2登場で参考のみ |
 
-> ⚠️ 旧BT資産（ATR_WidthSignal_BT_v3 / v3wavelog 系）は 2026-06-02 に参照禁止ゾーン `ADX２８検証ファイル/legacy_ATR_WidthSignal_BT/` へ隔離済み。新規BTは類似名コードを真似ず、[[memory: bt-analysis-principles]] に従ってゼロベースで組む（結果フィッティング禁止・構造分析優先）。BT世代1の発見は [[memory: bt-v1-findings-2026-06]] と `data/bt/PATTERN_REGIME_MAP_v1.md`。
+**BT世代2（2026-06-03〜04実行、46周期確定の根拠）**
+
+| ファイル | 内容 | 状態 |
+|---------|------|------|
+| `data/bt/ATR_WidthSignal_BT_v3bywavelog_gen2.mq5` | BT本体 世代2（H4_ADX周期可変）| 🟢 30 vs 46比較用 |
+| `data/bt/ATR_WidthSignal_BT_h4adx30.csv` | BT結果 (H4_ADX=30) | 🟢 フィルター後 PF 1.98 |
+| `data/bt/ATR_WidthSignal_BT_h4adx46.csv` | BT結果 (H4_ADX=46) | 🟢 **採用** PF 2.12 |
+| `data/bt/PATTERN_REGIME_MAP_v2.md` | 構造分析マップ コア（世代2版）| 🟢 機能/死亡パターン更新 |
+| `data/bt/PATTERN_REGIME_MAP_v2_PatternByPhase.md` | パターン×局面分析 | 🟢 PatC局面選好等 |
+| `data/bt/PATTERN_REGIME_MAP_v2_AxisDeep.md` | 軸別深掘り（PatC×ATR_Ratio / PatA×ADX） | 🟢 PatA万能性検証 |
+| `data/bt/PATTERN_REGIME_MAP_v2_AtrRatioDist.md` | H1/H4/D1 ATR_RATIO 分布 | 🟢 ATR Zone根拠 |
+
+> ⚠️ 旧BT資産（ATR_WidthSignal_BT_v3 / v3wavelog 系）は 2026-06-02 に参照禁止ゾーン `ADX２８検証ファイル/legacy_ATR_WidthSignal_BT/` へ隔離済み。新規BTは類似名コードを真似ず、[[memory: bt-analysis-principles]] に従ってゼロベースで組む（結果フィッティング禁止・構造分析優先）。BT世代1〜2の発見は [[memory: bt-v1-findings-2026-06]] と `data/bt/PATTERN_REGIME_MAP_v2*.md`。
+
+### フォワード記録 / メンテ運用
+
+| ファイル | 内容 | 状態 |
+|---------|------|------|
+| `data/forward/v4_forward_log.md` | v4 mq5 フォワード記録テンプレ | 🟢 **2026-06-04 開始** |
+| `data/maintenance/REVIEW_CYCLE.md` | 再評価サイクル設計書 | 🟢 8月集中メンテ→9月新サイクル |
 
 ### MT5出力CSV（→ ADXSCORE/mt5_data/ に同期）
 
@@ -192,7 +230,9 @@ def adx_score(h1_avg_adx, h4_pct_above20, h4_pct_above25):
 | `FractalWaveLog_D1_v3_1.csv` | D1 波形レベル（BU/PD, ADX, ATR, Fib） | UTF-16 | 週次パイプライン |
 | `FractalWaveLog_D1_weekly.csv` | D1 週次時系列（金曜サンプリング） | UTF-16 | 週次パイプライン |
 | `FractalWaveLog_H4_XAU.csv` | H4 波形レベル | UTF-8-sig | 週次パイプライン |
+| `FractalWaveLog_H4_XAU_Vlines.csv` | H4 縦線データ（H4_XAU_v3_1 補助出力）| UTF-8-sig | 週次パイプライン |
 | `FractalWaveLog_H4_weekly.csv` | H4 週次時系列 | UTF-8-sig | 週次パイプライン |
+| `H4PhaseAuto_weekly.csv` | H4 Phase Auto v2 出力（5段階自動判定）| UTF-8-sig | 週次パイプライン（2026-06-04 合流）|
 | `ADX_Weekly_Above_v4.csv` | H1/H4 ADX週次集計（H1=32, H4=46 正式周期）| UTF-16 | 週次パイプライン（ADXスコア計算元・現行） |
 | `ADX_Weekly_Above_v3.csv` | H1/H4 ADX週次集計 旧版（H1=28, H4=30 周期ズレ）| UTF-16 | フォールバック用（v4が優先） |
 | `WaveLog_Export_v16.csv` | H1 波形ログ全量（457波, 125列, ATR比率・MFE/MAE等） | UTF-8 | 分析用のみ |
@@ -231,21 +271,30 @@ ADXSCORE/
 │   ├── FractalWaveLog_D1_v3_1.csv
 │   ├── FractalWaveLog_D1_weekly.csv
 │   ├── FractalWaveLog_H4_XAU.csv
+│   ├── FractalWaveLog_H4_XAU_Vlines.csv
 │   ├── FractalWaveLog_H4_weekly.csv
+│   ├── H4PhaseAuto_weekly.csv         ← H4 Phase Auto v2 出力（5段階）
 │   └── ADX_Weekly_Above_v4.csv        ← ADXスコア計算元（H1=32, H4=46, 閾値25）
 ├── data/
 │   ├── INVENTORY.md                   ← データ索引（鮮度・信頼度・由来）★参照ゾーン入口
-│   ├── bt/                            ← BT結果CSV + BT mq5 ソース
-│   ├── forward/                       ← 手動フォワードテスト記録
-│   └── weekly_waves.json              ← process_wavelog.py の出力（ADXスコア含む）
+│   ├── bt/                            ← BT結果CSV + BT mq5 ソース + 各種spec
+│   ├── forward/                       ← 手動フォワードテスト記録（v4_forward_log.md）
+│   ├── maintenance/                   ← 再評価サイクル設計（REVIEW_CYCLE.md）
+│   ├── session_state/                 ← セッション引き継ぎ（latest.md + archive/）
+│   └── weekly_waves.json              ← process_wavelog.py の出力（ADXスコア + H4 Phase + ATR Zone 含む）
 ├── signals/                           ← 現用シグナル/インジ mq5 ミラー（MT5本体側からコピー）
 ├── docs/
 │   └── heatmap_v14.html               ← 最終出力（GitHub Pages公開 / Widget Webで表示）
 ├── retrospect/                        ← トレード振り返り記録
 └── scripts/
     ├── sync_mt5_data.sh               ← MT5→mt5_data/ 同期
-    ├── process_wavelog.py             ← CSV→weekly_waves.json 変換（ADXスコア計算込み）
-    └── generate_heatmap_v14.py        ← weekly_waves.json→HTML 生成
+    ├── process_wavelog.py             ← CSV→weekly_waves.json 変換（ADXスコア + H4 Phase + ATR Zone）
+    ├── generate_heatmap_v14.py        ← weekly_waves.json→HTML 生成（ATR Zone行追加版）
+    ├── analyze_bt_gen2.py             ← BT世代2 構造分析（PATTERN_REGIME_MAP_v2 生成）
+    ├── analyze_pattern_by_phase.py    ← パターン×局面分析
+    ├── analyze_axis_deep_v2.py        ← 軸別深掘り（PatC×ATR_Ratio / PatA×ADX）
+    ├── analyze_atr_ratio_dist.py      ← ATR_RATIO 分布（ATR Zone しきい値根拠）
+    └── compare_30_46_filtered.py      ← H4_ADX 30 vs 46 比較（46採用根拠）
 ```
 
 > ℹ️ `scores.json` は廃止。ADXスコアは `ADX_Weekly_Above_v3.csv` → `process_wavelog.py` で `weekly_waves.json` に直接埋め込まれる（Twelve Data API不要）。
@@ -263,9 +312,10 @@ ADXSCORE/
 
 | # | チャート | スクリプト | 出力CSV |
 |---|---------|-----------|---------|
-| 1 | D1 XAUUSD | `ARO_FractalWaveLog_D1_v3_2` | FractalWaveLog_D1_v3_1.csv（波形レベル）+ FractalWaveLog_D1_weekly.csv（週次時系列）|
-| 2 | H4 XAUUSD | `ARO_FractalWaveLog_H4_XAU_v3_1` | FractalWaveLog_H4_XAU.csv + H4_weekly.csv |
-| 3 | H1 XAUUSD | `ADX_Weekly_Above_v4` | ADX_Weekly_Above_v4.csv（ADXスコア元） |
+| 1 | D1 XAUUSD | `ARO_FractalWaveLog_D1_v3_2` | FractalWaveLog_D1_v3_1.csv + FractalWaveLog_D1_weekly.csv |
+| 2 | H4 XAUUSD | `ARO_FractalWaveLog_H4_XAU_v3_1` | FractalWaveLog_H4_XAU.csv + H4_XAU_Vlines.csv + H4_weekly.csv |
+| 3 | H4 XAUUSD | `ARO_H4PhaseAuto_v1` | H4PhaseAuto_weekly.csv（5段階自動判定）|
+| 4 | H1 XAUUSD | `ADX_Weekly_Above_v4` | ADX_Weekly_Above_v4.csv（ADXスコア元） |
 
 **Mac側：1コマンドで完結**
 
@@ -278,7 +328,7 @@ ADXSCORE/
 
 ## 8. 現在の開発ロードマップ（v11：フェーズ転換明示）
 
-### 8.0 フェーズ転換マップ（2026-06-01 明示）
+### 8.0 フェーズ転換マップ（2026-06-01 明示 / 2026-06-04 更新）
 
 ```
 【フェーズ1：感覚での認識ツール構築】 ← 完了 ✅
@@ -287,13 +337,20 @@ ADXSCORE/
 
          ▼ フェーズの境目（2026-06-01）
 
-【フェーズ2：感覚をロジック化】 ← 着手中
+【フェーズ2：感覚をロジック化】 ← 実装サイクル一周完走（2026-06-04）
 1. 生データ → 自動抽出ロジック化（手動トレンドライン依存からの脱却）
 2. リアルタイム化
 3. 細分化：H1目線のトレード優位性・期待値・方向性算出
 4. "感覚の可視化"をデータ収集ロジックとして再現できるかの検証
-5. 取得データのフォワードテスト
+5. 取得データのフォワードテスト  ← 2026-06-04 v4稼働開始
 6. ロジック・シグナル生成最適化
+
+▼ 実装サイクル成果（2026-06-04）
+- BT世代2 完走 → 46周期確定 / 9本フィルター実装
+- v4 mq5 フォワード稼働開始
+- H4 Phase Auto v2（5段階）完成・週次合流
+- heatmap_v14 ATR Zone行追加
+- あろさん感覚3本立て続けに統計裏付け = フェーズ2の方向性に確信
 ```
 
 ### 8.1 全体構造（3層モデル）
@@ -322,40 +379,65 @@ ADXSCORE/
 - 可変幅セル + 色分けロジック（HIGH/MID/HOT × DI+/DI-）で現用化
 - **週次データ基盤**: D1_v3_2（v3_1から統合済）/ H4_v3_1 スクリプト完成・動作確認済み
 
-#### Stage 2: 日次配信化 ⏸ 保留・再構成予定
+#### Stage 2: 日次配信化 ✅ 済（2026-06-04 再設計完了）
 - 元案: MT5スクリプト → CSV → LINE配信
-- 現方針: **フェーズ2「ロジック化トラック」と統合して再設計**
-- 自動データ取得（手動トレンドライン依存からの脱却）が確立してから、日次で配信すべき内容を再定義する
+- **新方針**: Scriptableリアルタイムウィジェットへ統合
+- **配信不要のLIVE構造**へ収束（あろさん判断 2026-06-04）
+- Scriptable構想は中優先候補に移行（Widget Web窓下の白丸スロット、リアルタイム現場ツール）
 
-#### Stage 3: H4ラベラー拡張
-- ATR8/46ベースで同思想を適用
-- T1〜T4をラベルとして組み込む
+#### Stage 3: H4ラベラー拡張 ✅ 済（H4 Phase Auto v2で達成 2026-06-04）
+- ATR8/46ベースで5段階自動判定（BU/PD/凪/収束底/凪離脱）
+- ラベル思想を厳守（点数化禁止）
+- `signals/ARO_H4PhaseAuto_v1.mq5` + `data/bt/h4_phase_auto_spec.md`
 
-#### Stage 4: 既存ツール整合
-- H1適正スコアの更新（D1ラベルとの連携）
+#### Stage 4: 既存ツール整合 ✅ 済（2026-06-04）
+- H1適正スコアの更新は heatmap_v14 ATR Zone行追加で代替達成
+- D1/H4 の ATR_RATIO 3区分（凪/中/拡張）ラベル化、認識ツール側で D1ラベル連携を実現
+- `data/bt/heatmap_v14_atr_zone_spec.md`
 
-#### Stage 5: iPhoneウィジェット化 ✅ 完了 (2026-06-02時点、方針転換あり)
-- **当初案**: Scriptable + Twelve Data API (`atr_monitor.js`)
-- **採用案**: **Widget Web** (iOSアプリ) で `heatmap_v14.html` を窓表示
-- **理由**: 週次マクロ前提なら、リアルタイム数値より「HTML丸ごと表示」の方が情報量・運用の楽さで有利
+#### Stage 5: iPhoneウィジェット化（週次マクロ）✅ 完了 (2026-06-02時点)
+- **採用ツール**: **Widget Web** (iOSアプリ)
+- **役割**: `heatmap_v14.html` を窓表示。**1日更新の週次マクロ専用**
 - **データフロー**: GitHub Pages公開 → Widget Web で表示
-- `scriptable/atr_monitor.js` は廃案（2026-06-02削除）
+- **理由**: 週次マクロ前提なら、リアルタイム数値より「HTML丸ごと表示」の方が情報量・運用の楽さで有利
 
-#### Stage 6: WIDTHSIGNAL v3bywavelog 新規BT構築 ✅ 世代1完了 (2026-06-03)
-- **目的**: 現用フラットセンサーのシグナル反応精度を測り、パターン別構造分析でフィルター候補を抽出
+#### Stage 9: Scriptableリアルタイムウィジェット 🟡 構想段階（2026-06-04 復活）
+- **位置づけ**: 旧Stage 2「日次配信化」を発展統合 → **配信不要のLIVE構造**へ
+- **採用ツール**: **Scriptable**（iOS）でウィジェット実装
+- **データソース**: **Twelve Data API**（生値常時取得）← 旧Stage 5廃案から復活
+- **配置**: ホーム画面下半分（Widget Web窓下の白丸スロット）
+- **役割**: リアルタイム現場ツール（各足ATR凪判定、危険信号、特に「凪離脱」警告）
+- **次セッション以降**: あろさんと擦り合わせ → 設計 → コー実装
+
+> 📌 **Stage 5 と Stage 9 の住み分け**
+> - Stage 5（Widget Web）: 1日1回更新の俯瞰、週次マクロ
+> - Stage 9（Scriptable+Twelve）: 生値常時取得のリアルタイム、現場ツール
+> - **同じiPhoneホーム画面で並行運用**（上＝マクロ / 下＝ライブ）
+
+#### Stage 6: WIDTHSIGNAL 新規BT構築 ✅ 世代1〜2完了 (2026-06-02〜04)
+- **目的**: シグナル反応精度を測り、パターン別構造分析でフィルター候補を抽出
 - **ベース**: `signals/ATR_WidthSignal_v3bywavelog.mq5`（5パターン×BUY/SELL multi-fire）
-- **BT世代1の成果**:
-  - BTソース: `data/bt/ATR_WidthSignal_BT_v3bywavelog.mq5`（Script型、71列フラット記録）
+- **BT世代1の成果**（2026-06-02）:
   - 結果CSV: `data/bt/ATR_WidthSignal_BT_NEW.csv`（947件 → 6hフィルター後481件）
-  - 分析マップ: `data/bt/PATTERN_REGIME_MAP_v1.md`（機能Top15 / 死亡Top6 / 構造的解釈）
+  - 分析マップ: `data/bt/PATTERN_REGIME_MAP_v1.md`
   - 主要発見: XAUUSDの非対称性「買いは押し目、売りは拡張」、Cross=NONE×SELL死亡帯（PF 0.21）
-  - 詳細: [[memory: bt-v1-findings-2026-06]]
-- **次セッション以降の課題**: フィルター実装BT（[[memory: bt-filter-strategy]]）、DI Velocity追加、認識ツール組み込み
+- **BT世代2の成果**（2026-06-03〜04）:
+  - **H4_ADX周期 30 vs 46 完全比較 → 46採用確定**（フィルター後 PF 2.12 vs 1.98、SELL/DN期で顕著）
+  - 分析マップ: `data/bt/PATTERN_REGIME_MAP_v2*.md`（コア / 局面別 / 軸別深掘り / ATR_Ratio分布）
+  - **あろさん感覚3本の統計裏付け**: PatD仮説1（BU期+H1拡張）/ 凪離脱フェイク（PF 0.49）/ PatB万能性
+- **実装結果**:
+  - `signals/ATR_WidthSignal_v4.mq5`（9本フィルターF1〜F9搭載、個別ON/OFF）→ **2026-06-04 フォワード稼働中**
+  - 詳細: [[memory: bt-v1-findings-2026-06]] / `data/bt/v4_implementation_spec.md`
 
-#### Stage 7: 構造発見の認識ツール組み込み 🟢 次の主軸
-- BT世代1の発見（PATTERN_REGIME_MAP_v1）を heatmap_v14 等に反映
-- ダメパターン削減ロジックの認識ツール化
-- DN局面サンプル蓄積（フォワード or 過去期間拡張）
+#### Stage 7: 構造発見の認識ツール組み込み ✅ 部分達成（2026-06-04 継続中）
+- BT世代2の発見を heatmap_v14 へ反映済（ATR Zone行追加、d1_atr_zone3 / h4_atr_zone3）
+- 9本フィルター（v4 mq5）でダメパターン削減ロジック実装
+- 残課題: PatA万能性可視化 / PatC局面選好ラベル化 / DN局面サンプル拡充 → **8月集中メンテで再評価**
+
+#### Stage 8: フォワード検証サイクル 🟢 進行中（2026-06-04 開始）
+- v4 mq5 フォワード稼働中、`data/forward/v4_forward_log.md` に記録
+- 初回集中メンテ: 2026-08-15 前後（ホリデーシーズン）→ 2026-09-01 新サイクル
+- 設計書: `data/maintenance/REVIEW_CYCLE.md`
 
 ---
 
