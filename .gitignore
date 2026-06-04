@@ -1,1 +1,4 @@
 .env
+
+# トレード履歴（個人情報含む。public repoには出さない）
+data/trades/
