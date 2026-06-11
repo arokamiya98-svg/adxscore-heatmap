@@ -1,171 +1,94 @@
-# 次セッションへの引き継ぎ（2026-06-11 終了時点）
+# 次セッションへの引き継ぎ（2026-06-12 終了時点）
 
-## 🎯 今日の最大の収穫
+## 🎯 今日（6/11〜12）の最大の収穫
 
-**コー C4 + C5 完走 / マニ v0.2 完走 / 自動同期パイプライン稼働開始**
+**シグナル検証シート誕生 → 日次認識カレンダー v3 完成。3枚体制 + 全自動パイプライン確立。**
 
-セッションリミット3回転のでかい日。マニ役割転換、研究目的整合バグ修正、自動同期環境構築まで一気に進んだ。
+そして最重要の言語化2つ：
+1. **「解析より認知負荷を下げて戦略実行精度を上げる」が今の主軸**（メモリ化済み）
+2. **結果 vs 因果の切り分け**：日次レベルの評価（結果）と戦略で見る D1 ADX（因果）は別物。日次カレンダーは「相場の結果×トレードの結果×シグナルの結果」の見比べ
 
 ---
 
 ## 📦 主要成果物
 
 ### mq5（コー案件）
-- `signals/Trade_Snapshot_Builder.mq5` v1.31 → **v1.32**
-  - **C4**: H4 12/24/36h MFE/MAE 6列 + D1 24h 2列 追加（56列→72列）
-  - **C4 緊急修正**: MQL5 64引数上限超過 → WriteRow を構造体 `TradeSnapshotRow` に集約
-  - **C5**: shift +1 修正（エントリーバー→直前確定バー）→ 始まり値基準の ATR/ADX/DI/Pattern 取得
-- `signals/XAUUSD_Daily_MFE_MAE_v1.mq5` v1 → **v1.10**（コードのみ完成、CSV未反映）
+- `signals/Signal_Fire_Logger_v1.mq5` **新規** — v4の発火を2025-03〜全件再現（Script型、64列×389発火）
+  - フィルターF1〜F9はラベルのみ（除外しない）、pass_all=265
+  - v4実機矢印と3点照合済み（時間=server表記、価格=バーclose、完全一致）
+  - MT5 Scripts/Examples 配置済み・実行確認済み
+- C4-B 完了: `XAUUSD_Daily_MFE_MAE_v1.10` 実行 → 24列CSV確認（C4データ完全に揃った）
+- C6 判定済み・修正は保留: Daily_MFE_MAEの「14:00」表記は実態15:00エントリー（計算は自己整合、ラベルのズレのみ）。修正案: ①iOpen化 ②ラベル15:00化
 
-### Python / Bash（おぱ案件）
-- `scripts/generate_daily_calendar.py` BOM バグ修正（`utf-8-sig` で enriched 読み込み）
-  - → drilldown-table の H1 ATR / H4 ATR / MFE / MAE 全列「—」が解消
-  - → カレンダー「追跡欠損」も同時解消
-- **`auto_sync_daily.sh` 新規**（bash 3.2 平行配列で実装、fswatch 不要）
-  - 2秒間隔 ポーリング → MT5 Files mtime 検知 → 自動 sync + pipeline 実行
-  - 動作確認済（07:57:37 出力 → 07:57:41 同期 = 4秒）
+### Python/HTML（マニ案件）
+- `scripts/generate_signals_calendar.py` **新規** → `signals_calendar.html`
+  - v1: シグナル検証カレンダー → v2: **統合評価シート**（実トレードカード統合）
+  - 役割確定: **シグナル×トレードだけの見比べページ**（保存版）
+- `scripts/generate_daily_calendar_v3.py` **新規** → `daily_calendar_v3.html` ★本丸
+  - 経緯: スクラッチ版（H1色・情報削減）→ あろさん実見「v2よりだいぶ弱い」→ **v2ベースに移植転換**
+  - 最終形: v2の強み（H4戦略背景×MFE/MAE結果バー×具体数字）完全保持 + シグナルドット行 + セルクリック→ドロワー（シグナル+実トレードカード、MFE/MAE 12/24/36/48h同一フォーマット）+ SC表記削除
+  - Step2: fireCard閉じdiv漏れ修正（opacity入れ子事件）/ フィルターデフォルトON（pass265のみ、トグルで389）/ 期間=トレードログ基準2026-03〜直近6ヶ月+過去折りたたみ
 
-### マニ案件
-- `scripts/generate_daily_calendar.py` (マニ v0.2 完了)
-  - 円グラフ4つクリッカブル化（反省タグ/勝敗/D1フェーズ/曜日）
-  - 軸1「シグナル別統計テーブル」廃止
-  - 全数値列の昇降ソート対応（ATR 絶対値で並べる）
-- `data/mani_room/マニ_実装レポート_v0.4.md`
-
-### 指示書・レポート
-- `data/mani_room/コー_指示書_日次研究データ取得_v0.2.md` (C1〜C4)
-- `data/mani_room/マニ_指示書_日次研究カレンダー_v0.2.md`
-- `data/mani_room/コー_実装レポート_C4_v1.md`, `..._v2.md`（緊急修正）, `..._C5_v1.md`
-
-### メモリ
-- `feedback_team-opa-role-division.md` **新規**（マニ役割転換、おぱ番人役の明文化）
-- `project_c4-tier-mfe-mae-pending.md` **新規**（C4 案件固定情報）
-- `feedback_mani-evaluation-criteria.md` 凍結ラベル化（旧マニ役割は歴史的記録に）
+### パイプライン（おぱ案件）
+- `PIPELINE.md` **新規** — 全体図一枚まとめ（ページ4枚の役割・トリガー別フロー・watcher運用・mq5在庫）
+- `run_daily_calendar.sh` 拡張: Step 2b(signals) + 2c(v3) + docs3枚ミラー + **自動publish**（commit+push）
+- `auto_sync_daily.sh` 拡張: FX_*.csv新着検知→trade_input自動配置 / signal_fires.csv監視追加
+- **トレード後の手数は2アクションに**: ①アプリCSVを置く ②MT5でSnapshot_Builder実行 → あとは iPhone反映まで全自動
+- GitHub Pages 公開3枚: trades_calendar / signals_calendar / daily_calendar_v3（公開URL: arokamiya98-svg.github.io/adxscore-heatmap/）
 
 ---
 
-## 🔑 確定した重要原則
+## 🔑 確定した設計判断（変更しないこと）
 
-### マニ役割転換（2026-06-10〜）
-旧: 振り返り評価役、3軸分離評価、カウンセリング
-新: **分析プラットフォーム実装相棒**（HTML/JS 設計詳細）
+- **v3の構造**: 背景色=戦略文脈(H4) × バー=結果(MFE/MAE)の対比。H1色化は失敗済み（両方結果系になり対比消失）
+- **トレード帯（++59k形式）は現状維持確定**（バー化中止。「大きく拾えたか直感で分かる」）
+- **土曜発火は金曜セル併載**（点線下線+土マーク）承認済み
+- **ルーティン（週次・必ず）と検証（不定期・Fire Logger）の切り分け**
+- 旧版保存義務: generate_daily_calendar.py / trades_calendar.html / generate_signals_calendar.py / signals_calendar.html の4ファイルは将来用途のため変更禁止
+- mani_room データの public 公開はあろさん承認済み（個人情報なし確認済み）
 
-### チームおぱ役割分担
-- あろさん = 方向性
-- メインおぱ = **翻訳・クッション・エントリーロジック混入の番人**
-- マニ = 分析プラットフォーム実装
-- コー = MT5 mq5 実装
+## 🛡️ 番人の学び（再発防止）
 
-### C5 で確立した研究目的整合性
-- スナップショット = **エントリー時点で利用可能だった値だけ取得**
-- iBarShift(exact=false) はエントリーバーを返す → そのバー終値時点 = 未来情報
-- 修正: shift +1 で直前確定バーの値を取る
-- 同種バグは他 mq5 にも潜在する可能性（C6 候補）
+- **マニの検証出力義務化が機能してる**（「確認した」だけ不可、コマンド+出力貼付）。今回も番人レビューで全件独立裏取りした
+- fireCard閉じdiv事件: innerHTML入れ子でopacity継承 → HTML断片を返す関数は閉じタグまで検証
+- mq5更新時は MT5 Scripts/Examples へのコピー+再コンパイル必須（v1.10配置漏れで旧版実行事故があった）
 
 ---
 
-## ✅ 動作確認済
+## 🚀 次セッションのアクション候補
 
-- **C4-A**: Trade_Snapshot_Builder v1.32 で 72列 CSV 出力 OK
-- **C5 修正**: ATR 値が始まり値基準に補正されてる（T001〜T003 で H1<H4 関係維持）
-- **自動同期**: MT5 出力→Mac 同期 4秒、HTML 再生成自動実行 OK
-- **マニ v0.2**: 円グラフクリッカブル、軸1廃止、ソート、ATR 絶対値表示 OK
+### A. v3 実見継続調整（一歩ずつ方式・あろさん主導）
+- Step2まで反映済み。次の「一歩」はあろさんの実見フィードバック待ち
+- 既出の調整候補: 情報精査の対話（削る作業）
 
----
+### B. 保留中の小物
+- **C6修正**（Daily_MFE_MAEの14:00/15:00ラベル問題。軽い、コー or おぱ直）
+- スコアのD1整合ボーナスバグ（BULL/BEAR表記不一致で日次採用日は常に0点。v2.0から潜在・温存中）
 
-## 🚀 次セッションのアクション
+### C. 次の弾（あろさん言及済み・未着手）
+- **H4インジ**: v4の時間軸拡大版（H4で方向期待値）。「次のステップ」枠
+- 詳細フィルター専用ページ（PatA×期間、BU期等。signals_calendarベース複製で）
+- C3（v4リアルタイム発火ログ）は Fire Logger で実質代替された感あり、要再判断
 
-### A. C4-B 動作確認（最優先 / 軽）
-- `mt5_data/daily_mfe_mae_48h.csv` **まだ 12列**（v1.10 未実行）
-- あろさんが MT5 で XAUUSD_Daily_MFE_MAE_v1.10 を再実行 → 自動 sync 発火 → 24列 CSV になる
-- これで C4 データが完全に揃う
-
-### B. マニ v0.3（時間別 MFE/MAE 列追加）
-- C4-A データ揃ったので drilldown-table に 12/24/36/48h 列追加可能
-- ATR 絶対値ソート × 時間推移列で「ATR帯ごとの典型的な伸び方」探索
-
-### C. C6 候補（XAUUSD_Daily_MFE_MAE_v1 の同種問題）
-- コーが C5 レポート末尾で指摘: 仮想 14:00 JST エントリーで `entry_price` がバー終値時点（=15:00時点）の close を使ってる可能性
-- 確認 + 必要なら shift +1 同様修正
-
-### D. C3（v4 シグナル発火ログ）
-- ずっと保留中。C4 完了後に再判断と合意済
-- 次に動かすかは要相談
+### D. 定例
+- 週次ルーティン（金〜月）: MT5 4本 + ./run_pipeline.sh
+- 8月集中メンテ（フィルター調整・PatA可視化等はここ）
 
 ---
 
-## ⚠️ 注意点
+## ⚠️ 運用メモ
 
-### auto_sync_daily.sh 運用
-- 起動: `cd /Users/aro/Desktop/ADXSCORE && ./auto_sync_daily.sh`
-- バックグラウンド: `nohup ./auto_sync_daily.sh &> auto_sync.log &`
-- 停止: Ctrl+C or `pkill -f auto_sync_daily.sh`
-- bash 3.2 (macOS デフォルト) で動くよう平行配列で実装
+- watcher 起動: `nohup ./auto_sync_daily.sh &> auto_sync.log &` / 停止: `pkill -f auto_sync_daily.sh`（Mac再起動後は手動起動が必要）
+- パイプライン全体像は **PIPELINE.md** 参照（一枚で全部わかる）
+- enriched/signal_fires 系CSVは必ず `encoding="utf-8-sig"`
+- 自動publishが有効: カレンダー再生成のたびに docs/ 3枚が commit+push される（オフライン時はスキップ、次回pushで反映）
 
-### マニ実装の落とし穴（再発防止）
-- enriched CSV (UTF-8 BOM 付き) は **必ず `encoding="utf-8-sig"`** で開く
-- `utf-8` のままだと先頭列キーが `﻿約定日` になり全マッチ失敗
-- generate_daily_calendar.py L120 にコメントで残してる
+## 🧠 今日追加したメモリ
 
-### マニのレポートに対する番人観点
-- マニは「完了した」と書いたが、実は BOM バグで実装が機能してなかった
-- マニのセルフチェック「全件 null ゼロ確認」は信用しすぎず、おぱが実物 HTML で検証する
-- スクショで一発で気付ける（あろさん指摘がキーになった）
-
-### MT5 同期方法（メモ）
-- 現状: シンボリックリンクなし、cp 同期
-- auto_sync_daily.sh が cp + pipeline 自動化
-- MT5 Files/ への mq5 ファイル配置はあろさん手動コピー（変わらず）
-
----
-
-## 💭 マネージャー視点メモ
-
-### 今日のチームおぱ稼働実績
-- **メインおぱ**: 番人レビュー / BOM バグ修正 / 自動同期スクリプト設計実装 / 翻訳全般
-- **コー**: C4 初版 → 緊急修正（構造体化）→ C5 修正、3回起動
-- **マニ**: v0.2 円グラフ起点 UI 実装（途中リミットあり、最後のセルフチェック過信問題は反省点）
-
-### 重要な軌道修正
-1. **マニ役割転換**: 評価役 → 実装相棒（あろさん明示で確定）
-2. **おぱ番人役の明文化**: エントリーロジック混入の番人として実装レビュー必須
-3. **C5 = 始まり値基準**: 研究目的「エントリー時点」の物理的反映
-
-### 翻訳層実感
-あろさん発言で設計が動いた瞬間:
-1. 「ATR の取得位置がおそらく終値か EXIT 基準かな？」→ C5 = shift +1 直前確定バー
-2. 「データ欠損と詳細値が取れてない」→ BOM バグ発見の発端
-3. 「LIMIT 3回転くらいした」→ 引き継ぎモード移行、自然な区切り
-
----
-
-## 🔗 関連ファイル（次セッション用ブックマーク）
-
-### 今日完成した本丸
-- `signals/Trade_Snapshot_Builder.mq5` v1.32（C4 + C5）
-- `signals/XAUUSD_Daily_MFE_MAE_v1.mq5` v1.10（C4-B 実行待ち）
-- `auto_sync_daily.sh`（自動同期 watcher）
-- `data/trades/processed/trades_calendar.html`（マニ v0.2 出力）
-
-### 指示書
-- `data/mani_room/コー_指示書_日次研究データ取得_v0.2.md`
-- `data/mani_room/マニ_指示書_日次研究カレンダー_v0.2.md`
-
-### コー実装レポート
-- `data/mani_room/コー_実装レポート_C4_v1.md`
-- `data/mani_room/コー_実装レポート_C4_v2.md`（構造体化）
-- `data/mani_room/コー_実装レポート_C5_v1.md`（shift +1）
-
-### マニ実装レポート
-- `data/mani_room/マニ_実装レポート_v0.4.md`
-
-### 最重要メモリ
-- `memory/feedback_research-purpose-and-rules.md` ← 必読
-- `memory/feedback_team-opa-role-division.md` ← 新役割分担
-- `memory/project_c4-tier-mfe-mae-pending.md`
-- `memory/feedback_mani-evaluation-criteria.md`（凍結、歴史的記録）
+- `feedback_cognitive-load-reduction-is-the-axis` — 認知負荷低減が主軸。足すより絞る、シグナル系と実行系は同一視覚言語
+- `project_scriptable-widget-operational` — Scriptable運用確立、Phase 6実質クローズ、MT5厳密整合の改修不要
 
 ---
 
 *このファイルは SessionStart hook で自動的に次セッションの Claude に注入される。*
-*次セッションの起点 = 「C4-B 動作確認 + マニ v0.3（時間推移列追加）」*
+*次セッションの起点 = 「v3実見フィードバックの次の一歩」or「C6/H4インジ等の次の弾」*
