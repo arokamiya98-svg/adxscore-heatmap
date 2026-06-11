@@ -2,15 +2,28 @@
 """
 generate_signals_calendar.py
 ────────────────────────────
-シグナル検証カレンダー v1.0（generate_daily_calendar.py を複製・改造）
-指示書: data/mani_room/マニ_指示書_シグナル検証カレンダー_v0.1.md
+統合評価シート v2.0（v1: シグナル検証カレンダー からの進化）
+指示書: data/mani_room/マニ_指示書_統合評価シート_v0.2.md
+        （v1 指示書 マニ_指示書_シグナル検証カレンダー_v0.1.md の仕様・禁止事項は継続有効）
 
-目的（固定・変更禁止）:
-  稼働中 v4 シグナルの発火を可視化・認識して、
-  あろさんが自分の使ってるシグナルへの理解を深める。
-  - シグナルの評価・改良ツールではない（8〜9月メンテの管轄）
-  - 月別・損益集計の類は作らない（研究ルール準拠）
-  - 実トレード表示は「有無 + 方向」のみ（執行確認用オーバーレイ）
+目的（v2 更新）:
+  シグナル発火 × トレード実行の同時認知。
+  「シグナルが出てた日、自分はどう執行したか」が1画面で見える。
+  主軸は「認知負荷を下げて戦略実行精度を上げる」— 解析機能の追加ではない。
+  - 月別・損益集計の類は作らない（研究ルール準拠、継続）
+  - トレードカードに損益額・ロット・累計系は出さない（禁止、指示書 §3.1）
+
+v2.0 変更点:
+  (1) ドリルダウン: トレード日はシグナルカードの下に「実トレードカード」追加
+      - 表示項目（これだけ）: 方向▲▼ / entry→exit JST時刻 / pips（符号で勝敗）/
+        スタイル / ★時間帯ラベル / タグ / h1 MFE/MAE 12/24/36/48h / 新規理由（折りたたみ）
+      - 核心: MFE/MAE 推移をシグナルカードと同一フォーマット（mm-steps）で表示
+        →「シグナルの伸び方」と「自分の執行の置かれた環境」を同じ言語で対比
+      - pips 表示はCSV生値/100（= USD価格幅。MFE/MAE と同スケールに揃える設計判断）
+      - タグは「反省」列（意思決定の正本、generate_daily_calendar v1.4 と同じ参照先）
+      - 新規理由はデフォルト閉の <details>（認知負荷対策）
+  (2) セルのトレード日マーク（枠線+方向）をデフォルト ON に変更（トグルは維持）
+  (3) トレードのみの日（発火ゼロ）もセルクリックでドリルダウン可能に
 
 設計判断（マニ）:
   (1) カレンダーは月〜土の6列グリッド
@@ -146,22 +159,63 @@ n_pass = sum(1 for fr in fires if fr["pass_all"])
 n_supp = n_total - n_pass
 
 # ============================================================
-# 入力: trades_enriched_full.csv（オーバーレイ: 有無 + 方向のみ）
+# 入力: trades_enriched_full.csv（v2: トレードカード用フルデータ）
+# ⚠️ utf-8-sig 必須（BOM事件再発防止）
+#
+# 設計判断（マニ v2）:
+#   - pips: CSV はポイント値（0.01刻み、例 -4000.0）。/100 で USD 価格幅に変換
+#     （検算: T001 entry 5020.00 → exit 4980.00 = -40.0、CSV pips=-4000.0 ✓）
+#     → MFE/MAE（USD価格幅）と同スケールになり「同じ言語での対比」が成立する
+#   - タグ = 「反省」列（あろさんの意思決定の正本。daily_calendar v1.4 と同じ参照先）
+#     「その他」は控えめ表示 / 空欄は非表示
+#   - ★ = 「評価」列（時間帯ラベル）。数値をそのまま ★N 表示、優劣解釈しない
+#   - 出さないもの: 損益額・ロット・累計系・考察・決済理由（指示書 §3.1 禁止）
 # ============================================================
+trades = []
 trades_by_date = defaultdict(list)
-n_trades = 0
 if ENRICHED.exists():
     with open(ENRICHED, encoding="utf-8-sig") as f:
-        for r in csv.DictReader(f):
-            ej = (r.get("entry_jst") or "").strip()
-            if not ej:
-                continue
-            try:
-                d = datetime.strptime(ej[:10], "%Y-%m-%d").date()
-            except ValueError:
-                continue
-            trades_by_date[d].append(r.get("direction", "").upper())
-            n_trades += 1
+        e_rows = list(csv.DictReader(f))
+    assert "trade_id" in e_rows[0], f"BOM混入の疑い: 先頭キー={list(e_rows[0].keys())[0]!r}"
+    for r in e_rows:
+        ej = (r.get("entry_jst") or "").strip()
+        if not ej:
+            continue
+        try:
+            d = datetime.strptime(ej[:10], "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        ex = (r.get("exit_jst") or "").strip()
+        if ex:
+            # 同日決済は HH:MM、日跨ぎは MM-DD HH:MM（日付跨ぎ明示、シグナルカードと同流儀）
+            exit_disp = ex[11:16] if ex[:10] == ej[:10] else ex[5:16]
+        else:
+            exit_disp = "—"
+        pips_raw = _f(r.get("pips"))
+        trades.append({
+            "tid": r.get("trade_id", "").strip(),
+            "date": ej[:10],
+            "_d": d,
+            "entry_time": ej[11:16],
+            "exit_disp": exit_disp,
+            "direction": (r.get("direction") or "").upper(),
+            "pips": None if pips_raw is None else pips_raw / 100.0,  # USD価格幅（MFE/MAEと同スケール）
+            "style": (r.get("スタイル") or "").strip(),
+            "star": (r.get("評価") or "").strip(),
+            "tag": (r.get("反省") or "").strip(),
+            "reason": (r.get("新規理由") or "").strip(),
+            # MFE/MAE 推移（シグナルカードと同一フォーマットで表示するための同キー構造）
+            "mfe": [_f(r.get("h1_mfe_usd_12h")), _f(r.get("h1_mfe_usd_24h")),
+                    _f(r.get("h1_mfe_usd_36h")), _f(r.get("h1_mfe_usd_48h"))],
+            "mae": [_f(r.get("h1_mae_usd_12h")), _f(r.get("h1_mae_usd_24h")),
+                    _f(r.get("h1_mae_usd_36h")), _f(r.get("h1_mae_usd_48h"))],
+            "bars_traced": _f(r.get("h1_bars_traced_48h")),
+        })
+trades.sort(key=lambda t: (t["date"], t["entry_time"]))
+for t in trades:
+    trades_by_date[t["_d"]].append(t)
+n_trades = len(trades)
+n_trade_days = len(trades_by_date)
 
 # ============================================================
 # カレンダー期間（CSVから自動: 月初〜最終月の翌月頭）
@@ -203,7 +257,7 @@ def month_weekdays_sat(year, month):
 html = []
 html.append("""<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8">
-<title>Signals Calendar — マニ v1.0</title>
+<title>評価シート — シグナル × 実トレード</title>
 <style>
 * { box-sizing: border-box; }
 body {
@@ -295,8 +349,8 @@ h1 { font-size: 14px; color: #5a9adf; margin: 0 0 4px; letter-spacing: .08em; }
   display: flex; flex-direction: column;
 }
 .cell.outside { opacity: 0.15; }
-.cell.has-fires { cursor: pointer; }
-.cell.has-fires:hover { border-color: #2a5a9a; background: #0c1422; }
+.cell.has-fires, .cell.has-trade { cursor: pointer; }
+.cell.has-fires:hover, .cell.has-trade:hover { border-color: #2a5a9a; background: #0c1422; }
 .cell.drill-open { border-color: #4a90e2; box-shadow: inset 0 0 0 1px #4a90e2; }
 .cell .day-hdr {
   display: flex; justify-content: space-between; align-items: center;
@@ -313,7 +367,7 @@ h1 { font-size: 14px; color: #5a9adf; margin: 0 0 4px; letter-spacing: .08em; }
 }
 .fire-dot.suppressed { opacity: 0.3; }   /* pass_all=FALSE: 実機なら見えなかった発火 */
 .fire-dot.fhide { display: none; }        /* フィルターで非表示 */
-/* 実トレードオーバーレイ（有無+方向のみ、デフォルトOFF） */
+/* 実トレードオーバーレイ（v2: デフォルトON、トグルで「シグナルのみ」へ即切替可） */
 .cell .trade-mark {
   display: none;
   position: absolute; right: 3px; bottom: 2px;
@@ -387,18 +441,64 @@ body.show-trades .cell .trade-mark { display: block; }
 .mm-legend .mfe-k { color: #8ac8ff; }
 .mm-legend .mae-k { color: #ef9090; }
 
+/* ===== v2: 実トレードカード（シグナルカードの下、トレード日のみ） ===== */
+.trade-sec-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 16px 0 8px; font-size: 10px; font-weight: 700;
+  color: #d8b060; letter-spacing: .08em;
+}
+.trade-sec-hdr::before, .trade-sec-hdr::after {
+  content: ""; flex: 1; height: 1px; background: #4a3c1a;
+}
+.trade-card {
+  border: 1px solid #4a3c1a; border-radius: 6px;
+  background: #0e0c07; margin-bottom: 10px; padding: 10px 12px;
+}
+.trade-card .tc-head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  font-size: 12px; font-weight: 700;
+}
+.trade-card .tc-dir {
+  padding: 1px 7px; border-radius: 3px; font-size: 11px;
+  color: #ffd060; background: rgba(255,208,96,0.10);
+  border: 1px solid #6a5a2a; letter-spacing: .03em;
+}
+.trade-card .tc-time { color: #c8d8e8; font-weight: 600; }
+.trade-card .tc-pips {
+  margin-left: auto; font-size: 12px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.trade-card .tc-pips.pos { color: #5ab8ff; }
+.trade-card .tc-pips.neg { color: #ef6060; }
+.trade-card .tc-pips.flat { color: #8a9ab0; }
+.trade-card .tc-meta { font-size: 10.5px; color: #c8d8e8; display: flex; gap: 12px; flex-wrap: wrap; }
+.trade-card .tc-meta .k { color: #6a5a3a; margin-right: 3px; }
+.trade-card .tc-tag { color: #d8c890; }
+.trade-card .tc-tag.other { color: #5a6a7a; }
+.trade-card .tc-reason { margin-top: 8px; font-size: 10px; }
+.trade-card .tc-reason summary {
+  cursor: pointer; color: #6a5a3a; user-select: none; letter-spacing: .04em;
+}
+.trade-card .tc-reason summary:hover { color: #a89060; }
+.trade-card .tc-reason[open] summary { color: #c8a860; }
+.trade-card .tc-reason-body {
+  margin-top: 6px; color: #a8b8cc; line-height: 1.7;
+  white-space: pre-wrap; background: rgba(0,0,0,0.35);
+  padding: 8px 10px; border-radius: 4px;
+}
+
 .notes { margin-top: 10px; font-size: 10px; color: #4a6a8a; line-height: 1.6; }
 .notes b { color: #6a8aaa; }
-</style></head><body>
+</style></head><body class="show-trades">
 """)
 
 gen_ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-html.append('<h1>SIGNALS CALENDAR — v4発火検証 マニ v1.0</h1>')
+html.append('<h1>評価シート — シグナル発火 × 実トレード（マニ v2.0）</h1>')
 html.append(f'<div class="sub">入力: {FIRES_CSV.name} / 発火 {n_total}件 (pass {n_pass} / 抑制 {n_supp}) / '
             f'期間: {all_fire_dates[0]:%Y-%m-%d} 〜 {all_fire_dates[-1]:%Y-%m-%d} / '
-            f'実トレード {n_trades}件 (オーバーレイ用) / 生成: {gen_ts}</div>')
-html.append('<div class="purpose"><b>目的:</b> 稼働中 v4 シグナルの発火を可視化して、自分の使ってるシグナルへの理解を深める。'
-            '評価・改良ツールではない（8〜9月メンテの管轄）。'
+            f'実トレード {n_trades}件・{n_trade_days}日 / 生成: {gen_ts}</div>')
+html.append('<div class="purpose"><b>目的:</b> シグナル発火とトレード実行を1画面で同時認知して、認知負荷を下げて戦略実行精度を上げる。'
+            '解析ツールではない。トレード日をクリックすると、シグナルカードの下に実トレードカード（同一フォーマットの MFE/MAE 推移付き）。'
             '<b>薄いドット = pass_all=FALSE（フィルター抑制、実機チャートには出ていない発火）</b>。'
             '日付は JST 基準（サーバー金曜深夜 = JST 土曜の発火があるため土曜列あり）。</div>')
 
@@ -417,7 +517,7 @@ html.append('<div class="fgrp"><span class="fttl">方向:</span>'
             '<button class="seg-btn active" data-dir="ALL">ALL</button>'
             '<button class="seg-btn" data-dir="BUY">BUY ▲</button>'
             '<button class="seg-btn" data-dir="SELL">SELL ▼</button></div>')
-html.append('<div class="fgrp"><button class="trade-toggle" id="trade-toggle">実トレード表示 OFF</button></div>')
+html.append('<div class="fgrp"><button class="trade-toggle active" id="trade-toggle">実トレード表示 ON</button></div>')
 html.append(f'<div class="fgrp"><span id="visible-count"></span></div>')
 html.append('</div>')
 
@@ -432,16 +532,18 @@ html.append('<div class="grp"><span class="ttl">形=方向:</span><span>▲ BUY 
 html.append('<div class="grp"><span class="ttl">薄表示:</span>'
             '<span class="lg-dot" style="opacity:0.3;color:#FFD700;">▲</span>'
             '<span>pass_all=FALSE（フィルター抑制 = 実機では見えなかった発火）</span></div>')
-html.append('<div class="grp"><span class="ttl">実トレード(ON時):</span>'
+html.append('<div class="grp"><span class="ttl">実トレード(デフォルトON):</span>'
             '<span style="box-shadow: inset 0 0 0 2px rgba(255,208,96,0.55); padding:1px 6px; border-radius:3px;">枠</span>'
             '<span style="color:#ffd060;font-weight:700;">▲/▼=エントリー方向</span>'
-            '<span style="opacity:0.6;">有無+方向のみ（執行確認用）</span></div>')
+            '<span style="opacity:0.6;">詳細は日クリック（トグルOFFで「シグナルのみ」表示）</span></div>')
 html.append('</div>')
 
 # ===== 月ループ =====
 emitted_dot_count = 0          # 検証用: HTML に出した fire-dot 数
 emitted_dot_fids = []          # 検証用: 出した fire_id
 cell_dates_rendered = set()    # 検証用: in-month セルの日付集合
+emitted_trade_cells = set()    # 検証用: has-trade セルの日付集合（v2）
+emitted_trade_marks = 0        # 検証用: トレード方向マーク総数（v2）
 DOW_LABELS = ["月", "火", "水", "木", "金", "土"]
 
 for m_start in month_iter(start, end):
@@ -481,6 +583,8 @@ for m_start in month_iter(start, end):
             for fr in day_fires:
                 state = "pass" if fr["pass_all"] else "抑制"
                 tip_parts.append(f"{fr['time_jst']} {fr['pattern']} {fr['direction']} ({state})")
+            for t in day_trades:
+                tip_parts.append(f"実トレード {t['entry_time']} {t['direction']}")
             title = " | ".join(tip_parts)
 
             html.append(f'<div class="{" ".join(classes)}" data-date="{d:%Y-%m-%d}" title="{title}">')
@@ -502,17 +606,20 @@ for m_start in month_iter(start, end):
                 emitted_dot_fids.append(fr["fid"])
             html.append('</div>')
             if day_trades:
-                marks = "".join("▲" if t == "BUY" else "▼" for t in day_trades)
+                marks = "".join("▲" if t["direction"] == "BUY" else "▼" for t in day_trades)
                 html.append(f'<span class="trade-mark">{marks}</span>')
+                emitted_trade_cells.add(d)
+                emitted_trade_marks += len(day_trades)
             html.append('</div>')
         html.append('</div>')
     html.append('</div>')
 
 html.append('<div class="notes">'
             '<b>注:</b> サーバー時間 = チャート表示時間（ドリルダウンに併記、チャート照合用）。'
-            'MFE/MAE は発火後 48h 固定追跡（12/24/36/48h スナップショット、USD建て）。'
+            'MFE/MAE は発火/エントリー後 48h 固定追跡（12/24/36/48h スナップショット、USD建て）。'
             '環境値は段階ラベル優先（生値は括弧内の補助表示）。'
-            'このツールは発火の認識用 — 月別・累計の損益/勝率サマリーは置かない（研究ルール準拠）。'
+            'トレードカードの pips は価格幅（USD換算、MFE/MAE と同スケール）。'
+            'このツールはシグナル×実行の同時認知用 — 月別・累計の損益/勝率サマリーは置かない（研究ルール準拠）。'
             '</div>')
 
 # ============================================================
@@ -521,22 +628,30 @@ html.append('<div class="notes">'
 fires_json = [{k: v for k, v in fr.items() if k != "_d"} for fr in fires]
 json_blob = json.dumps(fires_json, ensure_ascii=False).replace("</", "<\\/")
 colors_blob = json.dumps(PATTERN_COLORS)
+trades_json = [{k: v for k, v in t.items() if k != "_d"} for t in trades]
+trades_blob = json.dumps(trades_json, ensure_ascii=False).replace("</", "<\\/")
 
 html.append('<div id="drill">'
             '<div class="drill-head"><span class="drill-title" id="drill-title"></span>'
             '<button class="drill-close" id="drill-close">閉じる ✕</button></div>'
             '<div class="drill-note">サーバー時間 = チャート表示時間（照合用）。'
-            '薄カード = pass_all=FALSE（実機チャート非表示の発火）。バー長 = カード内の最大値基準（伸び方の形を見る用）。</div>'
+            '薄カード = pass_all=FALSE（実機チャート非表示の発火）。バー長 = カード内の最大値基準（伸び方の形を見る用）。'
+            'トレードカードの pips は価格幅（USD、MFE/MAE と同スケール）。</div>'
             '<div class="drill-body" id="drill-body"></div></div>')
 
 html.append("<script>")
 html.append(f"const FIRES = {json_blob};")
 html.append(f"const PAT_COLORS = {colors_blob};")
+html.append(f"const TRADES = {trades_blob};")
 html.append("""
 // ============ インデックス ============
 const byDate = {};
 for (const f of FIRES) {
   (byDate[f.date] = byDate[f.date] || []).push(f);
+}
+const tradesByDate = {};
+for (const t of TRADES) {
+  (tradesByDate[t.date] = tradesByDate[t.date] || []).push(t);
 }
 
 // ============ フィルター状態 ============
@@ -655,23 +770,64 @@ function fireCard(f) {
     filt + mmSteps(f);
 }
 
+// ============ v2: 実トレードカード ============
+// シグナルカードと同一フォーマットの MFE/MAE 推移（mmSteps を共用）— 認知サポートの核心
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function tradeCard(t) {
+  const glyph = t.direction === "BUY" ? "▲" : "▼";
+  let pipsCls = "flat", pipsTxt = "±0.0";
+  if (t.pips !== null && t.pips > 0) { pipsCls = "pos"; pipsTxt = "+" + t.pips.toFixed(1); }
+  else if (t.pips !== null && t.pips < 0) { pipsCls = "neg"; pipsTxt = t.pips.toFixed(1); }
+  const meta = [];
+  if (t.style) meta.push(`<span>${esc(t.style)}</span>`);
+  if (t.star) meta.push(`<span>★${esc(t.star)}</span>`);
+  if (t.tag) {
+    const otherCls = t.tag === "その他" ? " other" : "";
+    meta.push(`<span class="tc-tag${otherCls}">#${esc(t.tag)}</span>`);
+  }
+  const reason = t.reason
+    ? `<details class="tc-reason"><summary>新規理由 ▸</summary>` +
+      `<div class="tc-reason-body">${esc(t.reason)}</div></details>`
+    : "";
+  return `<div class="trade-card">` +
+    `<div class="tc-head"><span class="tc-dir">${glyph} ${t.direction}</span>` +
+    `<span class="tc-time">${t.entry_time} → ${t.exit_disp} JST</span>` +
+    `<span class="tc-pips ${pipsCls}">${pipsTxt} pips</span></div>` +
+    (meta.length ? `<div class="tc-meta">${meta.join("")}</div>` : "") +
+    mmSteps(t) + reason + `</div>`;
+}
+
 function renderDrill(dateStr) {
   openDate = dateStr;
   const all = byDate[dateStr] || [];
+  const dayTrades = tradesByDate[dateStr] || [];
   const shown = all.filter(f => fireVisible(f.pattern, f.direction, f.pass_all));
   const hidden = all.length - shown.length;
   document.getElementById("drill-title").textContent =
-    `${dateStr} — 発火 ${all.length}件${hidden ? `（フィルターで ${hidden} 件非表示中）` : ""}`;
-  document.getElementById("drill-body").innerHTML =
-    shown.length ? shown.map(fireCard).join("")
-      : '<div style="color:#4a6a8a;font-size:11px;padding:20px 0;text-align:center;">現在のフィルター条件で表示できる発火がありません</div>';
+    `${dateStr} — 発火 ${all.length}件${hidden ? `（フィルターで ${hidden} 件非表示中）` : ""}` +
+    (dayTrades.length ? ` / 実トレード ${dayTrades.length}件` : "");
+  let body;
+  if (shown.length) {
+    body = shown.map(fireCard).join("");
+  } else if (all.length) {
+    body = '<div style="color:#4a6a8a;font-size:11px;padding:20px 0;text-align:center;">現在のフィルター条件で表示できる発火がありません</div>';
+  } else {
+    body = '<div style="color:#4a6a8a;font-size:11px;padding:20px 0;text-align:center;">この日のシグナル発火はありません</div>';
+  }
+  if (dayTrades.length) {
+    body += `<div class="trade-sec-hdr">実トレード ${dayTrades.length}件</div>` +
+      dayTrades.map(tradeCard).join("");
+  }
+  document.getElementById("drill-body").innerHTML = body;
   drill.classList.add("open");
   document.querySelectorAll(".cell.drill-open").forEach(c => c.classList.remove("drill-open"));
   const cell = document.querySelector(`.cell[data-date="${dateStr}"]`);
   if (cell) cell.classList.add("drill-open");
 }
 
-document.querySelectorAll(".cell.has-fires").forEach(cell => {
+document.querySelectorAll(".cell.has-fires, .cell.has-trade").forEach(cell => {
   cell.addEventListener("click", () => renderDrill(cell.dataset.date));
 });
 document.getElementById("drill-close").addEventListener("click", () => {
@@ -690,7 +846,7 @@ OUT_HTML.write_text("\n".join(html), encoding="utf-8")
 # セルフチェック（完了条件の検証出力 — 指示書 §5）
 # ============================================================
 print("=" * 60)
-print("signals_calendar.html セルフチェック")
+print("signals_calendar.html セルフチェック (v2)")
 print("=" * 60)
 print(f"[1] CSV読込件数            : {n_total} 件（期待 389）")
 print(f"[2] HTML描画 fire-dot 数   : {emitted_dot_count} 件（期待 389）")
@@ -710,6 +866,35 @@ assert emitted_dot_count == 389, "HTML描画数が389ではない"
 assert not missing_fids and dup == 0, "欠落または重複あり"
 assert (n_pass, n_supp) == (265, 124), "pass_all集計が指示書と不一致"
 assert not not_in_cells, "カレンダー外の発火日あり"
+
+# ----- v2: トレード統合の検証（指示書 v0.2 §4 完了条件） -----
+print()
+print(f"[v2-1] trades_enriched 読込    : {n_trades} 件 / {n_trade_days} 日（distinct entry_jst 日付）")
+print(f"[v2-2] has-trade セル描画      : {len(emitted_trade_cells)} 日（期待 = {n_trade_days}）")
+print(f"[v2-3] トレード方向マーク描画  : {emitted_trade_marks} 個（期待 = {n_trades}）")
+trade_days_missing = set(trades_by_date.keys()) - emitted_trade_cells
+print(f"[v2-4] セル未描画のトレード日  : {sorted(str(d) for d in trade_days_missing) if trade_days_missing else 'なし（全トレード日がカレンダー内）'}")
+trade_only_days = sorted(str(d) for d in trades_by_date if d not in fires_by_date)
+print(f"[v2-5] 発火ゼロのトレード日    : {len(trade_only_days)} 日 {trade_only_days}（クリック可・ドリルダウン対応）")
+assert len(emitted_trade_cells) == n_trade_days, "トレード日セル数が不一致"
+assert emitted_trade_marks == n_trades, "トレードマーク数が不一致"
+assert not trade_days_missing, "カレンダー外のトレード日あり"
+
+print()
+print("[v2-6] トレードカード内容検証（サンプル日）:")
+for ds in ("2026-05-29", "2026-06-02"):
+    d_key = datetime.strptime(ds, "%Y-%m-%d").date()
+    day_t = trades_by_date.get(d_key, [])
+    day_f = fires_by_date.get(d_key, [])
+    print(f"  {ds}: シグナル {len(day_f)}件 / 実トレード {len(day_t)}件")
+    for t in day_t:
+        pips_txt = "—" if t["pips"] is None else f"{t['pips']:+.1f}"
+        meta = " ".join(x for x in (t["style"], f"★{t['star']}" if t["star"] else "", f"#{t['tag']}" if t["tag"] else "") if x)
+        print(f"    [{t['direction']}] {t['entry_time']} → {t['exit_disp']} JST  {pips_txt} pips  {meta}")
+        mm = " → ".join(f"{h}h: {mfe:.1f}/{mae:.1f}" for h, mfe, mae in
+                        zip((12, 24, 36, 48), t["mfe"], t["mae"]))
+        print(f"      MFE/MAE: {mm}")
+        print(f"      新規理由: {'あり(折りたたみ・デフォルト閉)' if t['reason'] else 'なし'}")
 
 print()
 print("[8] ドリルダウン検証 (2026-06-04 / 2026-06-05):")
