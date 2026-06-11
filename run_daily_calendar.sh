@@ -21,10 +21,12 @@ cd "$(dirname "$0")"
 
 OPEN_BROWSER=true
 DO_SYNC=true
+DO_PUBLISH=true
 for arg in "$@"; do
   case "$arg" in
     --no-open) OPEN_BROWSER=false ;;
     --no-sync) DO_SYNC=false ;;
+    --no-publish) DO_PUBLISH=false ;;
   esac
 done
 
@@ -87,12 +89,28 @@ echo ""
 HTML_PATH="$(pwd)/data/trades/processed/trades_calendar.html"
 
 # ── Step 2.5: docs/ へミラー (GitHub Pages 公開用) ─────────
-# iPhone/iPad からアドレス経由で閲覧するため (push 後に反映)
+# iPhone/iPad からアドレス経由で閲覧するため
 if [ -f "$HTML_PATH" ]; then
   cp "$HTML_PATH" docs/trades_calendar.html
-  echo "  🌍 docs/trades_calendar.html へミラー (push で公開反映)"
+  echo "  🌍 docs/trades_calendar.html へミラー"
 fi
 echo ""
+
+# ── Step 2.6: 自動 publish (docs/trades_calendar.html のみ) ─
+# 失敗 (オフライン等) してもパイプラインは止めない
+if [ "$DO_PUBLISH" = true ] && [ -f docs/trades_calendar.html ]; then
+  if ! git diff --quiet -- docs/trades_calendar.html 2>/dev/null; then
+    echo "▶ Step 2.6: GitHub Pages へ自動 publish"
+    if git add docs/trades_calendar.html \
+       && git commit -q -m "chore: auto-publish trades calendar" -- docs/trades_calendar.html \
+       && git push -q origin main; then
+      echo "  ✅ push 完了 → 数十秒で iPhone/iPad に反映"
+    else
+      echo "  ⚠️ publish 失敗 (オフライン?) — 次回 push で反映される"
+    fi
+    echo ""
+  fi
+fi
 
 echo "╔══════════════════════════════════════════════════╗"
 echo "║  ✅ 振り返りカレンダー完了                          ║"

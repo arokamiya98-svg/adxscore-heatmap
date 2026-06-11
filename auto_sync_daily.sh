@@ -34,6 +34,17 @@ get_latest_input() {
   ls -t data/mani_room/raw/imports/FX_*.csv 2>/dev/null | head -1
 }
 
+# FX_*.csv の状態シグネチャ（最新ファイルパス + mtime）
+get_fx_signature() {
+  local f
+  f=$(get_latest_input)
+  if [ -n "$f" ]; then
+    echo "$f:$(stat -f %m "$f")"
+  else
+    echo "none"
+  fi
+}
+
 ts() { date +"%H:%M:%S"; }
 
 echo "╔══════════════════════════════════════════════════╗"
@@ -60,12 +71,34 @@ for i in "${!TARGETS[@]}"; do
     echo "  [初期] $f (未生成)"
   fi
 done
+# FX_*.csv（アプリ書き出しCSV）の新着監視
+LAST_FX_SIG=$(get_fx_signature)
+echo "  [初期] FX_*.csv sig=$LAST_FX_SIG"
 echo ""
 echo "[$(ts)] 監視開始..."
 
 trap 'echo ""; echo "[$(ts)] 監視停止"; exit 0' INT TERM
 
 while true; do
+  # ── FX_*.csv 新着検知 → trade_input.csv 生成 → MT5 Files/ へ自動配置 ──
+  FX_SIG=$(get_fx_signature)
+  if [ "$FX_SIG" != "$LAST_FX_SIG" ] && [ "$FX_SIG" != "none" ]; then
+    LAST_FX_SIG="$FX_SIG"
+    echo ""
+    echo "[$(ts)] ▶ FX_*.csv 新着検知: ${FX_SIG%%:*}"
+    sleep $WRITE_SETTLE
+    if PREP_OUT=$(python3 scripts/prepare_trade_input.py \
+        --input "${FX_SIG%%:*}" \
+        --output "$DEST/trade_input.csv" 2>&1); then
+      echo "$PREP_OUT" | tail -3
+      cp "$DEST/trade_input.csv" "$MT5_FILES/trade_input.csv"
+      echo "[$(ts)] ✅ trade_input.csv を MT5 Files/ へ配置 — MT5 で Trade_Snapshot_Builder を実行してね"
+    else
+      echo "$PREP_OUT" | tail -5
+      echo "[$(ts)] ⚠️ prepare_trade_input.py 失敗、MT5 配置スキップ"
+    fi
+  fi
+
   CHANGED=()
   for i in "${!TARGETS[@]}"; do
     f="${TARGETS[$i]}"

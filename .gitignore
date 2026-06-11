@@ -2,3 +2,6 @@
 
 # トレード履歴（個人情報含む。public repoには出さない）
 data/trades/
+
+# 自動同期 watcher のログ
+auto_sync.log
