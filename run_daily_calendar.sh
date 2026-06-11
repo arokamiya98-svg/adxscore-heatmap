@@ -99,6 +99,10 @@ if [ -f "$DEST/signal_fires.csv" ]; then
   echo ""
 fi
 
+echo "▶ Step 2c: 日次認識カレンダー v3 生成 (generate_daily_calendar_v3.py)"
+python3 scripts/generate_daily_calendar_v3.py | tail -3
+echo ""
+
 HTML_PATH="$(pwd)/data/trades/processed/trades_calendar.html"
 
 # ── Step 2.5: docs/ へミラー (GitHub Pages 公開用) ─────────
@@ -112,16 +116,22 @@ if [ -f "$SIGNALS_HTML" ]; then
   cp "$SIGNALS_HTML" docs/signals_calendar.html
   echo "  🌍 docs/signals_calendar.html へミラー"
 fi
+V3_HTML="$(pwd)/data/trades/processed/daily_calendar_v3.html"
+if [ -f "$V3_HTML" ]; then
+  cp "$V3_HTML" docs/daily_calendar_v3.html
+  echo "  🌍 docs/daily_calendar_v3.html へミラー"
+fi
 echo ""
 
-# ── Step 2.6: 自動 publish (docs/ のカレンダー2枚のみ) ─────
+# ── Step 2.6: 自動 publish (docs/ のカレンダー3枚のみ) ─────
 # 失敗 (オフライン等) してもパイプラインは止めない
+PUBLISH_FILES="docs/trades_calendar.html docs/signals_calendar.html docs/daily_calendar_v3.html"
 if [ "$DO_PUBLISH" = true ] && [ -f docs/trades_calendar.html ]; then
-  if ! git diff --quiet -- docs/trades_calendar.html docs/signals_calendar.html 2>/dev/null \
-     || [ -n "$(git status --porcelain docs/signals_calendar.html 2>/dev/null)" ]; then
+  if ! git diff --quiet -- $PUBLISH_FILES 2>/dev/null \
+     || [ -n "$(git status --porcelain $PUBLISH_FILES 2>/dev/null)" ]; then
     echo "▶ Step 2.6: GitHub Pages へ自動 publish"
-    if git add docs/trades_calendar.html docs/signals_calendar.html 2>/dev/null \
-       && git commit -q -m "chore: auto-publish calendars" -- docs/trades_calendar.html docs/signals_calendar.html \
+    if git add $PUBLISH_FILES 2>/dev/null \
+       && git commit -q -m "chore: auto-publish calendars" -- $PUBLISH_FILES \
        && git push -q origin main; then
       echo "  ✅ push 完了 → 数十秒で iPhone/iPad に反映"
     else
