@@ -401,13 +401,17 @@ ADXSCORE/
 - **データフロー**: GitHub Pages公開 → Widget Web で表示
 - **理由**: 週次マクロ前提なら、リアルタイム数値より「HTML丸ごと表示」の方が情報量・運用の楽さで有利
 
-#### Stage 9: Scriptableリアルタイムウィジェット 🟡 構想段階（2026-06-04 復活）
+#### Stage 9: Scriptableリアルタイムウィジェット 🟢 稼働中（2026-06-05〜）
 - **位置づけ**: 旧Stage 2「日次配信化」を発展統合 → **配信不要のLIVE構造**へ
-- **採用ツール**: **Scriptable**（iOS）でウィジェット実装
-- **データソース**: **Twelve Data API**（生値常時取得）← 旧Stage 5廃案から復活
-- **配置**: ホーム画面下半分（Widget Web窓下の白丸スロット）
-- **役割**: リアルタイム現場ツール（各足ATR凪判定、危険信号、特に「凪離脱」警告）
-- **次セッション以降**: あろさんと擦り合わせ → 設計 → コー実装
+- **採用ツール**: **Scriptable**（iOS、4x2 medium ウィジェット）
+- **データソース**: **Twelve Data API** `/time_series` + 自前 Wilder ATR 計算（MT5 iATR 整合性目標）
+- **配置**: iPad ホーム画面下半分（Widget Web窓下）
+- **設計コンセプト**: 「**価格を見ずに認識するためのライブツール**」
+- **表示**: H1 ATR(16) / H1 ATR(32) / H4 ATR(8) HIGH閾値判定 + 今週トレード回数（[+1] / ⟲リセット）
+- **動的演出**: お店風ステータスメッセージ 4状態×16フレーズ（🍜冷やし中華始めました / ♨️お湯沸いてます / 🔥仕込み真っ最中 / 🏪本日は店じまい etc）← [[recognition-tool-keep-it-playful]] の設計指針による
+- **インタラクション**: 閾値タップで Alert ダイアログ → iCloud File に保存 / +1で `atr_widget_state.json` 更新 / 月曜00:00 自動リセット
+- **仕様**: `data/scriptable/SPEC_atr_widget_v1.md` / 実装: `data/scriptable/atr_widget.js`
+- **残課題**: Phase 6（MT5 iATR と Scriptable 値の 1週間フォワード整合性比較）
 
 > 📌 **Stage 5 と Stage 9 の住み分け**
 > - Stage 5（Widget Web）: 1日1回更新の俯瞰、週次マクロ

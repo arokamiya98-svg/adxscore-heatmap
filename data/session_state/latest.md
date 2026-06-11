@@ -1,143 +1,171 @@
-# 次セッションへの引き継ぎ（2026-06-04 PM終了時点）
+# 次セッションへの引き継ぎ（2026-06-11 終了時点）
 
 ## 🎯 今日の最大の収穫
 
-**「マニの再定義」とトレード視覚化土台の完成**:
+**コー C4 + C5 完走 / マニ v0.2 完走 / 自動同期パイプライン稼働開始**
 
-1. **マニの役割が180度変わった** ← 構想転換
-   - 当初: トレード哲学・資金管理・戦略・期待値・リソース全部背負う**メンタルアドバイザー**
-     → 自分でAI自作レベル、重すぎて頓挫
-   - 新定義: **視覚化エンジン + 照合データレイヤー**
-     → 「あろさんが見て直感で気づける土台」を作る役。評価役ではない
-   - 名前由来: 姫路・円鏡寺のマニ殿 + マニー(money)の語感一致
+セッションリミット3回転のでかい日。マニ役割転換、研究目的整合バグ修正、自動同期環境構築まで一気に進んだ。
 
-2. **ドキュメント整合性メンテ完了** (午前)
-   - CLAUDE.md v11 → v12 (Stage 2/3/4 済化、Stage 8 フォワード/Stage 9 Scriptable+Twelve 新設)
-   - data/INVENTORY.md 全面リライト (BT世代1/2分離、scripts/ + docs/ セクション新規)
-   - Stage 5 (Widget Web=週次マクロ専用1日更新) vs Stage 9 (Scriptable+Twelve=リアルタイム生値) の住み分け明記
-   - コミット `c9c2dca` → push済み
+---
 
-3. **トレード履歴の管理基盤** (午後)
-   - リポジトリ PUBLIC のため `data/trades/` を `.gitignore` 追加（個人情報保護）
-   - アプリCSV (35件, 2026-02-17〜06-02) を `data/trades/raw/` に配置
-   - TAG_SPEC v0.1 ドラフト (4軸: 時間帯/シグナルor裁量/パターン名/フェーズ認識)
+## 📦 主要成果物
 
-4. **マニ初回レポート v0.1**（驚きの発見3つ）
-   - ★3 ロンドン前ZONE **完全死亡帯** (N=4, 勝率0%, 累計 -54,000円) → 物理フィルター案件
-   - 最大ロット **1.00 = 平均0.081 の 12倍** 異常値 → 感情エントリーの疑い (未解明、次回確認)
-   - 売買の非対称性が実トレに出現 (買い+81,500円 / 売り-22,800円) → BT世代2の「買いは押し目」と一致
-   - 4月以降の控えは**正しい遂行性** (相場薄→見送り)、「成績低迷」と評価しないことをレポに明記
+### mq5（コー案件）
+- `signals/Trade_Snapshot_Builder.mq5` v1.31 → **v1.32**
+  - **C4**: H4 12/24/36h MFE/MAE 6列 + D1 24h 2列 追加（56列→72列）
+  - **C4 緊急修正**: MQL5 64引数上限超過 → WriteRow を構造体 `TradeSnapshotRow` に集約
+  - **C5**: shift +1 修正（エントリーバー→直前確定バー）→ 始まり値基準の ATR/ADX/DI/Pattern 取得
+- `signals/XAUUSD_Daily_MFE_MAE_v1.mq5` v1 → **v1.10**（コードのみ完成、CSV未反映）
 
-5. **トレードカレンダー v0.2**（視覚化第一弾完成）
-   - v0.1 (フェーズ背景+ATR Zone) は **ATR粒度差問題であろさん却下**
-   - v0.2 = **H4 ADX×DI軸 (6階調) 背景 + H4 Phase Auto バッジ**
-     - 「BUバッジだがADXは凪/弱」= 凪離脱フェイク温床、が一目でわかる構造
-     - 凪離脱バッジは黄色警告 + 枠光り
-   - あろさん承認「いい感じ」
+### Python / Bash（おぱ案件）
+- `scripts/generate_daily_calendar.py` BOM バグ修正（`utf-8-sig` で enriched 読み込み）
+  - → drilldown-table の H1 ATR / H4 ATR / MFE / MAE 全列「—」が解消
+  - → カレンダー「追跡欠損」も同時解消
+- **`auto_sync_daily.sh` 新規**（bash 3.2 平行配列で実装、fswatch 不要）
+  - 2秒間隔 ポーリング → MT5 Files mtime 検知 → 自動 sync + pipeline 実行
+  - 動作確認済（07:57:37 出力 → 07:57:41 同期 = 4秒）
 
-## 📦 今日の成果物
+### マニ案件
+- `scripts/generate_daily_calendar.py` (マニ v0.2 完了)
+  - 円グラフ4つクリッカブル化（反省タグ/勝敗/D1フェーズ/曜日）
+  - 軸1「シグナル別統計テーブル」廃止
+  - 全数値列の昇降ソート対応（ATR 絶対値で並べる）
+- `data/mani_room/マニ_実装レポート_v0.4.md`
 
-### コミット
-- `c9c2dca` docs: CLAUDE.md v12 + INVENTORY.md (push済み)
-- `1fe4ac6` feat: Mani foundation (.gitignore + scripts 2本) **← 未push**
+### 指示書・レポート
+- `data/mani_room/コー_指示書_日次研究データ取得_v0.2.md` (C1〜C4)
+- `data/mani_room/マニ_指示書_日次研究カレンダー_v0.2.md`
+- `data/mani_room/コー_実装レポート_C4_v1.md`, `..._v2.md`（緊急修正）, `..._C5_v1.md`
 
-### 新規ファイル
-- `scripts/mani_initial_report.py` (git管理)
-- `scripts/generate_trades_calendar.py` (git管理)
-- `data/trades/TAG_SPEC.md` (git管理外)
-- `data/trades/raw/FX_20260604_152941.csv` (git管理外)
-- `data/trades/processed/MANI_REPORT_v0.1.md` (git管理外)
-- `data/trades/processed/trades_calendar.html` (git管理外)
+### メモリ
+- `feedback_team-opa-role-division.md` **新規**（マニ役割転換、おぱ番人役の明文化）
+- `project_c4-tier-mfe-mae-pending.md` **新規**（C4 案件固定情報）
+- `feedback_mani-evaluation-criteria.md` 凍結ラベル化（旧マニ役割は歴史的記録に）
 
-### 更新
-- `.gitignore` (`data/trades/` 除外追加)
-- `CLAUDE.md` (v11→v12)
-- `data/INVENTORY.md` (全面リライト)
+---
 
-## 🚀 次セッションのアクション候補
+## 🔑 確定した重要原則
 
-### 最優先 (あろさん側のアプリ運用)
-1. **TAG_SPEC.md の見直し** (`data/trades/TAG_SPEC.md`)
-   - 4軸（時間帯/シグナルor裁量/パターン名/フェーズ認識）の取捨選択
-   - 必要なら軸の追加/削除
-2. **新規エントリーから4軸タグ運用開始**
-   - テンプレ例: `[★1 #PatC #BU期 #シグナル]` + 自由文
-   - 「新規理由」「考察」テンプレ採用
-3. **余裕あれば過去分の軸B(シグナル/裁量)遡り編集**
-   - 全軸は無理せず、シグナル一致だけでも記録
+### マニ役割転換（2026-06-10〜）
+旧: 振り返り評価役、3軸分離評価、カウンセリング
+新: **分析プラットフォーム実装相棒**（HTML/JS 設計詳細）
 
-### 中優先（おぱ側で進められる）
-4. **未push分の `1fe4ac6` を push** (GitHub Pagesには影響なし)
-5. **ロット1.00異常値の解明** ← マニ視点で最大の関心事
-6. **W16 (2026-04中旬) のフェーズデータ欠損調査** (process_wavelog.py の境界処理問題か)
+### チームおぱ役割分担
+- あろさん = 方向性
+- メインおぱ = **翻訳・クッション・エントリーロジック混入の番人**
+- マニ = 分析プラットフォーム実装
+- コー = MT5 mq5 実装
 
-### 1〜2ヶ月後 or 8月集中メンテで
-7. **CSV再エクスポート → カレンダー v0.3** 
-   - シグナル/パターン印字分け本実装（タグ運用が回ってから）
-8. **マニレポート v0.2** (本格分析)
-   - 自己認識フェーズ × 実マクロフェーズ整合性
-   - シグナル一致トレード単独集計
-   - 4タイプ分類（いい/悪い × 勝ち/負け）
-9. **インジ(v4) メンテナンスとマニ知見の循環**
-   - マニで見えた「死亡帯」「フェイク帯」を v4 フィルターに反映するサイクル
+### C5 で確立した研究目的整合性
+- スナップショット = **エントリー時点で利用可能だった値だけ取得**
+- iBarShift(exact=false) はエントリーバーを返す → そのバー終値時点 = 未来情報
+- 修正: shift +1 で直前確定バーの値を取る
+- 同種バグは他 mq5 にも潜在する可能性（C6 候補）
 
-## ⚠️ 注意点・原則メモ
+---
 
-- **data/trades/ は git管理外** (リポジトリPUBLIC、個人情報保護)
-- **マニは評価役ではない** ← 重要原則
-  - 評価レポートを作ると「並べただけ」になる
-  - 役割は「視覚化 + 照合データ」、判断はあろさんが行う
-- **カレンダーv0.2 設計**:
-  - 背景 = H4 ADX×DI (6階調、伸びた/伸びないが一目)
-  - 構造ラベル = h4_phase_auto バッジ (凪離脱は黄色警告)
-  - ATR表示は粒度差で誤解を生むため使わない
-- **シグナル/パターン印字分けは焦らない**
-  - 過去分を推定タグで埋めると「間違った刷り込み」になる
-  - アプリ側タグ運用が回ってから本実装
-- **マニ運用サイクル**: あろさんがアプリでタグ運用 → CSV再エクスポート → マニ分析 → インジ更新 → 運用継続
+## ✅ 動作確認済
 
-## 🔧 環境メモ
+- **C4-A**: Trade_Snapshot_Builder v1.32 で 72列 CSV 出力 OK
+- **C5 修正**: ATR 値が始まり値基準に補正されてる（T001〜T003 で H1<H4 関係維持）
+- **自動同期**: MT5 出力→Mac 同期 4秒、HTML 再生成自動実行 OK
+- **マニ v0.2**: 円グラフクリッカブル、軸1廃止、ソート、ATR 絶対値表示 OK
 
-- v4 mq5 フォワード稼働継続 (Day 0 → Day +1)
-- 2026-06-04 ベースの v12 ドキュメント反映済
-- Widget Web: heatmap_v14.html 自動更新中
-- Scriptable+Twelve は構想段階 (Stage 9)、次セッション以降の擦り合わせ案件
+---
+
+## 🚀 次セッションのアクション
+
+### A. C4-B 動作確認（最優先 / 軽）
+- `mt5_data/daily_mfe_mae_48h.csv` **まだ 12列**（v1.10 未実行）
+- あろさんが MT5 で XAUUSD_Daily_MFE_MAE_v1.10 を再実行 → 自動 sync 発火 → 24列 CSV になる
+- これで C4 データが完全に揃う
+
+### B. マニ v0.3（時間別 MFE/MAE 列追加）
+- C4-A データ揃ったので drilldown-table に 12/24/36/48h 列追加可能
+- ATR 絶対値ソート × 時間推移列で「ATR帯ごとの典型的な伸び方」探索
+
+### C. C6 候補（XAUUSD_Daily_MFE_MAE_v1 の同種問題）
+- コーが C5 レポート末尾で指摘: 仮想 14:00 JST エントリーで `entry_price` がバー終値時点（=15:00時点）の close を使ってる可能性
+- 確認 + 必要なら shift +1 同様修正
+
+### D. C3（v4 シグナル発火ログ）
+- ずっと保留中。C4 完了後に再判断と合意済
+- 次に動かすかは要相談
+
+---
+
+## ⚠️ 注意点
+
+### auto_sync_daily.sh 運用
+- 起動: `cd /Users/aro/Desktop/ADXSCORE && ./auto_sync_daily.sh`
+- バックグラウンド: `nohup ./auto_sync_daily.sh &> auto_sync.log &`
+- 停止: Ctrl+C or `pkill -f auto_sync_daily.sh`
+- bash 3.2 (macOS デフォルト) で動くよう平行配列で実装
+
+### マニ実装の落とし穴（再発防止）
+- enriched CSV (UTF-8 BOM 付き) は **必ず `encoding="utf-8-sig"`** で開く
+- `utf-8` のままだと先頭列キーが `﻿約定日` になり全マッチ失敗
+- generate_daily_calendar.py L120 にコメントで残してる
+
+### マニのレポートに対する番人観点
+- マニは「完了した」と書いたが、実は BOM バグで実装が機能してなかった
+- マニのセルフチェック「全件 null ゼロ確認」は信用しすぎず、おぱが実物 HTML で検証する
+- スクショで一発で気付ける（あろさん指摘がキーになった）
+
+### MT5 同期方法（メモ）
+- 現状: シンボリックリンクなし、cp 同期
+- auto_sync_daily.sh が cp + pipeline 自動化
+- MT5 Files/ への mq5 ファイル配置はあろさん手動コピー（変わらず）
+
+---
 
 ## 💭 マネージャー視点メモ
 
-**今日のチームおぱ稼働実績**:
-- メインおぱ: ドキュメント整合性メンテ + マニ役割再定義 + 視覚化2回イテレーション (v0.1→v0.2)
-- コー: 出番なし（コードは全てメインおぱが直接書いた、生成スクリプトレベル）
-- カイ: 出番なし
-- マニ: **役割が初めて固まった日**（評価役→視覚化&データ管理レイヤー）
+### 今日のチームおぱ稼働実績
+- **メインおぱ**: 番人レビュー / BOM バグ修正 / 自動同期スクリプト設計実装 / 翻訳全般
+- **コー**: C4 初版 → 緊急修正（構造体化）→ C5 修正、3回起動
+- **マニ**: v0.2 円グラフ起点 UI 実装（途中リミットあり、最後のセルフチェック過信問題は反省点）
 
-**翻訳層実感**: あろさんの「ATR粒度差問題」指摘 → ADX×DI軸への即時転換 = 視点フィードバックループが機能
+### 重要な軌道修正
+1. **マニ役割転換**: 評価役 → 実装相棒（あろさん明示で確定）
+2. **おぱ番人役の明文化**: エントリーロジック混入の番人として実装レビュー必須
+3. **C5 = 始まり値基準**: 研究目的「エントリー時点」の物理的反映
 
-**フェーズ2継続**: 「感覚をロジック化」の文脈で、トレード履歴も認識ツールに統合される基盤ができた
+### 翻訳層実感
+あろさん発言で設計が動いた瞬間:
+1. 「ATR の取得位置がおそらく終値か EXIT 基準かな？」→ C5 = shift +1 直前確定バー
+2. 「データ欠損と詳細値が取れてない」→ BOM バグ発見の発端
+3. 「LIMIT 3回転くらいした」→ 引き継ぎモード移行、自然な区切り
 
-## 関連ファイル（次セッション用ブックマーク）
+---
 
-### マニ視覚化
-- `scripts/generate_trades_calendar.py` (v0.2)
-- `scripts/mani_initial_report.py` (v0.1)
-- `data/trades/TAG_SPEC.md` ← まず編集対象
-- `data/trades/raw/FX_*.csv` ← 次回CSVもここに
-- `data/trades/processed/trades_calendar.html` ← ブラウザで開く
-- `data/trades/processed/MANI_REPORT_v0.1.md`
+## 🔗 関連ファイル（次セッション用ブックマーク）
 
-### ドキュメント基盤
-- `CLAUDE.md` (v12)
-- `data/INVENTORY.md` (2026-06-04版)
+### 今日完成した本丸
+- `signals/Trade_Snapshot_Builder.mq5` v1.32（C4 + C5）
+- `signals/XAUUSD_Daily_MFE_MAE_v1.mq5` v1.10（C4-B 実行待ち）
+- `auto_sync_daily.sh`（自動同期 watcher）
+- `data/trades/processed/trades_calendar.html`（マニ v0.2 出力）
 
-### 既存資産（参考）
-- `signals/ATR_WidthSignal_v4.mq5` (フォワード稼働中)
-- `signals/ARO_H4PhaseAuto_v1.mq5`
-- `docs/heatmap_v14.html` (週次マクロ)
-- `data/bt/PATTERN_REGIME_MAP_v2*.md`
-- `data/maintenance/REVIEW_CYCLE.md` (8月集中メンテ予定)
-- `data/forward/v4_forward_log.md`
+### 指示書
+- `data/mani_room/コー_指示書_日次研究データ取得_v0.2.md`
+- `data/mani_room/マニ_指示書_日次研究カレンダー_v0.2.md`
+
+### コー実装レポート
+- `data/mani_room/コー_実装レポート_C4_v1.md`
+- `data/mani_room/コー_実装レポート_C4_v2.md`（構造体化）
+- `data/mani_room/コー_実装レポート_C5_v1.md`（shift +1）
+
+### マニ実装レポート
+- `data/mani_room/マニ_実装レポート_v0.4.md`
+
+### 最重要メモリ
+- `memory/feedback_research-purpose-and-rules.md` ← 必読
+- `memory/feedback_team-opa-role-division.md` ← 新役割分担
+- `memory/project_c4-tier-mfe-mae-pending.md`
+- `memory/feedback_mani-evaluation-criteria.md`（凍結、歴史的記録）
 
 ---
 
 *このファイルは SessionStart hook で自動的に次セッションの Claude に注入される。*
-*セッション終了時に Claude が手動で更新するのが望ましい運用。*
+*次セッションの起点 = 「C4-B 動作確認 + マニ v0.3（時間推移列追加）」*
