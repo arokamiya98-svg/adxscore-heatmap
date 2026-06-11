@@ -81,10 +81,23 @@ else
 fi
 echo ""
 
+# signal_fires.csv は検証タイミングのみ生成される (Signal_Fire_Logger)
+# 存在すれば同期し、シグナル検証カレンダーも再生成する
+if [ "$DO_SYNC" = true ] && [ -f "$MT5_FILES/signal_fires.csv" ]; then
+  cp "$MT5_FILES/signal_fires.csv" "$DEST/signal_fires.csv"
+  echo "  📋 コピー: signal_fires.csv"
+fi
+
 # ── Step 2: HTML 生成 ──────────────────────────────────────
 echo "▶ Step 2: HTML 生成 (generate_daily_calendar.py)"
 python3 scripts/generate_daily_calendar.py
 echo ""
+
+if [ -f "$DEST/signal_fires.csv" ]; then
+  echo "▶ Step 2b: シグナル検証カレンダー生成 (generate_signals_calendar.py)"
+  python3 scripts/generate_signals_calendar.py
+  echo ""
+fi
 
 HTML_PATH="$(pwd)/data/trades/processed/trades_calendar.html"
 
@@ -94,15 +107,21 @@ if [ -f "$HTML_PATH" ]; then
   cp "$HTML_PATH" docs/trades_calendar.html
   echo "  🌍 docs/trades_calendar.html へミラー"
 fi
+SIGNALS_HTML="$(pwd)/data/trades/processed/signals_calendar.html"
+if [ -f "$SIGNALS_HTML" ]; then
+  cp "$SIGNALS_HTML" docs/signals_calendar.html
+  echo "  🌍 docs/signals_calendar.html へミラー"
+fi
 echo ""
 
-# ── Step 2.6: 自動 publish (docs/trades_calendar.html のみ) ─
+# ── Step 2.6: 自動 publish (docs/ のカレンダー2枚のみ) ─────
 # 失敗 (オフライン等) してもパイプラインは止めない
 if [ "$DO_PUBLISH" = true ] && [ -f docs/trades_calendar.html ]; then
-  if ! git diff --quiet -- docs/trades_calendar.html 2>/dev/null; then
+  if ! git diff --quiet -- docs/trades_calendar.html docs/signals_calendar.html 2>/dev/null \
+     || [ -n "$(git status --porcelain docs/signals_calendar.html 2>/dev/null)" ]; then
     echo "▶ Step 2.6: GitHub Pages へ自動 publish"
-    if git add docs/trades_calendar.html \
-       && git commit -q -m "chore: auto-publish trades calendar" -- docs/trades_calendar.html \
+    if git add docs/trades_calendar.html docs/signals_calendar.html 2>/dev/null \
+       && git commit -q -m "chore: auto-publish calendars" -- docs/trades_calendar.html docs/signals_calendar.html \
        && git push -q origin main; then
       echo "  ✅ push 完了 → 数十秒で iPhone/iPad に反映"
     else

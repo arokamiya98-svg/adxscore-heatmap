@@ -25,7 +25,7 @@ MT5_FILES="/Users/aro/Library/Application Support/net.metaquotes.wine.metatrader
 DEST="mt5_data"
 
 # 監視対象（MT5 mq5 が出力する CSV）
-TARGETS=("daily_mfe_mae_48h.csv" "daily_aggregate.csv" "trades_enriched.csv")
+TARGETS=("daily_mfe_mae_48h.csv" "daily_aggregate.csv" "trades_enriched.csv" "signal_fires.csv")
 POLL_INTERVAL=2
 WRITE_SETTLE=2   # MT5 書き込み完了待ち
 
