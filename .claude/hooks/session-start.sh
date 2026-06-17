@@ -22,7 +22,13 @@ fi
 
 # additionalContext として Claude に渡す（Python で JSON 構築、jq 依存なし）
 LATEST_PATH="$LATEST" "$PYTHON_BIN" <<'PYEOF'
-import json, os
+import json, os, sys
+# Windows のコンソールは既定 cp932 で絵文字を出せず UnicodeEncodeError になる。
+# 標準出力を UTF-8 に切り替える（Mac は元々 UTF-8 なので無害）。
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 with open(os.environ["LATEST_PATH"], encoding="utf-8") as f:
     content = f.read()
 ctx = (
