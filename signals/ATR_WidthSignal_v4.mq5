@@ -167,6 +167,12 @@ input group "=== 表示 ==="
 input double Arrow_ATR_Offset  = 0.8;
 input bool   Show_Dashboard    = true;
 
+// --- ★v4新規: プッシュ通知（農家しながら手元で気づくための経路A）---
+input group "=== ★v4新規: プッシュ通知 ==="
+input bool   Enable_Notification  = true;   // MT5アプリへプッシュ送信（要MetaQuotes ID設定）
+input bool   Notify_ClosedBarOnly = true;   // true=確定足のみ(ダマシ無/最大59分遅延) / false=形成中も速報
+input bool   Send_Test_Notification = false; // ★ONでチャート適用時にテスト通知を1発送信→ログに成否記録。送ったらOFFに戻す
+
 //+------------------------------------------------------------------+
 //| バッファ                                                         |
 //+------------------------------------------------------------------+
@@ -191,6 +197,9 @@ int hATR_S_D1, hATR_L_D1, hADX_D1;   // ★v4新規: D1ハンドル
 
 //--- ダッシュボードプレフィックス
 string DB_PREFIX = "WSv4_";
+
+//--- ★通知: 最後にプッシュ送信した確定足の時刻（重複送信防止）
+datetime g_last_notified_bar = 0;
 
 //+------------------------------------------------------------------+
 //| ★v4新規: EnvSnapshot 構造体                                     |
@@ -288,6 +297,16 @@ int OnInit()
 
    //--- ★v4新規: フィルター状態を起動時にPrint
    PrintFiltersStatus();
+
+   //--- ★v4新規: テスト送信（Send_Test_Notification=ON時に1発だけ。通知経路の生死確認用）
+   if(Send_Test_Notification)
+   {
+      string tmsg = "☆v4 テスト送信 / 通知経路チェック\n" +
+                    TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES);
+      bool tsent = SendNotification(tmsg);
+      PrintFormat("[TEST] Notify=%s | %s",
+                  tsent ? "SENT-OK" : "SENT-FAIL", tmsg);
+   }
 
    if(Show_Dashboard) CreateDashboard();
    return INIT_SUCCEEDED;
@@ -868,6 +887,44 @@ int OnCalculate(const int rates_total,
             sigs, warn
          );
       }
+
+      //==================================================================
+      // ★通知: 矢印が立った発火（=9本フィルター通過の"乗るべきfire"）を
+      //   確定足で1回だけプッシュ送信。i=1=直近確定足（ArraySetAsSeries）。
+      //   形成中速報がほしければ Notify_ClosedBarOnly=false で i=0。
+      //==================================================================
+      if(Enable_Notification)
+      {
+         int ni = Notify_ClosedBarOnly ? 1 : 0;   // 既定=確定足(i=1)
+         if(i == ni)
+         {
+            string fires = "";
+            if(PatA_BuyBuf[ni]>0)  fires += "◆PatA BUY ";
+            if(PatA_SellBuf[ni]>0) fires += "◆PatA SELL ";
+            if(PatB_BuyBuf[ni]>0)  fires += "▲PatB BUY ";
+            if(PatB_SellBuf[ni]>0) fires += "▽PatB SELL ";
+            if(PatC_BuyBuf[ni]>0)  fires += "●PatC BUY ";
+            if(PatC_SellBuf[ni]>0) fires += "●PatC SELL ";
+            if(PatD_BuyBuf[ni]>0)  fires += "★PatD BUY ";
+            if(PatD_SellBuf[ni]>0) fires += "★PatD SELL ";
+            if(PatE_BuyBuf[ni]>0)  fires += "☆PatE BUY ";
+            if(PatE_SellBuf[ni]>0) fires += "☆PatE SELL ";
+
+            if(fires != "" && time[ni] != g_last_notified_bar)
+            {
+               g_last_notified_bar = time[ni];
+               bool sent = SendNotification(
+                  BuildNotifyMsg(fires, close[ni], atr_zone, h1_pat,
+                                 di_dir_d1, d1_atr_cross_dir));
+               //--- ★v4新規: 発火ログ（時刻・内容・通知成否をエキスパートログに残す）
+               PrintFormat("[FIRE] %s | %s@ %.2f | %s帯 %s | D1 %s %s | Notify=%s",
+                           TimeToString(time[ni], TIME_DATE|TIME_MINUTES),
+                           fires, close[ni], atr_zone, h1_pat,
+                           d1_atr_cross_dir, di_dir_d1,
+                           sent ? "SENT-OK" : "SENT-FAIL");
+            }
+         }
+      }
    }
 
    return rates_total;
@@ -1014,5 +1071,21 @@ void SetLabel(string name, string text, color col)
 {
    ObjectSetString(0,  name, OBJPROP_TEXT,  text);
    ObjectSetInteger(0, name, OBJPROP_COLOR, col);
+}
+
+//+------------------------------------------------------------------+
+//| ★通知メッセージ生成（お店風ラフ味・認識ツール文脈・255字以内）   |
+//|   ATR帯/H1パターン/D1局面を添え「どんな文脈の発火か」を渡す       |
+//|   ※絵文字は実機の表示/コンパイル確認後に足す（まず記号で確実に） |
+//+------------------------------------------------------------------+
+string BuildNotifyMsg(string fires, double px, string zone, string h1pat,
+                      string d1dir, string d1cross)
+{
+   string head = "XAU 仕込み入りました";
+   string body = StringFormat("%s| %.2f / %s帯 %s / D1 %s %s",
+                    fires, px, zone, h1pat, d1cross, d1dir);
+   string msg = head + "\n" + body;
+   if(StringLen(msg) > 250) msg = StringSubstr(msg, 0, 250);
+   return msg;
 }
 //+------------------------------------------------------------------+
