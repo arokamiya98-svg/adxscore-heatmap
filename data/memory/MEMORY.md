@@ -1,0 +1,34 @@
+- [完璧主義禁止の真意](feedback_anti-perfectionism-true-meaning.md) — 「手抜きOK」ではない。不確実性領域=方向性軸、確実領域=詰める、の二段構え
+- [外付けメンタルパートナー役](feedback_external-mental-partner-role.md) — おぱは結果記録係ではなくメンタル変化のフォローアップ役。意思+外部装置のハイブリッド最適化
+- [おぱはチームおぱのマネージャー役](feedback_opa-as-team-manager.md) — マニ/コー/ブン等のマネージャー。叩き台→正書→指示書→委譲→報告統合のフロー
+- [設計責任はチームおぱ側で持つ](feedback_design-responsibility-stays-on-team.md) — 細かい設計判断はチーム内で詰める。あろさんに設計判断を回しすぎない、形にしてから渡す
+- [振り返りの3軸分離原則](feedback_retrospection-three-axes.md) — 個別判断/方向性/戦略遂行の3軸。「感情」と「理」を混ぜず、おぱは外部評価役
+- [マニ旧役割（凍結）](feedback_mani-evaluation-criteria.md) — 2026-06-10 マニ実装相棒へ役割転換のため凍結。歴史的記録として保持
+- [チームおぱ役割分担（2026-06-10）](feedback_team-opa-role-division.md) — マニ=実装相棒、おぱ=番人、コー=mq5、あろさん=方向性
+- [C4案件: 時間別MFE/MAE保留中](project_c4-tier-mfe-mae-pending.md) — ATR帯×時系列クロス探索の本丸。Trade_Snapshot_Builder + Daily_MFE_MAE 両方の mq5 改修
+- [BT統計の局面バイアス](feedback_bt-regime-bias.md) — BTは背景局面のバイアスを内包。2024年買い相場のサンプルは今(DI-優勢)に直接適用不可。D1 ADX局面別BTで信頼性を上げる
+- [BT分析の原則](feedback_bt-analysis-principles.md) — 「過去勝率が悪い→フィルターに」は結果フィッティングNG。「なぜシグナルが通用しなかったか」を構造分析する。数値より物語が先
+- [プロジェクトのフェーズ転換ロードマップ](project_roadmap-sensory-to-logic-phase.md) — フェーズ1（感覚での戦略・HTML完成）→ フェーズ2（感覚をロジック化、自動・リアルタイム・H1細分化）
+- [メンタル/パフォーマンス研究トラック](project_mental-performance-research-track.md) — 2026-06-01着手予定。苫米地・西田・フロー理論を起点におぱmd改訂へ
+- [資金管理フローと理論](project_capital-management-flow-and-theory.md) — HFMarkets口座構造、TOP-UPボーナス、2連勝1サイクル、ナンピン抑制構造、入金額=リスク上限の物理装置
+- [トレード手法サマリー](project_trading-method-summary.md) — ATR×ADX戦略。ATR=タイミング、ADX=評価軸。D1俯瞰/H4戦略/H1執行の役割分担、H1 ADX35超え冷え待ち
+- [波形パイプラインのフォワード弱性](project_fwd-data-pipeline-weakness.md) — 波形抽出は手動トレンドラインに依存。進行中週のデータが空欄になる構造的特性
+- [Mac環境スペック](project_hardware-mac-environment.md) — MacBook 2017 Intel Core m3 / 8GB / Ventura 13.7.8（OS終端）。重い処理・並列処理は要配慮
+- [マニのいるゾーン](project_mani-work-zone.md) — マニの参照データは ADXSCORE/ 配下のみ。ADX28検証ファイル/ は凍結（参照禁止）。BT/FW/signals/INVENTORY すべてADXSCORE集約
+- [ADXSCOREツール現状一覧](reference_adxscore-tool-current-state.md) — ファイル構成・データフロー・主要関数。フェーズ2着手前のスナップショット
+- [BTシグナルログ](reference_bt-signal-log.md) — ATR_WidthSignal BT群。v3=フィルター済み27件(2026-01〜05, UTF-16, 31列) / v3wavelog=未フィルター全件記録（旧872件は凍結ゾーン）。data/bt/に集約
+- [BT世代1の発見サマリ](project_bt-v1-findings-2026-06.md) — 2026-06-02実行BT。XAUUSDの非対称性「買いは押し目・売りは拡張」、機能/死亡パターンマップ
+- [BTフィルター戦略](feedback_bt-filter-strategy.md) — フィルター実装はダメパターン削減主軸、機能パターン選別は補助。構造的説明あるダメパターンから順に削る
+- [認識ツールにラフ味を残す](feedback_recognition-tool-keep-it-playful.md) — トレードモード突入抑制のため、認識ツールには意図的に親しみやすい演出（お店風メッセージ等）を入れる
+- [認識粒度は段階的（連続値NG）](feedback_user-recognition-is-stepped-not-continuous.md) — あろさんはADX 22とか細かい値で判断していない。20/25/30/35の閾値段階。UIも連続グラデーションでなく段階化
+- [凪≠RANGEの概念区別](feedback_nagi-vs-range-distinction.md) — 凪=ATR収束（落ち着きへ向かう）、RANGE=ADX閾値未達（横ばい）。UI/ラベルで混同しない
+- [ATRは値幅情報・方向と混同しない](feedback_atr-is-band-not-direction.md) — ATR Phase(BU/PD)=値幅、DI方向=価格方向。BU=青/PD=赤は誤り。色は DI で青/赤、ATR Phase でメイン/サブ系
+- [戦略・実行・振り返りの3フェーズ分離](feedback_flow-theory-three-phases.md) — フロー理論ベース。混ぜない。各フェーズで目的とツールが違う。フェーズ移行はあろさん主導
+- [研究目的固定・禁止事項・提案ルール](feedback_research-purpose-and-rules.md) — マニの部屋プロジェクトの絶対原則。研究目的は環境後付け取得、勝率/PF/月別/損益集計は禁止、シグナル評価の勝率はOK、48h固定MAE/MFE、MT5専用
+- [Scriptableウィジェット運用確立](project_scriptable-widget-operational.md) — MT5との値差はバーカウント由来、誤差理解で運用。Phase 6実質クローズ、価格非表示が認識運用の核
+- [認知負荷低減が今の主軸](feedback_cognitive-load-reduction-is-the-axis.md) — 解析より認知負荷低減→執行精度。足すより絞る、シグナル系と実行系は同一視覚言語で
+- [MT5の重さはCPUバウンド](reference_mt5-heaviness-is-cpu-bound.md) — メモリ不足でなくWine+毎tickインジ計算が主因。増設/解放は無効、インジ/チャート/バー数を絞るのが効く（認知負荷低減と一石二鳥）
+- [認知ルートの純度と手描きライン](feedback_recognition-route-purity-and-manual-lines.md) — 削る基準=認知ルートの純度。手描きライン作業は認知行為として価値があり潰さない。ロジックで判断できない核=フェーズ×Vel×値動き×ATRの交わり
+- [手描きBU/PD波の数値的肖像](project_handdrawn-bu-pd-portrait.md) — BU=短17bar・ATR拡張+25%/PD=長23bar・収縮-11%。質的構造は局面不変、値幅だけ局面依存(直近ボラ解放で2倍)。黄金比φ・H1の波
+- [レンジ周期は存在しない](project_range-cycle-does-not-exist.md) — 「レンジ周期執行」仮説は土台なし(連続レンジ区間1個・周期バラバラ)。XAUレンジはパルス的。エッジは周期でなくH1低ADXボトムアウト順張り59%で既存獲得済み
+- [VPS本拠地化（2026-06）](project_vps-base-2026-06.md) — ABLENET VPS(Windows Server 2022)にClaude Code導入完了。Mac=記憶母艦/VPS=24h前線のハイブリッド。リポジトリPUBLIC要検討
