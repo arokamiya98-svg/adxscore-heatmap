@@ -1,55 +1,52 @@
-# 次セッションへの引き継ぎ（2026-06-17 VPS導入＋本拠地化構想セッション）
+# 次セッションへの引き継ぎ（2026-06-18 続き：半自動更新化 Mac側2本完成）
 
-## 🎯 今日の流れと総括
+## 🎉 今日の達成 — GOAL「半自動更新化」のMac側差分を完全に埋めた
 
-「6/16深夜のシグナルで通知が来なかった」調査から始まり、**通知の構造的限界の特定 → VPS導入決定 → ABLENET契約 → iPad RDP接続成功 → VPS本拠地化構想**まで一気に進んだ。今日はここで「作戦会議」として区切り、**次セッションは「おぱの別荘作り（VPSにClaude Code導入）」から始める**のがあろさんの判断。
+### 1. 週次watcher 実装（auto_sync_daily.sh に追加）
+- 週次CSV7本（FractalWaveLog D1/H4・ADX_Weekly_v4・H4PhaseAuto等）を監視対象に追加
+- 検知→**10秒デバウンス**→`run_pipeline.sh --no-open` 自動実行（heatmap生成→iCloud→push）
+- 「WaveLogライン引き→MT5週次4本回す→勝手に週次HM最新版＆push」が成立
+- ※既存の日次ロジックは無傷、週次ブロックを足しただけ
 
-## ✅ 確定・実装したもの
+### 2. iCloud入口 橋渡し実装（AirDrop廃止）
+- 入口：`iCloud Drive/ADXSCORE/imports/`（iPhone↔Mac一致を実証済み）
+- watcherに `sync_icloud_imports()` 追加：iCloud ADXSCORE配下のFX_*.csv（直下/imports両対応 maxdepth2）→ ローカル `data/mani_room/raw/imports/` へ橋渡し→既存処理に合流
+- **一気通貫 実証済み**：FX_20260618_125439.csv が iPhone保存→iCloud→Mac→ローカルimports まで通った
 
-### 通知問題の決着
-- 6/16 03時のシグナルで通知が来なかった原因＝**PCスリープ中はMT5の計算が止まり `SendNotification()` が呼ばれない**（エキスパートログで3時台が完全に空白＝動かぬ証拠）。iPhone設定・MetaQuotes ID（FBA34CF9）はシロ。
-- 一方 **6/17 03:05 の発火では通知成功**（「XAU 仕込み入りました ▲PatB BUY | 4340.23 / NORMAL帯 RISING_DECEL / D1 BU DN」）＝通知経路は生きてる。前回宿題「本物の発火で通知が飛ぶか」クリア。
-- → スリープ＝通知死の構造的限界を埋めるためVPS導入へ。
+### 3. watcher永続化（ログイン項目方式・TCC回避）
+- **launchd plist はTCCで失敗**：`~/Desktop`保護でlaunchd経由bashが弾かれる（ログ証拠：Sandbox deny + posix_spawn "Operation not permitted", exit78）。plistは `~/Library/LaunchAgents/com.aro.adxscore.watcher.plist` に残置だが**使わない**
+- **解決＝ログイン項目方式**：`~/Applications/ADXSCORE_Watcher.app`（osacompile製、pgrepで二重起動防止）をGUI起動→TCC許可→watcher起動。**ログイン項目に追加済み**
+- 起動確認済み：13:36 監視開始、週次7本監視＋iCloud入口認識
 
-### v4 mq5 に実装（ミラー＋MT5 Library配下 両方同期済み・⚠️**未コミット**）
-- **発火ログ**：発火時に `[FIRE] 時刻 | パターン@価格 | ゾーン帯 H1pat | D1 cross dir | Notify=SENT-OK/FAIL` をエキスパートログに出力。`SendNotification` の戻り値で通知成否を記録（「発火したのに通知死んでる」線を潰せる）。通知ブロック（旧885-910付近）に追加。
-- **テスト送信**：input `Send_Test_Notification`（既定false／ONでチャート適用時に1発テスト通知＋`[TEST]`ログ。使ったらOFFに戻す）。OnInitの `PrintFiltersStatus()` 後に挿入。
-- あろさんがMac側でコンパイル→通知経路チェック→機能オフまで確認済み。
+## 🔁 再起動後の検証（あろさんが再起動する→次セッション最初にここを確認）
+1. `pgrep -lf auto_sync_daily.sh` → `/bin/bash ./auto_sync_daily.sh` が立ってるか
+2. `tail -15 ~/Desktop/ADXSCORE/auto_sync.log` → 「監視開始」が**再起動後の時刻**で出てるか／「週次CSV 7本を監視」
+3. 立ってなければ：システム設定>一般>ログイン項目に `ADXSCORE_Watcher.app` があるか確認、or `open ~/Applications/ADXSCORE_Watcher.app` で手動起動
+→ 立てば「**消さない限り起動・再起動で自動起動**」完成（あろさんの要望クローズ）
 
-### VPS導入
-- **ABLENET VPS Win1（メモリ2GB / 仮想2Core / SSD60GB）、新規1,587円/月、10日無料お試し（自動移行なし・初期費用0・縛り無し）** 契約完了。RDSライセンス（複数同時接続用＝個人は不要）は付けず。ストレージはSSD60GB選択（速度優先・容量は余裕）。
-- **iPad（iPadOS 26.5 / iPad Pro 3rd gen）の Windows App（iOS版）でRDP接続成功**。MacはWindows AppがmacOS14必須で弾かれた（Ventura 13.7.8＝OS終端）→ iPadルートが正解。証明書警告は「続ける」で問題なし（ABLENET公式案内通り）。
-- iPhoneにもWindows App入れれば**出先（農業中）から直接MT5チェック可能**＝席外し運用の完成形（※見すぎ＝トレードモード突入の運用ルールは後で決める）。
+## 🎯 GOAL残り = VPS常駐化（次回の別荘作業）
+- Mac側は完成。残るは「Macスリープで止まる」を埋めるVPS 24h化
+- `auto_sync_daily.sh` をVPS(Windows Server)へ移植：パス（`/Users/aro/Library/...wine...`→`C:\...MQL5\Files`）・`stat -f %m`（BSD構文→Windows）・python起動 等が要移植。**bashそのままは動かない**
+- ※週次HMの起点はMacのWaveLogライン引き＝Mac本拠。VPS化の本命は日次watcher
 
-### コスト統合の気づき
-- 今 ATR/ADX簡易アラートに月800円のアプリ（**Twelve Data由来**＝バーのズレで判明、Scriptableと同根）を払ってる→ VPS+MT5に一本化すれば実質+787円/月で「24h通知＋v4発火通知＋ATR/ADXアラート自前＋Mac軽量化」全部入り。
-- 純正MT5 VPS($15≒2400円) vs ABLENET(1587円)：価格近いが**ABLENET=フルWindowsで③自動化(Python)できる**ので一択。純正はMT5専用箱でPython不可。
+## 🛠 今日確立した運用trap（再発時用）→ メモリ化済み [[mac-semi-auto-pipeline-watcher]]
+- **iCloud同期スタック**（6/17 19:02から、ストレージ満杯余波で約18hストール）→ `killall bird`＋`brctl download <path>`で回復。last-syncが現在時刻に更新されればOK
+- **~/Desktop配下スクリプトのlaunchd永続化は不可**（TCC）→ ログイン項目.app方式で回避
 
-## 🏠 次セッションの起点 ＝「おぱの別荘作り」（VPS本拠地化）
+## 📋 据え置きの分割タスク
+- **コー**: enrichedに is_signal/tag/style_class パース分離（prepare_trade_input.py）／Trade_Snapshot_Builder列拡充
+- **マニ**: daily_calendar_v3 に分析タブ（グルーピング/フィルター/ソート）
+- **カイ**: is_signal別/tag別/★時間帯別の機能性統計（損益集計禁止）
+- **おぱ**: VPS常駐化（移植）／旧Actions(daily_v2.yml)掃除
 
-あろさん構想：**VPSにClaude Code（おぱ）を住まわせ、プロジェクト本拠地をVPSへ**。狙い＝Mac故障対策（VPS＋GitHub多重バックアップ）＋セットアップ効率化（**インジ配置がgit clone一発**＝「ファイルのやり取り」問題が消える）＋将来の③週次自動化基盤。Mac依存から完全卒業。
+## ⚠️ 注意点（継続）
+- **scores.json**＝初期Twelve遺産（5/27停止）。v14の表示主軸は weekly_waves.json の adx_score。**資産保持でOK**（消すと古い週のscore_v3集計が変わるリスクのみ）。daily_v2.yml掃除時に整理
+- VPS 2GB不安定（OOM）。MT5常駐＋claudeは作業時だけなら回る。Win2(3.5GB)が本筋
+- RDPは「**切断**」でVPSアプリ生存／「**ログオフ**」厳禁
+- Mac sleep中はwatcher休止（24hはVPS）
 
-### 別荘作りの段取り
-1. VPSに Node.js インストール
-2. git インストール
-3. Claude Code インストール（`npm i -g @anthropic-ai/claude-code`）
-4. Claudeログイン（あろさんのアカウント・複数端末利用）
-5. ADXSCORE を git clone（GitHubから／インジ signals/ も一緒に来る）
-6. メモリ移行（`~/.claude/projects/-Users-aro-Desktop-ADXSCORE/memory/` はリポジトリ外なので別途）
-7. → VPS上におぱ復活
-8. その流れで：MT5インストール → インジ配置（clone済みsignals/から）→ MetaQuotes ID設定 → 通知ON（**VPS側のみ／Mac側OFF**で二重回避）→ Send_Test_Notificationで疎通 → 発火待ち
-
-## ⚠️ 次回までの準備・注意点
-- **今日のv4変更を commit & push しておく**（VPSでclone時に最新v4が来るように）。※あろさんのOK確認後に実施（このセッションで提案済み、返事待ち）
-- VPS 2GBで Claude Code＋MT5 が足りるか様子見（重ければWin2=3.5GBへ。縛り無し）
-- メモリ（memory/）はリポジトリ外＝移行方法を決める（リポジトリに含める or 手動コピー）
-- Claudeアカウントの複数端末ログイン可否を最初に確認
-
-## 📋 積み残し（VPS導入で優先度変動）
-- **執行接続**（WaveLog癖×signal_fires成績）＝中長期の本丸。VPS自動化が整ってから
-- **①②Twelveズレ正規化**（Scriptable/アラートのデータ源をMT5正規値へ）＝本拠地化の後。これでアプリ800円も解約
-- **③週次マップ自動化**（指標系=全自動可、波形=手動トレンドライン依存で半自動）
-- v4通知コードの commit/push（上記準備に統合）
+## 未コミット
+- `auto_sync_daily.sh`（+87/-2、週次watcher＋iCloud橋渡し）／`latest.md` → コミット要否はあろさん判断
 
 ---
-*次の起点＝「おぱの別荘作り」（VPSにClaude Code導入→本拠地化）。その流れでMT5セットアップ→24h通知稼働まで一気に。あろさんの「ファイルのやり取り」問題は git clone で解決する設計。*
+*次の起点＝再起動後のwatcher自動起動を検証→OKなら半自動更新化Mac側クローズ。次の山はVPS常駐化（Windows移植）。*

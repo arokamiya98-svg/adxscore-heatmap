@@ -24,10 +24,29 @@ cd "$(dirname "$0")"
 MT5_FILES="/Users/aro/Library/Application Support/net.metaquotes.wine.metatrader5/drive_c/Program Files/MetaTrader 5/MQL5/Files"
 DEST="mt5_data"
 
-# 監視対象（MT5 mq5 が出力する CSV）
+# iCloud入口（iPhoneアプリ → 共有シート"ファイルに保存" → ここ）→ ローカルimportsへ橋渡し
+# AirDrop手動を廃止。ADXSCORE直下/imports どちらに保存されても拾う
+ICLOUD_IMPORTS="$HOME/Library/Mobile Documents/com~apple~CloudDocs/ADXSCORE"
+LOCAL_IMPORTS="data/mani_room/raw/imports"
+
+# 監視対象（MT5 mq5 が出力する CSV）— 日次研究カレンダー用
 TARGETS=("daily_mfe_mae_48h.csv" "daily_aggregate.csv" "trades_enriched.csv" "signal_fires.csv")
+
+# 監視対象（週次マップ用）— 更新されたら run_pipeline.sh で週次ヒートマップを再生成
+# WaveLog にライン引き → MT5 週次スクリプトを回す → ここが検知して自動で最新版＆push
+WEEKLY_TARGETS=(
+  "FractalWaveLog_D1_v3_1.csv"
+  "FractalWaveLog_D1_weekly.csv"
+  "FractalWaveLog_H4_XAU.csv"
+  "FractalWaveLog_H4_weekly.csv"
+  "FractalWaveLog_H4_XAU_Vlines.csv"
+  "H4PhaseAuto_weekly.csv"
+  "ADX_Weekly_Above_v4.csv"
+)
+
 POLL_INTERVAL=2
-WRITE_SETTLE=2   # MT5 書き込み完了待ち
+WRITE_SETTLE=2     # MT5 書き込み完了待ち（日次・単発出力）
+WEEKLY_SETTLE=10   # 週次は4スクリプト連続出力のためデバウンス長め
 
 # 入力 CSV の最新版（FX_*.csv）
 get_latest_input() {
@@ -43,6 +62,24 @@ get_fx_signature() {
   else
     echo "none"
   fi
+}
+
+# iCloud入口の新着 FX_*.csv をローカル imports へ橋渡し（AirDrop不要化）
+# ADXSCORE直下と imports/ の両方を拾う（maxdepth 2）。プレースホルダは実体DLしてからcp
+sync_icloud_imports() {
+  [ -d "$ICLOUD_IMPORTS" ] || return 0
+  local src base dst
+  while IFS= read -r src; do
+    [ -z "$src" ] && continue
+    base=$(basename "$src")
+    dst="$LOCAL_IMPORTS/$base"
+    if [ ! -f "$dst" ]; then
+      brctl download "$src" 2>/dev/null || true
+      if cp "$src" "$dst" 2>/dev/null; then
+        echo "[$(ts)] ☁️→💻 iCloud入口から取込: $base"
+      fi
+    fi
+  done < <(find "$ICLOUD_IMPORTS" -maxdepth 2 -iname "FX_*.csv" 2>/dev/null | grep -v "/.Trash/")
 }
 
 ts() { date +"%H:%M:%S"; }
@@ -71,6 +108,18 @@ for i in "${!TARGETS[@]}"; do
     echo "  [初期] $f (未生成)"
   fi
 done
+# 週次CSV の初期 mtime（既存ファイルは初回スキップ）
+LAST_WEEKLY_MTIMES=()
+for i in "${!WEEKLY_TARGETS[@]}"; do
+  f="${WEEKLY_TARGETS[$i]}"
+  SRC="$MT5_FILES/$f"
+  if [ -f "$SRC" ]; then
+    LAST_WEEKLY_MTIMES[$i]=$(stat -f %m "$SRC")
+  else
+    LAST_WEEKLY_MTIMES[$i]=0
+  fi
+done
+echo "  [初期] 週次CSV ${#WEEKLY_TARGETS[@]}本を監視"
 # FX_*.csv（アプリ書き出しCSV）の新着監視
 LAST_FX_SIG=$(get_fx_signature)
 echo "  [初期] FX_*.csv sig=$LAST_FX_SIG"
@@ -80,6 +129,9 @@ echo "[$(ts)] 監視開始..."
 trap 'echo ""; echo "[$(ts)] 監視停止"; exit 0' INT TERM
 
 while true; do
+  # ── iCloud入口 → ローカルimports 橋渡し（AirDrop不要化）──
+  sync_icloud_imports
+
   # ── FX_*.csv 新着検知 → trade_input.csv 生成 → MT5 Files/ へ自動配置 ──
   FX_SIG=$(get_fx_signature)
   if [ "$FX_SIG" != "$LAST_FX_SIG" ] && [ "$FX_SIG" != "none" ]; then
@@ -139,6 +191,39 @@ while true; do
     echo "[$(ts)]   run_daily_calendar.sh --no-open 実行"
     ./run_daily_calendar.sh --no-open 2>&1 | grep -E "(OK 出力|トレード日数|期間|日次CSV|完了)" | head -10
     echo "[$(ts)] ✅ パイプライン完了 — ブラウザは Cmd+R で再読み込み"
+  fi
+
+  # ── 週次CSV 更新検知 → run_pipeline.sh で週次ヒートマップ再生成 ──
+  WEEKLY_CHANGED=()
+  for i in "${!WEEKLY_TARGETS[@]}"; do
+    f="${WEEKLY_TARGETS[$i]}"
+    SRC="$MT5_FILES/$f"
+    if [ -f "$SRC" ]; then
+      NEW_MTIME=$(stat -f %m "$SRC")
+      if [ "$NEW_MTIME" -gt "${LAST_WEEKLY_MTIMES[$i]}" ]; then
+        WEEKLY_CHANGED+=("$f")
+        LAST_WEEKLY_MTIMES[$i]=$NEW_MTIME
+      fi
+    fi
+  done
+
+  if [ ${#WEEKLY_CHANGED[@]} -gt 0 ]; then
+    echo ""
+    echo "[$(ts)] ▶ 週次CSV 更新検知: ${WEEKLY_CHANGED[*]}"
+    echo "[$(ts)]   週次は複数スクリプト連続出力 → ${WEEKLY_SETTLE}s デバウンス待ち..."
+    sleep $WEEKLY_SETTLE
+    # デバウンス中に書かれた残りの週次CSVの mtime も取り込む（多重起動防止）
+    for i in "${!WEEKLY_TARGETS[@]}"; do
+      f="${WEEKLY_TARGETS[$i]}"
+      SRC="$MT5_FILES/$f"
+      [ -f "$SRC" ] && LAST_WEEKLY_MTIMES[$i]=$(stat -f %m "$SRC")
+    done
+    echo "[$(ts)]   run_pipeline.sh --no-open 実行（週次HM再生成→iCloud→push）"
+    if ./run_pipeline.sh --no-open 2>&1 | grep -E "(Step|完了|iCloud|GitHub|push|更新|⚠️)" | head -15; then
+      echo "[$(ts)] ✅ 週次パイプライン完了 — Widget Web は次回更新で最新版"
+    else
+      echo "[$(ts)] ⚠️ run_pipeline.sh でエラー（watcher は継続）"
+    fi
   fi
 
   sleep $POLL_INTERVAL
