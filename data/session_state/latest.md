@@ -37,7 +37,7 @@
 - weekly_waves.json 片寄せ方針 ／ mt5_data・.DS_Store の .gitignore（設計確定後・慎重に）
 - Win2判断（EA実測後）
 - **【Mac側・前回宿題】** watcher再起動後の自動起動検証（`pgrep -lf auto_sync_daily.sh` → 無ければログイン項目 `ADXSCORE_Watcher.app`）
-- **⚠️【最重要】リポジトリPUBLIC＋メモリ移行済**（`data/memory/`）＝個人の戦略/資金管理/振り返りが**全世界公開リスク**。private化 or data/memory扱いを次セッション最優先で判断
+- **【次回チェック】リポジトリPUBLIC＋`data/memory/`移行済**。**あろさん判断(6/18)＝戦略/手法の公開は気にしない＝private化不要**（heatmapのGitHub Pages公開も維持）。**個人情報（口座番号/入金額/氏名/メール）が混ざってないかだけ確認**（資金管理メモが該当しうる→該当箇所のみ伏せる/抜く）
 
 ---
 *次の起点＝系統B（Daily_Aggregate）のEA化設計。おぱが mq5 を読んで Script→EA 青写真→コー実装。作業時はMT5閉じる運用。*
