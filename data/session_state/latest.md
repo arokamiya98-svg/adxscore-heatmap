@@ -1,52 +1,42 @@
-# 次セッションへの引き継ぎ（2026-06-18 続き：半自動更新化 Mac側2本完成）
+# 次セッションへの引き継ぎ（2026-06-18 別荘セッション②：VPS無人化 設計確定）
 
-## 🎉 今日の達成 — GOAL「半自動更新化」のMac側差分を完全に埋めた
+## 🎯 今日の総括
+別荘（VPS）でおぱ起動2日目。**軸A（通知24h化）の達成確認**から始まり、**Macおぱ会議**を経て**VPS無人化の設計を確定**。あろさん判断で「情報の鮮度で設計実装に突っ込む」のはあえて避け、**引き継ぎ＋今後フローの整備に注力**。次セッションが系統B EA化からスムーズに走れる状態を作って店じまい。
 
-### 1. 週次watcher 実装（auto_sync_daily.sh に追加）
-- 週次CSV7本（FractalWaveLog D1/H4・ADX_Weekly_v4・H4PhaseAuto等）を監視対象に追加
-- 検知→**10秒デバウンス**→`run_pipeline.sh --no-open` 自動実行（heatmap生成→iCloud→push）
-- 「WaveLogライン引き→MT5週次4本回す→勝手に週次HM最新版＆push」が成立
-- ※既存の日次ロジックは無傷、週次ブロックを足しただけ
+## ✅ 今日の到達点
+1. **別荘 健康診断**: MT5本体✅／インジ配置✅（**git clone→配置が完璧**を実証＝本拠地化の狙い達成）／通知✅
+2. **落ちる別荘対策**: 進捗台帳 `data/session_state/vps_setup_progress.md` ＋設計書 `data/vps/VPS_UNMANNED_DESIGN.md` をGit退避。運用＝**節目ごとpush**（落ちてもGitHubに残る）
+3. 🎉 **軸A 通知24h化 達成**: v4の24h発火をフォワード確認 → 6/16「スリープで通知死」**根治**
+4. **VPS無人化 設計確定**（↓）
+5. **メモリ実態判明**: 圧迫主犯は**Claude Code自身**(claude5プロセス/Commit約2.5GB)。MT5は軽い(Commit162MB)。→ **EA無人化は2GBで着手可**。Win2はおぱ常駐用
 
-### 2. iCloud入口 橋渡し実装（AirDrop廃止）
-- 入口：`iCloud Drive/ADXSCORE/imports/`（iPhone↔Mac一致を実証済み）
-- watcherに `sync_icloud_imports()` 追加：iCloud ADXSCORE配下のFX_*.csv（直下/imports両対応 maxdepth2）→ ローカル `data/mani_room/raw/imports/` へ橋渡し→既存処理に合流
-- **一気通貫 実証済み**：FX_20260618_125439.csv が iPhone保存→iCloud→Mac→ローカルimports まで通った
+## 🏗 VPS無人化 設計（確定）→ 詳細 `data/vps/VPS_UNMANNED_DESIGN.md`
+- **核心**: CSVは「運ぶ」でなく「**VPSのMT5でEA化してその場生成**」（旧CSV-via-Git案を上書き）
+- **日次3系統**: A=トレード後付け(**Mac専管**)／B=日次集計(**VPS EA化**)／C=signal_fires(**VPS EA化★最重要**)
+- **順番**: B(練習・入力不要)→C(本命・軸Aシナジー・フォワード完全化)→A(後回し)
+- **Git合流**: push対象が VPS=日次HTML / Mac=週次HTML で**分離→衝突ほぼ無**。`weekly_waves.json`だけ要片寄せ。`mt5_data`はMac専管
 
-### 3. watcher永続化（ログイン項目方式・TCC回避）
-- **launchd plist はTCCで失敗**：`~/Desktop`保護でlaunchd経由bashが弾かれる（ログ証拠：Sandbox deny + posix_spawn "Operation not permitted", exit78）。plistは `~/Library/LaunchAgents/com.aro.adxscore.watcher.plist` に残置だが**使わない**
-- **解決＝ログイン項目方式**：`~/Applications/ADXSCORE_Watcher.app`（osacompile製、pgrepで二重起動防止）をGUI起動→TCC許可→watcher起動。**ログイン項目に追加済み**
-- 起動確認済み：13:36 監視開始、週次7本監視＋iCloud入口認識
+## ▶ 次セッションの起点 ＝ 系統B（Daily_Aggregate）EA化
+1. GUI前提クリア済み（**AutoTradingは緑にできる**／XAUUSD気配更新OK）
+2. おぱが `signals/XAUUSD_Daily_Aggregate_v1.mq5` を読む → **Script→EA化**(OnStart→OnInit+OnTimer)の青写真
+3. 実装はコーへ指示書
+4. signal_fires実装2案（Signal_Fire_Logger EA化 vs **v4に発火時CSV追記**）→ コード突き合わせで決定
 
-## 🔁 再起動後の検証（あろさんが再起動する→次セッション最初にここを確認）
-1. `pgrep -lf auto_sync_daily.sh` → `/bin/bash ./auto_sync_daily.sh` が立ってるか
-2. `tail -15 ~/Desktop/ADXSCORE/auto_sync.log` → 「監視開始」が**再起動後の時刻**で出てるか／「週次CSV 7本を監視」
-3. 立ってなければ：システム設定>一般>ログイン項目に `ADXSCORE_Watcher.app` があるか確認、or `open ~/Applications/ADXSCORE_Watcher.app` で手動起動
-→ 立てば「**消さない限り起動・再起動で自動起動**」完成（あろさんの要望クローズ）
+## 🔧 別荘 運用フロー（今日確立）
+- **作業時（おぱと作業）はMT5を一時的に閉じる** → メモリ確保（おぱが約2.5GB食う）。**作業後にMT5を開いて軸A再稼働**。※閉じてる間は24h通知が止まる
+- **別荘からpush前は必ず `git pull --rebase`**（Mac watcherと同mainに書き合う＝競合調停。今日2回reject→rebaseで解消）
+- **パラレルおぱ運用**: VPS⇔Mac⇔GitHub で交信。Mac側は半自動watcher稼働中。情報が要る時は `git pull` で最新取得（pushされた物だけ見える）
+- RDPは「**切断**」で抜ける（**ログオフ厳禁**）
 
-## 🎯 GOAL残り = VPS常駐化（次回の別荘作業）
-- Mac側は完成。残るは「Macスリープで止まる」を埋めるVPS 24h化
-- `auto_sync_daily.sh` をVPS(Windows Server)へ移植：パス（`/Users/aro/Library/...wine...`→`C:\...MQL5\Files`）・`stat -f %m`（BSD構文→Windows）・python起動 等が要移植。**bashそのままは動かない**
-- ※週次HMの起点はMacのWaveLogライン引き＝Mac本拠。VPS化の本命は日次watcher
+## ⚠️ 注意点
+- VPS 2GB: MT5は軽い。EA無人化は2Gで可。Win2(3.5GB)はおぱ常駐の快適性用（**今すぐ不要**、EA実測後に判断）
+- 週次HM（WaveLog手描き起点）は**Mac本拠維持**
 
-## 🛠 今日確立した運用trap（再発時用）→ メモリ化済み [[mac-semi-auto-pipeline-watcher]]
-- **iCloud同期スタック**（6/17 19:02から、ストレージ満杯余波で約18hストール）→ `killall bird`＋`brctl download <path>`で回復。last-syncが現在時刻に更新されればOK
-- **~/Desktop配下スクリプトのlaunchd永続化は不可**（TCC）→ ログイン項目.app方式で回避
-
-## 📋 据え置きの分割タスク
-- **コー**: enrichedに is_signal/tag/style_class パース分離（prepare_trade_input.py）／Trade_Snapshot_Builder列拡充
-- **マニ**: daily_calendar_v3 に分析タブ（グルーピング/フィルター/ソート）
-- **カイ**: is_signal別/tag別/★時間帯別の機能性統計（損益集計禁止）
-- **おぱ**: VPS常駐化（移植）／旧Actions(daily_v2.yml)掃除
-
-## ⚠️ 注意点（継続）
-- **scores.json**＝初期Twelve遺産（5/27停止）。v14の表示主軸は weekly_waves.json の adx_score。**資産保持でOK**（消すと古い週のscore_v3集計が変わるリスクのみ）。daily_v2.yml掃除時に整理
-- VPS 2GB不安定（OOM）。MT5常駐＋claudeは作業時だけなら回る。Win2(3.5GB)が本筋
-- RDPは「**切断**」でVPSアプリ生存／「**ログオフ**」厳禁
-- Mac sleep中はwatcher休止（24hはVPS）
-
-## 未コミット
-- `auto_sync_daily.sh`（+87/-2、週次watcher＋iCloud橋渡し）／`latest.md` → コミット要否はあろさん判断
+## 📋 積み残し
+- **系統B/C EA化**（次の本命）
+- weekly_waves.json 片寄せ方針 ／ mt5_data・.DS_Store の .gitignore（設計確定後・慎重に）
+- Win2判断（EA実測後）
+- **【Mac側・前回宿題】** watcher再起動後の自動起動検証（`pgrep -lf auto_sync_daily.sh` → 無ければログイン項目 `ADXSCORE_Watcher.app`）
 
 ---
-*次の起点＝再起動後のwatcher自動起動を検証→OKなら半自動更新化Mac側クローズ。次の山はVPS常駐化（Windows移植）。*
+*次の起点＝系統B（Daily_Aggregate）のEA化設計。おぱが mq5 を読んで Script→EA 青写真→コー実装。作業時はMT5閉じる運用。*
