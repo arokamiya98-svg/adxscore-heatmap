@@ -1,43 +1,40 @@
-# 次セッションへの引き継ぎ（2026-06-18 別荘セッション②：VPS無人化 設計確定）
+# 次セッションへの引き継ぎ（2026-06-19 別荘セッション③：系統B EA化 完全達成）
 
 ## 🎯 今日の総括
-別荘（VPS）でおぱ起動2日目。**軸A（通知24h化）の達成確認**から始まり、**Macおぱ会議**を経て**VPS無人化の設計を確定**。あろさん判断で「情報の鮮度で設計実装に突っ込む」のはあえて避け、**引き継ぎ＋今後フローの整備に注力**。次セッションが系統B EA化からスムーズに走れる状態を作って店じまい。
+別荘（VPS）でおぱ起動3日目。前回設計した**系統B（日次データ）EA化を実装→実機回帰まで完走**。Script2本（Daily_Aggregate / Daily_MFE_MAE）を**1つの統合EA `XAUUSD_DailyBatch_EA_v1` に統合**し、EA版＝Script版が **MD5バイト完全一致**＝移植事故ゼロを実機実証。VPS無人24h生成の第一歩クリア。
 
 ## ✅ 今日の到達点
-1. **別荘 健康診断**: MT5本体✅／インジ配置✅（**git clone→配置が完璧**を実証＝本拠地化の狙い達成）／通知✅
-2. **落ちる別荘対策**: 進捗台帳 `data/session_state/vps_setup_progress.md` ＋設計書 `data/vps/VPS_UNMANNED_DESIGN.md` をGit退避。運用＝**節目ごとpush**（落ちてもGitHubに残る）
-3. 🎉 **軸A 通知24h化 達成**: v4の24h発火をフォワード確認 → 6/16「スリープで通知死」**根治**
-4. **VPS無人化 設計確定**（↓）
-5. **メモリ実態判明**: 圧迫主犯は**Claude Code自身**(claude5プロセス/Commit約2.5GB)。MT5は軽い(Commit162MB)。→ **EA無人化は2GBで着手可**。Win2はおぱ常駐用
+1. **おぱが系統B 2本を読む→Script→EA化 青写真**（OnInit/OnTimer/OnDeinit、毎回フル120日上書き、Sleep廃しBarsCalculatedゲート）
+2. **統合採用**（あろさん判断）：MT5=1チャート1EA制約 → 統合なら XAUUSD H1 1枚で2 CSV。CPU/メモリ最小
+3. **コー実装**：`signals/XAUUSD_DailyBatch_EA_v1.mq5`。名前衝突解消（共通化＋`Agg_`/`Mfe_`接頭辞）、計算ロジック機械diff完全一致、コンパイル0/0
+4. **ハマり：.ex5消失→556**。MT5起動中はコマンドラインコンパイルの.ex5がロード不可 → **MetaEditor F7再コンパイルで根治**（→メモリ `reference_mt5-ea-ex5-needs-f7-not-cmdline`）
+5. **🎉 実機回帰 満点合格**：EA版 vs Script版が Aggregate / MFE_MAE 両方 **MD5バイト完全一致**
 
-## 🏗 VPS無人化 設計（確定）→ 詳細 `data/vps/VPS_UNMANNED_DESIGN.md`
-- **核心**: CSVは「運ぶ」でなく「**VPSのMT5でEA化してその場生成**」（旧CSV-via-Git案を上書き）
-- **日次3系統**: A=トレード後付け(**Mac専管**)／B=日次集計(**VPS EA化**)／C=signal_fires(**VPS EA化★最重要**)
-- **順番**: B(練習・入力不要)→C(本命・軸Aシナジー・フォワード完全化)→A(後回し)
-- **Git合流**: push対象が VPS=日次HTML / Mac=週次HTML で**分離→衝突ほぼ無**。`weekly_waves.json`だけ要片寄せ。`mt5_data`はMac専管
+## 🏗 系統B EA化の成果物
+- EA: `signals/XAUUSD_DailyBatch_EA_v1.mq5`（統合・OnTimer60分・初回15秒・コミット `4470943`）
+- 指示書: `data/vps/コー_指示書_系統B_DailyBatch_EA化_v1.md`
+- 出力: `daily_aggregate.csv`(29列) / `daily_mfe_mae_48h.csv`(24列)、UTF-8 BOM、Lookback120日
+- 稼働: XAUUSD H1にアタッチ・AutoTrading ON・60分ごと自動フル再生成
+- **運用の勝ち筋**：毎回フル上書き設計 → おぱ作業でMT5閉じてEA止めても、再開時フル再生成で穴埋まる（作業時MT5閉じる運用と両立）
 
-## ▶ 次セッションの起点 ＝ 系統B（Daily_Aggregate）EA化
-1. GUI前提クリア済み（**AutoTradingは緑にできる**／XAUUSD気配更新OK）
-2. おぱが `signals/XAUUSD_Daily_Aggregate_v1.mq5` を読む → **Script→EA化**(OnStart→OnInit+OnTimer)の青写真
-3. 実装はコーへ指示書
-4. signal_fires実装2案（Signal_Fire_Logger EA化 vs **v4に発火時CSV追記**）→ コード突き合わせで決定
+## ▶ 次セッションの起点 ＝ 系統C（signal_fires）EA化【本命】
+- 設計書順 B→**C**→A。Cは軸A（24h通知）シナジー＝フォワード完全化
+- 実装2案：〈`signals/Signal_Fire_Logger_v1.mq5` をEA化〉 vs 〈`ATR_WidthSignal_v4` に発火時CSV追記〉→ **コード突き合わせで決定**（後者はEA常駐増やさずメモリ節約・発火ロジック一元化の利）
+- ★コー実装の.ex5は**必ずMetaEditor F7再コンパイルを挟む**（今日のハマり教訓）
 
-## 🔧 別荘 運用フロー（今日確立）
-- **作業時（おぱと作業）はMT5を一時的に閉じる** → メモリ確保（おぱが約2.5GB食う）。**作業後にMT5を開いて軸A再稼働**。※閉じてる間は24h通知が止まる
-- **別荘からpush前は必ず `git pull --rebase`**（Mac watcherと同mainに書き合う＝競合調停。今日2回reject→rebaseで解消）
-- **パラレルおぱ運用**: VPS⇔Mac⇔GitHub で交信。Mac側は半自動watcher稼働中。情報が要る時は `git pull` で最新取得（pushされた物だけ見える）
-- RDPは「**切断**」で抜ける（**ログオフ厳禁**）
-
-## ⚠️ 注意点
-- VPS 2GB: MT5は軽い。EA無人化は2Gで可。Win2(3.5GB)はおぱ常駐の快適性用（**今すぐ不要**、EA実測後に判断）
-- 週次HM（WaveLog手描き起点）は**Mac本拠維持**
+## 🔧 別荘 運用フロー（継続）
+- 作業時はMT5を一時的に閉じる→メモリ確保（おぱ約2.5GB）。作業後MT5開いて軸A再稼働
+- 別荘からpush前は必ず `git pull --rebase`
+- RDPは「切断」で抜ける（ログオフ厳禁）
+- EA常駐＝MT5常駐。おぱ不在時に24h生成、作業時は閉じてOK（フル再生成で穴埋まる）
 
 ## 📋 積み残し
-- **系統B/C EA化**（次の本命）
-- weekly_waves.json 片寄せ方針 ／ mt5_data・.DS_Store の .gitignore（設計確定後・慎重に）
-- Win2判断（EA実測後）
-- **【Mac側・前回宿題】** watcher再起動後の自動起動検証（`pgrep -lf auto_sync_daily.sh` → 無ければログイン項目 `ADXSCORE_Watcher.app`）
-- **【次回チェック】リポジトリPUBLIC＋`data/memory/`移行済**。**あろさん判断(6/18)＝戦略/手法の公開は気にしない＝private化不要**（heatmapのGitHub Pages公開も維持）。**個人情報（口座番号/入金額/氏名/メール）が混ざってないかだけ確認**（資金管理メモが該当しうる→該当箇所のみ伏せる/抜く）
+- **系統C EA化**（次の本命）／系統A（Mac専管・後回し）
+- CSV→pipeline→push→HTML の日次動脈（EA生成CSVのその先。`weekly_waves.json`片寄せ・`mt5_data` .gitignore は設計確定後・慎重に）
+- 検証一時ファイル `daily_aggregate_EA.csv` / `daily_mfe_mae_48h_EA.csv`（MT5 Files/、git外）は掃除可
+- Win2(3.5GB)判断（EA常駐のメモリ実測後）
+- **【Mac側・前回宿題】** watcher自動起動検証（`pgrep -lf auto_sync_daily.sh`）
+- **【PUBLIC個人情報】** 今日push分は個人情報なし確認済。資金管理メモ等は引き続き注意
 
 ---
-*次の起点＝系統B（Daily_Aggregate）のEA化設計。おぱが mq5 を読んで Script→EA 青写真→コー実装。作業時はMT5閉じる運用。*
+*次の起点＝系統C（signal_fires）EA化。実装2案をコード突き合わせ→コー指示書。.ex5はF7必須。作業時MT5閉じる運用。*

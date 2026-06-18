@@ -1,7 +1,7 @@
 # CLAUDE.md — ARO Trading Support Project
 
 > このファイルはClaude Codeが毎セッション自動参照するコンテキストファイルです。
-> 最終更新: 2026-06-04 (v12: フェーズ2実装サイクル完走 / v4稼働中 / H4 Phase Auto v2 / Stage 2・4 済化)
+> 最終更新: 2026-06-19 (v13: 系統B EA化 完全達成・実機回帰バイト一致 / VPS無人化トラック進行中・次は系統C)
 
 ---
 
@@ -177,7 +177,9 @@ def adx_score(h1_avg_adx, h4_pct_above20, h4_pct_above25):
 | `ATR_Dual_v1.mq5` | 全TF sub | ATR短期×長期二本表示 | ✅ 現用 |
 | `ATR_Ratio_Dual_v1.mq5` | 全TF sub | ATR Ratio 二本表示（2026-06-02 追加）| ✅ 現用 |
 | `BarCount_Drawing_v1.mq5` | 補助 | バーカウント描画 | ✅ 現用 |
+| `XAUUSD_DailyBatch_EA_v1.mq5` | H1(VPS) | 系統B 日次データ統合EA（Daily_Aggregate+MFE_MAE、OnTimer60分・初回15秒）| ✅ **VPS無人化稼働 2026-06-19**（回帰バイト一致）|
 
+> ⚠️ `XAUUSD_DailyBatch_EA_v1` はVPS無人化用EA。Script版 `XAUUSD_Daily_Aggregate_v1` / `_MFE_MAE_v1`（Scripts/ARO）は分析用に温存。EA再コンパイルは**MetaEditor F7必須**（コマンドライン.ex5はロード不可）。
 > オリジナルは `MT5/MQL5/Indicators/Free Indicators/` 配下。
 > 詳細・周期パラメータは `data/INVENTORY.md` 参照。
 

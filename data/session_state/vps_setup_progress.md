@@ -2,7 +2,7 @@
 
 > 別荘（VPS）は **落ちる前提**（2GB OOM）。落ちても「どこまでできてるか」をこの1枚で即把握する。
 > 運用：**節目ごとに更新＆push**（GitHubが本当のバックアップ。VPSローカルが飛んでも残る）。
-> 最終更新: 2026-06-18
+> 最終更新: 2026-06-19
 
 ## 凡例
 ✅完了 ／ ⏳作業中 ／ 🔲未着手 ／ ⚠️要確認・引っかかり中
@@ -14,7 +14,7 @@
 | 1 | MT5本体インストール | ✅ | `terminal64.exe` 存在＋データインスタンスあり（確認済 6/18） |
 | 2 | 通知系（MetaQuotes ID／通知ON／疎通） | ✅ | あろさん「通知クリア」済 |
 | 3 | インジ・スクリプト配置（signals/ → MQL5/Indicators・Scripts） | ✅ | ARO配下に現用インジ7＋スクリプト5 配置済（6/17, v4等コンパイル済）※週次収集3本のみ未配置 |
-| 4 | インジ稼働＆CSV出力 | 🔲 ← **今ここ** | `MQL5\Files\` に対象CSVが出る（タイムスタンプが更新される） |
+| 4 | インジ稼働＆CSV出力 | ✅ | 系統B EA化で daily_aggregate/mfe_mae を24h自動生成（実機回帰バイト一致 6/19）。※表の前提=watcher動脈はEA生成CSV前提で再設計待ち |
 | 5 | 日次watcher Windows移植（auto_sync_daily.sh） | 🔲 | パス／`stat -f %m`／python起動 を書換 → 手動1回実行でpipeline通る |
 | 6 | watcher永続化（タスクスケジューラ or スタートアップ） | 🔲 | VPS再起動後も自動で立つ |
 | 7 | 24h稼働テスト | 🔲 | 1日放置で CSV→pipeline→push が無人で回る／落ちない |
@@ -41,3 +41,6 @@
 - 2026-06-18: 🎉 **軸A（通知24h化）達成** — VPSで v4シグナルの24h発火を**フォワード確認**。6/16「PCスリープで通知死」問題が根治。VPS導入の第一動機クリア。
 - 2026-06-18: 次=**軸B CSV動脈**（あろさん設計: iPhone→iCloud→Mac→Git→VPS→python自動化）。土台は既存（mt5_data/CSV13本＋FX_*.csvが全てgit追跡下／.gitignore除外なし）。設計前提「CSV排出先＆Mac watcherのpush挙動」をMacおぱに調査依頼（コマンド集発行・出力待ち）。
   - 設計論点: ①誰がpushするか ②VPS処理結果の戻し方 ③Mac/VPS境界線。回答が来たらGit合流ロジックを具体設計。
+- 2026-06-19: 🎉 **系統B EA化 完全達成**。Script2本→統合EA `XAUUSD_DailyBatch_EA_v1`（コミット4470943）。実機回帰でEA版=Script版が Agg/MFE 両方 **MD5バイト完全一致**。XAUUSD H1常駐・OnTimer60分で daily CSV 24h自動生成。
+  - **ハマり教訓**: MT5起動中はコマンドラインコンパイルの.ex5がロード失敗(556)→`.ex5`消失。**MetaEditor F7再コンパイルで根治**（→メモリ `reference_mt5-ea-ex5-needs-f7-not-cmdline`）。系統C実装でも必ずF7を挟む。
+  - 次=**系統C（signal_fires）EA化**（実装2案: Signal_Fire_Logger EA化 vs v4に発火時CSV追記）。
