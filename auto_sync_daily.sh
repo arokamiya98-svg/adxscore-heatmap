@@ -29,8 +29,10 @@ DEST="mt5_data"
 ICLOUD_IMPORTS="$HOME/Library/Mobile Documents/com~apple~CloudDocs/ADXSCORE"
 LOCAL_IMPORTS="data/mani_room/raw/imports"
 
-# 監視対象（MT5 mq5 が出力する CSV）— 日次研究カレンダー用
-TARGETS=("daily_mfe_mae_48h.csv" "daily_aggregate.csv" "trades_enriched.csv" "signal_fires.csv")
+# 監視対象（Mac MT5 mq5 が出力する CSV）— 系統A 成績のみ（Mac専管・iPhone入力由来）
+# ⚠️ VPS由来3つ（signal_fires / daily_aggregate / daily_mfe_mae_48h）は Mac MT5 Files に
+#    出力されない＝ここで監視しても永遠に空振り。VPSが git push する → 下部「git pull検知」で拾う。
+TARGETS=("trades_enriched.csv")
 
 # 監視対象（週次マップ用）— 更新されたら run_pipeline.sh で週次ヒートマップを再生成
 # WaveLog にライン引き → MT5 週次スクリプトを回す → ここが検知して自動で最新版＆push
@@ -47,6 +49,7 @@ WEEKLY_TARGETS=(
 POLL_INTERVAL=2
 WRITE_SETTLE=2     # MT5 書き込み完了待ち（日次・単発出力）
 WEEKLY_SETTLE=10   # 週次は4スクリプト連続出力のためデバウンス長め
+GIT_CHECK_INTERVAL=60  # VPS push 取込: git fetch/pull は60秒に1回（2秒ポーリングとは別カウンタ）
 
 # 入力 CSV の最新版（FX_*.csv）
 get_latest_input() {
@@ -84,11 +87,38 @@ sync_icloud_imports() {
 
 ts() { date +"%H:%M:%S"; }
 
+# ── VPS が push した daily/ を git pull で取込 ──
+# Mac MT5 には出ないCSV（系統B/C）はファイル監視では拾えない。VPSが GitHub main へ
+# push する → ここで origin/main の進行を検知 → pull → daily/ に差分あれば日次カレンダー再生成。
+# set -e 下でも watcher が死なないよう、各 git 呼び出しは || / if でガードする。
+check_git_pull() {
+  git fetch origin main --quiet >/dev/null 2>&1 || return 0
+  local local_head=$(git rev-parse HEAD 2>/dev/null || echo local)
+  local remote_head=$(git rev-parse origin/main 2>/dev/null || echo remote)
+  [ "$local_head" = "$remote_head" ] && return 0
+  # pull すると HEAD が進むため、daily/ の差分有無は pull 前に判定する
+  local daily_changed=$(git diff --name-only HEAD origin/main -- mt5_data/daily/ 2>/dev/null)
+  echo ""
+  echo "[$(ts)] ▶ origin/main 更新検知 → git pull --rebase --autostash"
+  if git pull --rebase --autostash origin main >/dev/null 2>&1; then
+    if [ -n "$daily_changed" ]; then
+      echo "[$(ts)]   daily/ 更新あり → run_daily_calendar.sh --no-open"
+      ./run_daily_calendar.sh --no-open 2>&1 | grep -E "(OK 出力|トレード日数|期間|日次CSV|完了)" | head -10
+      echo "[$(ts)] ✅ 日次カレンダー再生成完了（VPS daily 合流）"
+    else
+      echo "[$(ts)] ✅ git pull 完了（daily/ 変更なし＝週次②等の取込のみ）"
+    fi
+  else
+    echo "[$(ts)] ⚠️ git pull 失敗（watcher継続・次回 ${GIT_CHECK_INTERVAL}s 後に再試行）"
+  fi
+}
+
 echo "╔══════════════════════════════════════════════════╗"
 echo "║   MT5 自動同期 watcher 起動                       ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo "  MT5 Files: $MT5_FILES"
-echo "  ターゲット: ${TARGETS[*]}"
+echo "  ターゲット(Mac MT5): ${TARGETS[*]}"
+echo "  VPS push取込: git pull検知 ${GIT_CHECK_INTERVAL}s毎 → daily/ 更新で日次カレンダー再生成"
 echo "  ポーリング: ${POLL_INTERVAL}s"
 echo ""
 echo "  停止: Ctrl+C または kill <PID>"
@@ -127,6 +157,8 @@ echo ""
 echo "[$(ts)] 監視開始..."
 
 trap 'echo ""; echo "[$(ts)] 監視停止"; exit 0' INT TERM
+
+GIT_CHECK_COUNTER=0  # ループ累積秒。GIT_CHECK_INTERVAL 到達で check_git_pull 発火
 
 while true; do
   # ── iCloud入口 → ローカルimports 橋渡し（AirDrop不要化）──
@@ -224,6 +256,13 @@ while true; do
     else
       echo "[$(ts)] ⚠️ run_pipeline.sh でエラー（watcher は継続）"
     fi
+  fi
+
+  # ── VPS push 取込: origin/main の進行を GIT_CHECK_INTERVAL 毎に git pull検知 ──
+  GIT_CHECK_COUNTER=$((GIT_CHECK_COUNTER + POLL_INTERVAL))
+  if [ "$GIT_CHECK_COUNTER" -ge "$GIT_CHECK_INTERVAL" ]; then
+    GIT_CHECK_COUNTER=0
+    check_git_pull
   fi
 
   sleep $POLL_INTERVAL
