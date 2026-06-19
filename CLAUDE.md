@@ -246,13 +246,13 @@ def adx_score(h1_avg_adx, h4_pct_above20, h4_pct_above25):
 | `FractalWaveLog_H4_XAU.csv` | H4 波形レベル | UTF-8-sig | 週次パイプライン |
 | `FractalWaveLog_H4_XAU_Vlines.csv` | H4 縦線データ（H4_XAU_v3_1 補助出力）| UTF-8-sig | 週次パイプライン |
 | `FractalWaveLog_H4_weekly.csv` | H4 週次時系列 | UTF-8-sig | 週次パイプライン |
-| `H4PhaseAuto_weekly.csv` | H4 Phase Auto v2 出力（5段階自動判定）| UTF-8-sig | 週次パイプライン（2026-06-04 合流）|
+| `H4PhaseAuto_weekly.csv` | H4 Phase Auto v2 出力（5段階自動判定）| **UTF-16** | 週次パイプライン（2026-06-04 合流）|
 | `ADX_Weekly_Above_v4.csv` | H1/H4 ADX週次集計（H1=32, H4=46 正式周期）| UTF-16 | 週次パイプライン（ADXスコア計算元・現行） |
 | `ADX_Weekly_Above_v3.csv` | H1/H4 ADX週次集計 旧版（H1=28, H4=30 周期ズレ）| UTF-16 | フォールバック用（v4が優先） |
 | `WaveLog_Export_v16.csv` | H1 波形ログ全量（457波, 125列, ATR比率・MFE/MAE等） | UTF-8 | 分析用のみ |
 | `WaveLog_Trail_BU_v16.csv` | H1 BU波内H1バーデータ（1768レコード, 104波） | UTF-8 | 分析用のみ |
 
-> ⚠️ **エンコーディング注意**: D1系・ADX_Weekly系はUTF-16（MQL5 FILE_UNICODE）、H4系・日次系はUTF-8-sig（BOM付きバイナリ）。Pythonで読む際は要確認。
+> ⚠️ **エンコーディング注意**: D1系・ADX_Weekly系・**`H4PhaseAuto_weekly`** はUTF-16（MQL5 FILE_UNICODE）、**FractalWaveLog_H4系**・日次daily系はUTF-8-sig（BOM付きバイナリ）。同じ「H4系」でも `H4PhaseAuto_weekly` だけ別スクリプト出力でUTF-16なので注意。Pythonで読む際は要確認。
 > ⚠️ **WaveLog_Export_v16.csv / WaveLog_Trail_BU_v16.csv** はパイプラインに含めない。データ分析専用。
 
 #### 日次データプール（`mt5_data/daily/`・系統B/C EA が毎時出力 → VPS push）
@@ -522,8 +522,10 @@ Scripts保存 : .../MQL5/Scripts/Examples/
 
 ### CSV出力の注意点
 - D1系スクリプト: **UTF-16**（FILE_WRITE|FILE_TXT|FILE_UNICODE）
-- H4系スクリプト: **UTF-8-sig**（BOM付きバイナリ = FILE_WRITE|FILE_BIN + BOM手動書込）
+- FractalWaveLog_H4系スクリプト: **UTF-8-sig**（BOM付きバイナリ = FILE_WRITE|FILE_BIN + BOM手動書込）
+- `H4PhaseAuto_weekly`（`ARO_H4PhaseAuto_v1.mq5`）: **UTF-16**（FILE_UNICODE。FractalWaveLog_H4系と違い ADX_Weekly系と同方式）
 - ADX_Weekly_Above系: **UTF-16**（D1系と同じ FILE_UNICODE）
+- 日次daily系（signal_fires / daily_aggregate / daily_mfe_mae_48h）: **UTF-8-sig**（BOM付き）
 - WaveLog_Export系: **UTF-8**（BOMなし）
 - CSVを渡された時は必ずエンコーディング確認から始める
 - Pythonでの読み込みは `["utf-16", "utf-8-sig", "utf-8"]` の順でフォールバック試行すると安全
