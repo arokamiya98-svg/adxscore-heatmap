@@ -69,7 +69,10 @@ echo ""
 echo "▶ Step 5: GitHub Pages に自動push"
 cd "$(dirname "$0")"
 if git rev-parse --git-dir > /dev/null 2>&1; then
-  git add docs/heatmap_v14.html data/weekly_waves.json
+  git add docs/heatmap_v14.html data/weekly_waves.json \
+          mt5_data/ADX_Weekly_Above_v4.csv \
+          mt5_data/ADX_Weekly_Above_v3.csv \
+          mt5_data/H4PhaseAuto_weekly.csv
   git commit -m "weekly update $(date '+%Y-%m-%d')" 2>/dev/null || echo "  (変更なし)"
   git push origin main && echo "🚀 GitHub Pages 更新完了！" || echo "⚠️  push 失敗（手動で git push してね）"
 else

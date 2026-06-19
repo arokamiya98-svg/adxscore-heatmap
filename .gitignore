@@ -8,3 +8,6 @@ auto_sync.log
 
 # VPS data pool push のログ
 vps_pool.log
+
+# ① 手描き波形CSV（認知ステップ・再生成可・Macローカル専用 / 設計書 日次動脈_DESIGN_v1 §2）
+mt5_data/FractalWaveLog_*.csv

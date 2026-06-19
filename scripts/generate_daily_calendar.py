@@ -88,9 +88,9 @@ ENRICHED = ROOT / "data" / "mani_room" / "enriched" / "trades_enriched_full.csv"
 OUT = ROOT / "data" / "trades" / "processed"
 WAVES = ROOT / "data" / "weekly_waves.json"
 # v1.0: 仮想 48h MFE/MAE (JST 14:00 仮想エントリー、C1出力)
-DAILY_MFE_MAE = ROOT / "mt5_data" / "daily_mfe_mae_48h.csv"
+DAILY_MFE_MAE = ROOT / "mt5_data" / "daily" / "daily_mfe_mae_48h.csv"
 # v1.2: 日次 D1/H4/H1 集計（C2出力、最優先データソース）
-DAILY_AGG = ROOT / "mt5_data" / "daily_aggregate.csv"
+DAILY_AGG = ROOT / "mt5_data" / "daily" / "daily_aggregate.csv"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # ============================================================

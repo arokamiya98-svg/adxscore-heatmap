@@ -41,8 +41,8 @@ DEST="mt5_data"
 
 # ── Step 1: MT5 → mt5_data/ 同期 ──────────────────────────
 if [ "$DO_SYNC" = true ]; then
-  echo "▶ Step 1: MT5 → mt5_data/ 同期"
-  mkdir -p "$DEST"
+  echo "▶ Step 1: MT5 → mt5_data/daily/ 同期"
+  mkdir -p "$DEST/daily"
 
   DAILY_FILES=(
     "daily_mfe_mae_48h.csv"   # C1: 非トレード日 48h MFE/MAE
@@ -53,7 +53,7 @@ if [ "$DO_SYNC" = true ]; then
   MISSING=0
   for fname in "${DAILY_FILES[@]}"; do
     src="$MT5_FILES/$fname"
-    dst="$DEST/$fname"
+    dst="$DEST/daily/$fname"
     if [ ! -f "$src" ]; then
       echo "  ⚠️  未生成: $fname (MT5 で対応スクリプトを実行)"
       MISSING=$((MISSING+1))
@@ -84,8 +84,8 @@ echo ""
 # signal_fires.csv は検証タイミングのみ生成される (Signal_Fire_Logger)
 # 存在すれば同期し、シグナル検証カレンダーも再生成する
 if [ "$DO_SYNC" = true ] && [ -f "$MT5_FILES/signal_fires.csv" ]; then
-  cp "$MT5_FILES/signal_fires.csv" "$DEST/signal_fires.csv"
-  echo "  📋 コピー: signal_fires.csv"
+  cp "$MT5_FILES/signal_fires.csv" "$DEST/daily/signal_fires.csv"
+  echo "  📋 コピー: signal_fires.csv → daily/"
 fi
 
 # ── Step 2: HTML 生成 ──────────────────────────────────────
@@ -93,7 +93,7 @@ echo "▶ Step 2: HTML 生成 (generate_daily_calendar.py)"
 python3 scripts/generate_daily_calendar.py
 echo ""
 
-if [ -f "$DEST/signal_fires.csv" ]; then
+if [ -f "$DEST/daily/signal_fires.csv" ]; then
   echo "▶ Step 2b: シグナル検証カレンダー生成 (generate_signals_calendar.py)"
   python3 scripts/generate_signals_calendar.py
   echo ""

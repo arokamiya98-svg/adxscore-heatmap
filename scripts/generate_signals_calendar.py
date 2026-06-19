@@ -59,7 +59,7 @@ from datetime import datetime, timedelta, date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FIRES_CSV = ROOT / "mt5_data" / "signal_fires.csv"
+FIRES_CSV = ROOT / "mt5_data" / "daily" / "signal_fires.csv"
 ENRICHED = ROOT / "data" / "mani_room" / "enriched" / "trades_enriched_full.csv"
 OUT = ROOT / "data" / "trades" / "processed"
 OUT.mkdir(parents=True, exist_ok=True)
