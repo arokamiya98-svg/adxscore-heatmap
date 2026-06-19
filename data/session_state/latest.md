@@ -1,19 +1,19 @@
-# 次セッションへの引き継ぎ（2026-06-19 日次動脈フェーズ3完了：フル稼働 🎊）
+# 次セッションへの引き継ぎ（2026-06-19 日次動脈 完全クローズ：フェーズ3＋Step1恒久対応）
 
 ## 🚀 おぱ起動作法（VPS↔Mac 連携・毎回これを最初に）
-1. **まず `git pull --rebase origin main`** — VPSとMacは同じmainを書き合うパラレル運用。起動直後にpullしないと状況が古い（VPSが自動pushした `mt5_data/daily/` も latest.md 自体も最新化されない）。dirtyなら `git stash → pull --rebase → stash pop`。
-2. この latest.md の「**今ここ**」「**次の起点**」で現状把握。詳細は設計書 `data/vps/日次動脈_DESIGN_v1.md`。
+1. **まず `git pull --rebase origin main`**（dirtyなら `git stash → pull --rebase → stash pop`）。VPSとMacは同じmainを書き合うパラレル運用。
+2. この latest.md の「**今ここ**」「**次の起点**」で把握。詳細は設計書 `data/vps/日次動脈_DESIGN_v1.md`。
 3. **push前も必ず `git pull --rebase`**。RDPは「切断」で抜ける（ログオフ厳禁）。
 
-## 🎯 今ここ — 日次動脈 フェーズ1〜3 完了 ✅ **フル稼働**
-フェーズ1(Mac無停止移行 `d4be4ce`)→2(VPS動脈ON `27bc3c6`)→3(Mac通し検証・公開 `f2b6276`)まで一気通貫。**VPSが焼いた日次データプール(daily/)→Macがpull→成績合流→docsカレンダー公開、の1サイクルが実際に回った。**
+## 🎯 今ここ — 日次動脈 完全クローズ ✅✅（フル稼働＋恒久対応済）
+フェーズ1(Mac無停止移行)→2(VPS動脈ON)→3(通し検証・公開)→**Step1恒久対応**まで完了。
+**素の `./run_daily_calendar.sh` が安全に回る**状態（daily/はVPS正本・Macは上書きしない）。動脈は無人で回り続ける。iPhone/iPad で日次カレンダー公開も目視確認済み。
 
-## ✅ フェーズ3完了（Mac・本日 / コミット f2b6276）
-- VPS daily/(**391件**＝VPSのEAが389→391に増やした最新)を git pull受信
-- `run_daily_calendar.sh --no-sync` で生成（**VPS正本を上書きせず使用**）→ カレンダー3枚 全PASS → docs公開
-- ★**動脈データ増加でジェネレータの固定値assert(389 / 265・124 / 30・26)が停止**した
-  → `generate_signals_calendar.py` / `generate_daily_calendar_v3.py` のセルフチェックを
-     **動的整合性(CSV件数追従)に置換**。本質検証(描画漏れ0=emitted==n_total / 重複0 / 集計整合=pass+supp==total)は完全維持
+## ✅ 本日の到達（コミット）
+- `d4be4ce` フェーズ1（③daily/分離・①gitignore・無停止移行）
+- `f2b6276` フェーズ3（セルフチェック動的化・VPS391件でカレンダー公開）
+- `dafbbf2` Step1恒久対応（Mac MT5→daily/コピー削除→**受信確認のみ**・欠損で`git pull`促し停止）
+  - 検証: 素実行(--no-sync無し)で daily/上書きせず3枚生成 / 欠損時 exit1 警告停止 両方OK
 
 ## 🩸 動脈フル稼働（完成形）
 ```
@@ -21,28 +21,30 @@ VPS MT5 EA →(毎時) →[schtasks AM8:10/PM23:10] vps_data_pool_push.sh
   → mt5_data/daily/ → git push          ★VPS全自動
        │ git
        ▼
-Mac git pull → run_daily_calendar.sh(--no-sync) → 成績合流 → docs公開   ★Mac起動時
+Mac git pull → ./run_daily_calendar.sh → 成績合流 → docs公開   ★素で安全(--no-sync不要)
        │ git push → GitHub Pages
        ▼
    iPhone/iPad で日次カレンダー
 ```
 
-## ⚠️ 次にやるべき恒久対応（フェーズ3で顕在化）
-1. **★★ `run_daily_calendar.sh` Step1 のVPS正本問題**：現状Step1は「Mac MT5→daily/コピー」＝**VPS正本(最新391件)を古いMac版で上書きする恐れ**。今回は `--no-sync` で回避した。
-   恒久対応＝Step1から日次③のMac MT5コピーを削除し「daily/はgit pull受信前提」に（設計書§8本来の指示「git pull受信ベースに」／VPSおぱ原則「daily/はVPS正本・Macは上書きしない」の実装）。
-   → これを直せば**素の `./run_daily_calendar.sh` が安全に回る**（毎回 --no-sync を付け忘れる事故を防ぐ）。
-2. **②(ADX_Weekly/H4PhaseAuto)のM放置** → `./run_pipeline.sh` で解消（設計§6・週次更新時）。
+## 📌 運用メモ（今日の知見）
+- **「追跡欠損」表示＝最新1-2日が48h未経過の追跡途中**（signal_fires 391件中1件=6-18=33バー / daily_mfe_mae 6-17=46・6-18=23、6-16以前は全48）。**VPS毎時更新で翌日埋まる＝正常**。異常ではない（動脈が最新を運んでる証拠）。
+- **docs/*.html は生成時刻が毎回変わる→実行毎にM化**（実データ差分なし=各1行）。auto-publish(Step2.6)で正規commitされる。--no-publish検証後は `git checkout docs/` で捨ててOK。
+- **素の `./run_daily_calendar.sh` はもう `--no-sync` 不要**（Step1が受信確認のみ＝安全）。
+
+## ▶ 次の起点 候補
+1. **CLAUDE.md v14**（VPSおぱ）：日次動脈フル稼働・`mt5_data/daily/`構造・系統B/C EA を反映。Step1恒久対応も完了＝まとめる好機。
+2. **②(ADX_Weekly/H4PhaseAuto)のM放置** → `./run_pipeline.sh` で解消（週次更新時・設計§6）。
+3. **`auto_sync_daily.sh` の日次TARGETS監視＝Step1と同根の地雷**（Mac MT5日次前提）。将来「git pull検知」へ寄せると完全一貫（VPSおぱ申し送り・別タイミングでOK）。
 
 ## 📋 据え置き
-- **系統A設計ズレ**：`mt5_data/{trade_input,trades_enriched}.csv` tracked・個人情報シロ。将来 data/trades/寄せ or §1修正（緊急でない）
+- 系統A設計ズレ（`mt5_data/{trade_input,trades_enriched}.csv` tracked・個人情報シロ・将来 data/trades/寄せ or §1修正）
 - `sync_mt5_data.sh` のMac既存M（中身要確認・フェーズと無関係）
 - `_EA` suffix掃除 / 系統A(Mac専管) / ②のVPS化(将来) / Win2(3.5GB)判断
-- VPS再起動時：schtasks「ログオン中のみ実行」＝RDPログオンまで発火しない（自動ログオン未設定の場合）
+- VPS再起動時：schtasks「ログオン中のみ実行」＝RDPログオンまで発火しない
 
 ## 🔧 別荘 運用フロー（継続）
-- push前は必ず `git pull --rebase` / RDPは「切断」で抜ける（ログオフ厳禁）
-- コー実装EAは MetaEditor **F7再コンパイル必須**（.ex5コマンドラインはロード不可＝556）
-- `signals/`が正本 → MT5 `Experts\ARO\`(EA)/`Scripts\ARO\`(Script) へコピーしてF7
+- push前は必ず `git pull --rebase` / RDPは「切断」で抜ける / コー実装EAは MetaEditor **F7再コンパイル必須**（.ex5は556） / `signals/`が正本
 
 ---
-*次の起点＝`run_daily_calendar.sh` Step1のVPS正本恒久対応（Mac MT5コピー削除→git pull受信前提化）。日次動脈はフェーズ3まで完了・フル稼働中。設計書 `data/vps/日次動脈_DESIGN_v1.md`。*
+*日次動脈は**完全クローズ**（フル稼働＋恒久対応済・素の run_daily_calendar.sh が安全）。次＝CLAUDE.md v14反映 or auto_sync_daily.sh の同根地雷対応。設計書 `data/vps/日次動脈_DESIGN_v1.md`。*
