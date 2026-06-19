@@ -1,7 +1,7 @@
 # 次セッションへの引き継ぎ（2026-06-19 別荘セッション⑤：日次動脈 設計フィックス）
 
 ## 🎯 今日の総括
-別荘（VPS）でおぱ起動5日目。系統B・Cで「CSVその場生成」を終えた次の一手＝**日次動脈（EA生成CSV→pipeline→HTML→push）の設計を集中して仕上げた**。実装はせず設計に専念。成果物は設計書 **`data/vps/日次動脈_DESIGN_v1.md`**（11セクション・叩き台スクリプト/タスクスケジューラ/実装順序込み）。あろさんとの対話で核心思想と.gitignore線引きを決め切り、おぱのセルフレビューで順序の穴も潰した。
+別荘（VPS）でおぱ起動5日目。系統B・Cで「CSVその場生成」を終えた次の一手＝**日次動脈（EA生成CSV→pipeline→HTML→push）の設計を集中して仕上げ、さらにVPS側フェーズ0まで実装した**。成果物は設計書 **`data/vps/日次動脈_DESIGN_v1.md`**（11セクション・叩き台スクリプト/タスクスケジューラ/実装順序込み）＋ **`scripts/vps_data_pool_push.sh`**（配置・構文OK・まだ動かさない / commit 4eddfab）。あろさんとの対話で核心思想と.gitignore線引きを決め切り、おぱのセルフレビューで順序の穴も潰した。**残りはフェーズ1（Mac・無停止移行）から**——設計の安全原則「daily/移動とMacパス変更は同一コミット群」を守るため、VPS単独で③を先行させずここで意図的に停止。
 
 ## ✅ 今日の到達点
 1. **現状調査で「動脈は9割完成・切れ目は3つだけ」と判明**：① VPS用sync無し（Mac版syncは週次6本＆Macパスのみ）② ジェネレータ出力先 `data/trades/` がgitignore＆VPSに不在 ③ processed→docs→push は実は `run_daily_calendar.sh` Step2.5/2.6 が**既に自動化済**（手動コピーではなかった）。
@@ -12,13 +12,13 @@
 6. **セルフレビューで順序の穴を修正**：daily/移動とMacパス変更を別フェーズにすると移行中Mac側が壊れる→**無停止移行（同一コミット群）**に組み替え（§9）。
 
 ## 🏗 設計の成果物
-- 設計書: `data/vps/日次動脈_DESIGN_v1.md`（状態=設計のみ・実装は次）
-- 叩き台: VPS `scripts/vps_data_pool_push.sh`（フルコード掲載・MT5 Files→daily/→pull --rebase→add daily/→commit→push）
+- 設計書: `data/vps/日次動脈_DESIGN_v1.md`（11セクション・schtasks登録コマンド追記済）
+- スクリプト: `scripts/vps_data_pool_push.sh`（**配置済・構文チェックOK・実行はフェーズ2**。MT5 Files→daily/→pull --rebase→add daily/のみ→commit→push）
 - sync対象確定: 無印3本（`signal_fires`/`daily_aggregate`/`daily_mfe_mae_48h`）。`_EA` suffixは回帰検証名残（無印とdiff0）→掃除対象
 - タスクスケジューラ: `C:\Program Files\Git\bin\bash.exe -lc "..."` / 叩き台1日2回(JST08:10/23:10)・要調整
 
 ## ▶ 次セッションの起点 候補
-1. **日次動脈の実装**（本命）：設計書フェーズ0〜3。フェーズ0(VPSスクリプト配置)→1(箱+Mac配管を1コミット群・無停止移行)→2(VPS動脈ON)→3(通し検証)。フェーズ1はMac作業が絡む点に注意。
+1. **日次動脈の実装 フェーズ1から**（本命）：フェーズ0(VPS `vps_data_pool_push.sh`配置)は**完了済**。次は **フェーズ1=Mac無停止移行**（Macおぱに「設計書フェーズ1を実装」と依頼：daily/へ③をgit mv＋FractalWaveLogを.gitignore/rm --cached＋generate_*.py/run_daily_calendar.shのパスをdaily/へ＋run_pipeline.sh Step5に②add追加 → **全部1コミットでpush**）→ フェーズ2(VPS:`bash scripts/vps_data_pool_push.sh`手動テスト→設計書§7のschtasks 2行登録＋「ログオンに関わらず実行」)→ フェーズ3(通し検証)。
 2. **②のVPS化**（将来の大トラック）：ADX_Weekly/H4PhaseAutoのEA化（系統B/C方式）→データプール拡大
 3. **運用観察**：EA2本常駐のメモリ実測 → Win2(3.5GB)判断
 
