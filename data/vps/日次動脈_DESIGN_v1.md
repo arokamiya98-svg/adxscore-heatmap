@@ -201,6 +201,15 @@ git add docs/heatmap_v14.html data/weekly_waves.json \
 
 **頻度の考え方**：EAは毎時更新、Macは起動時pull。だからVPSは「Macが起動した時にそこそこ新鮮」であれば足りる。毎時pushはcommit履歴を汚すので、まず1日2回で開始 → フォワードで「鮮度が足りない」と感じたら increase。＝**やってみて詰める**枠。
 
+### schtasks 登録コマンド（フェーズ2で実行・bash.exe実パス確認済 2026-06-19）
+```cmd
+schtasks /Create /TN "ADXSCORE_DataPool_AM" /TR "\"C:\Program Files\Git\bin\bash.exe\" -lc \"/c/Users/Administrator/adxscore-heatmap/scripts/vps_data_pool_push.sh\"" /SC DAILY /ST 08:10 /RL HIGHEST /F
+schtasks /Create /TN "ADXSCORE_DataPool_PM" /TR "\"C:\Program Files\Git\bin\bash.exe\" -lc \"/c/Users/Administrator/adxscore-heatmap/scripts/vps_data_pool_push.sh\"" /SC DAILY /ST 23:10 /RL HIGHEST /F
+```
+> ⚠️ RDP切断中も動かすには、登録後にタスクのプロパティで「**ユーザーがログオンしているかどうかにかかわらず実行する**」にチェック（パスワード要）。`git push` の認証情報がAdministratorに紐づくため `/RU SYSTEM` は避ける。
+> ⚠️ `/ST` はVPSローカル時刻。VPSのTZがJSTでなければ時刻を補正する。
+> 削除は `schtasks /Delete /TN "ADXSCORE_DataPool_AM" /F`（PM も同様）。
+
 ---
 
 ## 8. Mac側の組み替え点（実装時チェックリスト）
