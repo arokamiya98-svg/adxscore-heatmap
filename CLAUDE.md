@@ -1,7 +1,7 @@
 # CLAUDE.md — ARO Trading Support Project
 
 > このファイルはClaude Codeが毎セッション自動参照するコンテキストファイルです。
-> 最終更新: 2026-06-19 (v13: 系統B EA化 完全達成・実機回帰バイト一致 / VPS無人化トラック進行中・次は系統C)
+> 最終更新: 2026-06-19 (v14: 日次動脈フル稼働・系統A/B/C 3系統整備・§15「VPS無人化運用」新設 / 系統B/C EA化完了・Step1恒久対応済 `dafbbf2`)
 
 ---
 
@@ -177,11 +177,23 @@ def adx_score(h1_avg_adx, h4_pct_above20, h4_pct_above25):
 | `ATR_Dual_v1.mq5` | 全TF sub | ATR短期×長期二本表示 | ✅ 現用 |
 | `ATR_Ratio_Dual_v1.mq5` | 全TF sub | ATR Ratio 二本表示（2026-06-02 追加）| ✅ 現用 |
 | `BarCount_Drawing_v1.mq5` | 補助 | バーカウント描画 | ✅ 現用 |
-| `XAUUSD_DailyBatch_EA_v1.mq5` | H1(VPS) | 系統B 日次データ統合EA（Daily_Aggregate+MFE_MAE、OnTimer60分・初回15秒）| ✅ **VPS無人化稼働 2026-06-19**（回帰バイト一致）|
 
-> ⚠️ `XAUUSD_DailyBatch_EA_v1` はVPS無人化用EA。Script版 `XAUUSD_Daily_Aggregate_v1` / `_MFE_MAE_v1`（Scripts/ARO）は分析用に温存。EA再コンパイルは**MetaEditor F7必須**（コマンドライン.ex5はロード不可）。
-> オリジナルは `MT5/MQL5/Indicators/Free Indicators/` 配下。
-> 詳細・周期パラメータは `data/INVENTORY.md` 参照。
+> オリジナルは `MT5/MQL5/Indicators/Free Indicators/` 配下。詳細・周期パラメータは `data/INVENTORY.md` 参照。
+
+### 日次動脈 EA/Script（系統A/B/C・signals/ にミラー）
+
+日次カレンダーを支える3系統。**EA本体はVPS無人化用**（毎時 OnTimer 60分・初回15秒）、**Script版は分析用に温存**。データフロー詳細は §15「日次動脈／VPS無人化運用」参照。
+
+| 系統 | ファイル | 型 | 出力CSV（`mt5_data/`） | 管理 | 状態 |
+|------|---------|----|----------------------|------|------|
+| **A 成績** | `Trade_Snapshot_Builder.mq5` | Script | `trades_enriched.csv` | Mac専管（iPhone入力由来）| ✅ 現用 |
+| **B 集計** | `XAUUSD_DailyBatch_EA_v1.mq5` | **EA** | `daily/daily_aggregate.csv` ＋ `daily/daily_mfe_mae_48h.csv` | VPS push | ✅ **VPS無人化 2026-06-19**（回帰バイト一致）|
+| ↳ B 温存 | `XAUUSD_Daily_Aggregate_v1.mq5` / `XAUUSD_Daily_MFE_MAE_v1.mq5` | Script | （上記を個別生成）| 分析用 | 🟡 温存 |
+| **C シグナル** | `Signal_Fire_Logger_EA_v1.mq5` | **EA** | `daily/signal_fires.csv` | VPS push | ✅ **VPS無人化稼働** |
+| ↳ C 温存 | `Signal_Fire_Logger_v1.mq5` | Script | （同上）| 分析用 | 🟡 温存 |
+
+> ⚠️ EA再コンパイルは **MetaEditor F7必須**（コマンドライン .ex5 はロード不可）。`signals/` が正本、オリジナルEAは MT5本体側。
+> ⚠️ 系統A（`trades_enriched`）は**Mac専管**＝VPSは構造的に成績を持てない（iPhone入力由来）。系統B/Cの③日次CSVは `mt5_data/daily/` でVPSがpush。
 
 ### BT 関連 (data/bt/)
 
@@ -240,8 +252,18 @@ def adx_score(h1_avg_adx, h4_pct_above20, h4_pct_above25):
 | `WaveLog_Export_v16.csv` | H1 波形ログ全量（457波, 125列, ATR比率・MFE/MAE等） | UTF-8 | 分析用のみ |
 | `WaveLog_Trail_BU_v16.csv` | H1 BU波内H1バーデータ（1768レコード, 104波） | UTF-8 | 分析用のみ |
 
-> ⚠️ **エンコーディング注意**: D1系・ADX_Weekly系はUTF-16（MQL5 FILE_UNICODE）、H4系はUTF-8-sig（BOM付きバイナリ）。Pythonで読む際は要確認。
+> ⚠️ **エンコーディング注意**: D1系・ADX_Weekly系はUTF-16（MQL5 FILE_UNICODE）、H4系・日次系はUTF-8-sig（BOM付きバイナリ）。Pythonで読む際は要確認。
 > ⚠️ **WaveLog_Export_v16.csv / WaveLog_Trail_BU_v16.csv** はパイプラインに含めない。データ分析専用。
+
+#### 日次データプール（`mt5_data/daily/`・系統B/C EA が毎時出力 → VPS push）
+
+| ファイル | 内容 | エンコード | 用途 |
+|---------|------|-----------|------|
+| `daily/signal_fires.csv` | シグナル発火ログ（系統C・発火ごと1行）| UTF-8-sig | 日次カレンダー（signals / trades）|
+| `daily/daily_aggregate.csv` | 日次集計（系統B・1日1行）| UTF-8-sig | 日次カレンダー |
+| `daily/daily_mfe_mae_48h.csv` | 48h固定 MFE/MAE（系統B・建値後48時間追跡）| UTF-8-sig | 日次カレンダー |
+
+> ⚠️ ③日次CSVは **VPSがpush**（`mt5_data/daily/` のみ書く）。Mac は素の `run_daily_calendar.sh` で **受信確認のみ**＝上書きしない（Step1恒久対応 `dafbbf2`）。最新1〜2日が「追跡欠損」表示でも48h未経過の追跡途中＝正常（VPS毎時更新で翌日埋まる）。詳細は §15。
 
 ### ヒートマップ / ダッシュボード
 
@@ -268,35 +290,44 @@ def adx_score(h1_avg_adx, h4_pct_above20, h4_pct_above25):
 ```
 ADXSCORE/
 ├── CLAUDE.md                          ← このファイル（Claude Code自動参照）
-├── run_pipeline.sh                    ← 一発実行（sync→process→generate）
-├── mt5_data/                          ← MT5から同期されるCSV（週次パイプライン用）
-│   ├── FractalWaveLog_D1_v3_1.csv
-│   ├── FractalWaveLog_D1_weekly.csv
-│   ├── FractalWaveLog_H4_XAU.csv
-│   ├── FractalWaveLog_H4_XAU_Vlines.csv
-│   ├── FractalWaveLog_H4_weekly.csv
-│   ├── H4PhaseAuto_weekly.csv         ← H4 Phase Auto v2 出力（5段階）
-│   └── ADX_Weekly_Above_v4.csv        ← ADXスコア計算元（H1=32, H4=46, 閾値25）
+├── run_pipeline.sh                    ← 週次パイプライン（sync→process→heatmap生成→公開）
+├── run_daily_calendar.sh             ← 日次カレンダー（VPS daily/ 受信確認→成績合流→docs公開）
+├── auto_sync_daily.sh                ← Mac常駐watcher（週次/日次/iCloud入口を監視）
+├── mt5_data/                          ← MT5/VPS由来CSV
+│   ├── FractalWaveLog_*.csv           ← ① 手描き波形（.gitignore・Macローカル専用・再生成可）
+│   ├── ADX_Weekly_Above_v4.csv        ← ② 自動集計（ADXスコア元・git追跡・Macがpush）
+│   ├── H4PhaseAuto_weekly.csv         ← ② 自動集計（H4 Phase 5段階）
+│   ├── trade_input.csv / trades_enriched.csv  ← 系統A 成績（Mac専管・iPhone入力由来）
+│   └── daily/                         ← ③ 日次データプール（VPS EA毎時→VPSがpush）
+│       ├── signal_fires.csv
+│       ├── daily_aggregate.csv
+│       └── daily_mfe_mae_48h.csv
 ├── data/
 │   ├── INVENTORY.md                   ← データ索引（鮮度・信頼度・由来）★参照ゾーン入口
 │   ├── bt/                            ← BT結果CSV + BT mq5 ソース + 各種spec
-│   ├── forward/                       ← 手動フォワードテスト記録（v4_forward_log.md）
+│   ├── forward/                       ← v4 mq5 フォワード記録（v4_forward_log.md）
 │   ├── maintenance/                   ← 再評価サイクル設計（REVIEW_CYCLE.md）
+│   ├── vps/                           ← 日次動脈/VPS無人化 設計書・コー指示書（系統B/C EA化）
+│   ├── scriptable/                    ← Scriptable ウィジェット（atr_widget.js + SPEC）
+│   ├── mani_room/                     ← マニの部屋（振り返り・raw/imports）
+│   ├── trades/                        ← 成績（.gitignore・processed/ に日次カレンダーHTML）
 │   ├── session_state/                 ← セッション引き継ぎ（latest.md + archive/）
-│   └── weekly_waves.json              ← process_wavelog.py の出力（ADXスコア + H4 Phase + ATR Zone 含む）
-├── signals/                           ← 現用シグナル/インジ mq5 ミラー（MT5本体側からコピー）
-├── docs/
-│   └── heatmap_v14.html               ← 最終出力（GitHub Pages公開 / Widget Webで表示）
+│   └── weekly_waves.json              ← process_wavelog.py 出力（ADXスコア + H4 Phase + ATR Zone）
+├── signals/                           ← 現用 mq5 ミラー（認識ツール + 系統A/B/C EA・★正本）
+├── docs/                              ← GitHub Pages 公開
+│   ├── heatmap_v14.html               ← 週次ヒートマップ（run_pipeline 生成 / Widget Web表示）
+│   └── *_calendar*.html               ← 日次カレンダー（run_daily_calendar 生成）
 ├── retrospect/                        ← トレード振り返り記録
 └── scripts/
-    ├── sync_mt5_data.sh               ← MT5→mt5_data/ 同期
-    ├── process_wavelog.py             ← CSV→weekly_waves.json 変換（ADXスコア + H4 Phase + ATR Zone）
-    ├── generate_heatmap_v14.py        ← weekly_waves.json→HTML 生成（ATR Zone行追加版）
-    ├── analyze_bt_gen2.py             ← BT世代2 構造分析（PATTERN_REGIME_MAP_v2 生成）
-    ├── analyze_pattern_by_phase.py    ← パターン×局面分析
-    ├── analyze_axis_deep_v2.py        ← 軸別深掘り（PatC×ATR_Ratio / PatA×ADX）
-    ├── analyze_atr_ratio_dist.py      ← ATR_RATIO 分布（ATR Zone しきい値根拠）
-    └── compare_30_46_filtered.py      ← H4_ADX 30 vs 46 比較（46採用根拠）
+    ├── sync_mt5_data.sh               ← MT5→mt5_data/ 同期（週次①②）
+    ├── process_wavelog.py             ← CSV→weekly_waves.json（ADXスコア + H4 Phase + ATR Zone）
+    ├── generate_heatmap_v14.py        ← weekly_waves.json→週次HTML（ATR Zone行追加版）
+    ├── prepare_trade_input.py         ← iPhone入力→trade_input（系統A前処理）
+    ├── generate_daily_calendar_v3.py  ← 日次カレンダー（メイン）
+    ├── generate_signals_calendar.py   ← シグナル発火カレンダー（signal_fires）
+    ├── generate_trades_calendar.py    ← 成績カレンダー
+    ├── vps_data_pool_push.sh / .bat   ← ★VPS側：daily/ 製造→push（VPSで実行）
+    └── analyze_*.py / compare_*.py    ← BT世代2 構造分析群（PATTERN_REGIME_MAP_v2 生成）
 ```
 
 > ℹ️ `scores.json` は廃止。ADXスコアは `ADX_Weekly_Above_v3.csv` → `process_wavelog.py` で `weekly_waves.json` に直接埋め込まれる（Twelve Data API不要）。
@@ -598,6 +629,71 @@ data/session_state/
 └ archive/
    └ YYYY-MM-DD_HHMM.md  ← 自動スナップショット履歴
 ```
+
+---
+
+## 15. 日次動脈 / VPS無人化運用（2026-06-19 フル稼働）
+
+> VPSのMT5 EAが毎時焼く日次CSVを **git経由でMacへ運び**、Macがトレード成績を合流させて日次カレンダーを公開する自動動脈。フェーズ1〜3＋Step1恒久対応まで完了＝**素の `./run_daily_calendar.sh` が安全に回る**。
+> 詳細設計: `data/vps/日次動脈_DESIGN_v1.md` ／ VPS無人化の母体: `data/vps/VPS_UNMANNED_DESIGN.md`
+
+### 15.1 3つの場所の役割分担
+
+```
+┌─ VPS = データプール製造機（24h全自動・個人情報ゼロ）──┐
+│  MT5 EA（系統B/C）→ daily/{signal_fires, daily_aggregate,│
+│                      daily_mfe_mae_48h}.csv（毎時上書き） │
+│  vps_data_pool_push.sh（schtasks AM8:10 / PM23:10）      │
+│    → mt5_data/daily/ コピー → git pull --rebase → push   │
+└──────────────────────────────────────────────────────────┘
+                   │ git（GitHub main）= 合流点
+                   ▼
+┌─ Mac = 成績合流機（立ち上げ時・成績を持つ側）──────────┐
+│  git pull → daily/ 受信確認                              │
+│  ＋ iPhone→iCloud→FX_*.csv → trade_input → enriched      │
+│  run_daily_calendar.sh → 成績オーバーレイ合流            │
+│    → data/trades/processed/*.html → docs/ → git push     │
+└──────────────────────────────────────────────────────────┘
+                   │ git push → GitHub Pages
+                   ▼
+            iPhone/iPad で日次カレンダー閲覧
+```
+
+**なぜこの分担が必然か**: 成績（`trades_enriched`）は iPhone入力由来で `data/trades/`（.gitignore）にしか無く、VPSには存在しない。VPSは構造的に成績を持てない＝純データ生産に徹する（系統AがMac専管なのと同じ理由）。
+**個人情報の線引き（あろさん確定 2026-06-19）**: NGは具体的な口座番号のみ。成績・ロジック・損益・ロットは公開OK ＝ docs/ カレンダー公開は継続OK。
+
+### 15.2 CSV 3分類と git 方針
+
+| # | 分類 | ファイル | 生成 | git方針 |
+|---|------|---------|------|---------|
+| ① | 手描き波形 | `FractalWaveLog_*` | Mac手動MT5（認知ステップ）| **.gitignore**（Macローカル・再生成可）|
+| ② | 自動集計 | `ADX_Weekly_Above_v4`(+v3) / `H4PhaseAuto_weekly` | MT5自動（ライン不要）| **git追跡**・Macが `run_pipeline.sh` でpush |
+| ③ | 日次 | `daily/{signal_fires, daily_aggregate, daily_mfe_mae_48h}` | VPS EA（毎時）| **`mt5_data/daily/` に分離**・VPSがpush |
+
+**rebase衝突が構造的に消える理屈**: ①は管理外・②はMacのみ・③はVPSのみが書く → `mt5_data/` が常時クリーン → `git pull --rebase` が事故らない。
+> ※ §10「CSV出力の注意点」はエンコード、ここ §15.2 は git運用、で棲み分け。
+
+### 15.3 日次ルーティン ＋ おぱ起動作法
+
+- **VPS側（全自動・無人）**: schtasks `ADXSCORE_DataPool_AM`(8:10) / `_PM`(23:10) が `vps_data_pool_push.bat` を発火 → daily/ をpush。RDP切断中も動く（※再起動後はRDPログオンまで発火しない）。
+- **Mac側（立ち上げ時）**: `git pull` → `./run_daily_calendar.sh`（**`--no-sync` 不要・素で安全**）→ 成績合流 → docs公開 → push。
+
+**🚀 おぱ起動作法（VPS↔Mac パラレル運用・毎回これを最初に）**:
+1. **まず `git pull --rebase origin main`**（dirtyなら `git stash → pull --rebase → stash pop`）。VPSとMacは同じmainを書き合う。
+2. **push前も必ず `git pull --rebase`**。
+3. RDPは「**切断**」で抜ける（ログオフ厳禁＝schtasks継続のため）。コー実装EAは MetaEditor **F7再コンパイル必須**（`.ex5` はロード不可）。`signals/` が正本。
+
+### 15.4 運用メモ＆地雷
+
+- ⚠️ **「追跡欠損」表示＝正常**: 最新1〜2日が48h未経過の追跡途中（毎時更新で翌日埋まる）＝動脈が最新を運んでる証拠。**ジェネレータに固定件数の assert を置かない**（データ増加が常態 / 動的整合性へ）。
+- ⚠️ **temp バースト**: Bash出力が無言で切れ `temp ... full (0MB free)` が出るのは物理でなく Claude Code サンドボックス層の断続バグ。重要コマンドはファイル化（`> _diag.txt` → Read）／出力を小さく保つ／続くなら再起動。
+- ⚠️ **Step1恒久対応（`dafbbf2`）**: Mac の `run_daily_calendar.sh` Step1 は daily/ を「受信確認のみ」（上書きしない）。欠損時は `git pull` を促して停止。
+- `docs/*.html` は生成時刻が毎回変わり実行毎にM化（実データ差分なし）＝auto-publishで正規commit、検証時は `git checkout docs/` で破棄可。
+
+### 15.5 完了条件・残課題
+
+- **完了条件（達成済 ✅）**: VPSがRDP切断中もdaily/を自動push / Macはpullだけで最新取得 / `mt5_data/` が両マシン常時クリーン / 日次カレンダー3枚がVPSデータ＋Mac成績で公開更新。
+- **残課題**: ②のVPS化（ADX_Weekly / H4PhaseAuto も EA化でデータプール拡大＝次の大トラック候補）/ `auto_sync_daily.sh` の日次監視を「git pull検知」へ寄せる（Step1と同根の地雷）/ `_EA` suffix掃除 / push頻度の調整（1日2回で開始→体感で増減）。
 
 ---
 
