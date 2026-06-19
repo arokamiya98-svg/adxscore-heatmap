@@ -1,40 +1,40 @@
-# 次セッションへの引き継ぎ（2026-06-19 別荘セッション③：系統B EA化 完全達成）
+# 次セッションへの引き継ぎ（2026-06-19 別荘セッション⑤：日次動脈 設計フィックス）
 
 ## 🎯 今日の総括
-別荘（VPS）でおぱ起動3日目。前回設計した**系統B（日次データ）EA化を実装→実機回帰まで完走**。Script2本（Daily_Aggregate / Daily_MFE_MAE）を**1つの統合EA `XAUUSD_DailyBatch_EA_v1` に統合**し、EA版＝Script版が **MD5バイト完全一致**＝移植事故ゼロを実機実証。VPS無人24h生成の第一歩クリア。
+別荘（VPS）でおぱ起動5日目。系統B・Cで「CSVその場生成」を終えた次の一手＝**日次動脈（EA生成CSV→pipeline→HTML→push）の設計を集中して仕上げた**。実装はせず設計に専念。成果物は設計書 **`data/vps/日次動脈_DESIGN_v1.md`**（11セクション・叩き台スクリプト/タスクスケジューラ/実装順序込み）。あろさんとの対話で核心思想と.gitignore線引きを決め切り、おぱのセルフレビューで順序の穴も潰した。
 
 ## ✅ 今日の到達点
-1. **おぱが系統B 2本を読む→Script→EA化 青写真**（OnInit/OnTimer/OnDeinit、毎回フル120日上書き、Sleep廃しBarsCalculatedゲート）
-2. **統合採用**（あろさん判断）：MT5=1チャート1EA制約 → 統合なら XAUUSD H1 1枚で2 CSV。CPU/メモリ最小
-3. **コー実装**：`signals/XAUUSD_DailyBatch_EA_v1.mq5`。名前衝突解消（共通化＋`Agg_`/`Mfe_`接頭辞）、計算ロジック機械diff完全一致、コンパイル0/0
-4. **ハマり：.ex5消失→556**。MT5起動中はコマンドラインコンパイルの.ex5がロード不可 → **MetaEditor F7再コンパイルで根治**（→メモリ `reference_mt5-ea-ex5-needs-f7-not-cmdline`）
-5. **🎉 実機回帰 満点合格**：EA版 vs Script版が Aggregate / MFE_MAE 両方 **MD5バイト完全一致**
+1. **現状調査で「動脈は9割完成・切れ目は3つだけ」と判明**：① VPS用sync無し（Mac版syncは週次6本＆Macパスのみ）② ジェネレータ出力先 `data/trades/` がgitignore＆VPSに不在 ③ processed→docs→push は実は `run_daily_calendar.sh` Step2.5/2.6 が**既に自動化済**（手動コピーではなかった）。
+2. **核心思想を確定**：VPS=データプール製造（全自動・成績ゼロ）／Mac=成績合流（個人情報側）／git=合流点。トレード成績(`trades_enriched`)はiPhone由来で `data/trades/`(gitignore)にしか無くVPS不在＝VPSは構造的に純データ生産に徹する。
+3. **CSV3分類で.gitignore線引き決着（あろさんの指摘が設計を救った）**：①手描き波形(FractalWaveLog)=gitignore・Macローカル ②自動集計(ADX_Weekly/H4PhaseAuto)=**追跡維持**（ADXスコア計算元・手描き不要→将来VPS化候補）③日次(signal_fires/daily_aggregate/daily_mfe)=`mt5_data/daily/`分離・VPS push。当初おぱは②を①と一緒くたにignoreしかけた→あろさんが「ADX_Weeklyは手書き関係ない自動スコア系」と訂正。
+4. **rebase衝突を構造的に根絶**：①管理外／②Mac commit（`run_pipeline.sh` Step5にadd追加でM放置解消）／③VPS commit → `mt5_data/`常時クリーン。
+5. **個人情報の線引き確定（あろさん）**：NGは具体的な口座番号のみ。成績/ロジック/損益/ロットは公開OK→ docs/カレンダー公開はこのまま継続。
+6. **セルフレビューで順序の穴を修正**：daily/移動とMacパス変更を別フェーズにすると移行中Mac側が壊れる→**無停止移行（同一コミット群）**に組み替え（§9）。
 
-## 🏗 系統B EA化の成果物
-- EA: `signals/XAUUSD_DailyBatch_EA_v1.mq5`（統合・OnTimer60分・初回15秒・コミット `4470943`）
-- 指示書: `data/vps/コー_指示書_系統B_DailyBatch_EA化_v1.md`
-- 出力: `daily_aggregate.csv`(29列) / `daily_mfe_mae_48h.csv`(24列)、UTF-8 BOM、Lookback120日
-- 稼働: XAUUSD H1にアタッチ・AutoTrading ON・60分ごと自動フル再生成
-- **運用の勝ち筋**：毎回フル上書き設計 → おぱ作業でMT5閉じてEA止めても、再開時フル再生成で穴埋まる（作業時MT5閉じる運用と両立）
+## 🏗 設計の成果物
+- 設計書: `data/vps/日次動脈_DESIGN_v1.md`（状態=設計のみ・実装は次）
+- 叩き台: VPS `scripts/vps_data_pool_push.sh`（フルコード掲載・MT5 Files→daily/→pull --rebase→add daily/→commit→push）
+- sync対象確定: 無印3本（`signal_fires`/`daily_aggregate`/`daily_mfe_mae_48h`）。`_EA` suffixは回帰検証名残（無印とdiff0）→掃除対象
+- タスクスケジューラ: `C:\Program Files\Git\bin\bash.exe -lc "..."` / 叩き台1日2回(JST08:10/23:10)・要調整
 
-## ▶ 次セッションの起点 ＝ 系統C（signal_fires）EA化【本命】
-- 設計書順 B→**C**→A。Cは軸A（24h通知）シナジー＝フォワード完全化
-- 実装2案：〈`signals/Signal_Fire_Logger_v1.mq5` をEA化〉 vs 〈`ATR_WidthSignal_v4` に発火時CSV追記〉→ **コード突き合わせで決定**（後者はEA常駐増やさずメモリ節約・発火ロジック一元化の利）
-- ★コー実装の.ex5は**必ずMetaEditor F7再コンパイルを挟む**（今日のハマり教訓）
+## ▶ 次セッションの起点 候補
+1. **日次動脈の実装**（本命）：設計書フェーズ0〜3。フェーズ0(VPSスクリプト配置)→1(箱+Mac配管を1コミット群・無停止移行)→2(VPS動脈ON)→3(通し検証)。フェーズ1はMac作業が絡む点に注意。
+2. **②のVPS化**（将来の大トラック）：ADX_Weekly/H4PhaseAutoのEA化（系統B/C方式）→データプール拡大
+3. **運用観察**：EA2本常駐のメモリ実測 → Win2(3.5GB)判断
 
 ## 🔧 別荘 運用フロー（継続）
-- 作業時はMT5を一時的に閉じる→メモリ確保（おぱ約2.5GB）。作業後MT5開いて軸A再稼働
+- 作業時はMT5を一時的に閉じる→メモリ確保。作業後MT5開いてEA/軸A再稼働
 - 別荘からpush前は必ず `git pull --rebase`
 - RDPは「切断」で抜ける（ログオフ厳禁）
-- EA常駐＝MT5常駐。おぱ不在時に24h生成、作業時は閉じてOK（フル再生成で穴埋まる）
+- コー実装EAは必ず MetaEditor F7 再コンパイル（.ex5コマンドラインはロード不可＝556）
+- リポジトリ`signals/`が正本 → MT5 `Experts\ARO\`（EA）/ `Scripts\ARO\`（Script）へコピーしてF7
 
 ## 📋 積み残し
-- **系統C EA化**（次の本命）／系統A（Mac専管・後回し）
-- CSV→pipeline→push→HTML の日次動脈（EA生成CSVのその先。`weekly_waves.json`片寄せ・`mt5_data` .gitignore は設計確定後・慎重に）
-- 検証一時ファイル `daily_aggregate_EA.csv` / `daily_mfe_mae_48h_EA.csv`（MT5 Files/、git外）は掃除可
-- Win2(3.5GB)判断（EA常駐のメモリ実測後）
-- **【Mac側・前回宿題】** watcher自動起動検証（`pgrep -lf auto_sync_daily.sh`）
-- **【PUBLIC個人情報】** 今日push分は個人情報なし確認済。資金管理メモ等は引き続き注意
+- 日次動脈の**実装**（設計完了・上記①）
+- 系統A（Mac専管・後回し）
+- ②のVPS化（将来）／Win2(3.5GB)判断（EA2本常駐メモリ実測後）
+- **【Mac側・宿題】** watcher自動起動検証（`pgrep -lf auto_sync_daily.sh`）／実装フェーズ1のMacパス変更（generate_*.py / run_daily_calendar.sh を `daily/` へ）
+- **【PUBLIC個人情報】** 今日push分（設計書）は個人情報なし。NGは口座番号のみと確定済
 
 ---
-*次の起点＝系統C（signal_fires）EA化。実装2案をコード突き合わせ→コー指示書。.ex5はF7必須。作業時MT5閉じる運用。*
+*次の起点＝日次動脈の実装（設計書 `data/vps/日次動脈_DESIGN_v1.md` フェーズ0〜3）。フェーズ1は無停止移行＝daily移動とMacパス変更を同一コミット群で。または②のVPS化。.ex5はF7必須。*
