@@ -201,10 +201,11 @@ git add docs/heatmap_v14.html data/weekly_waves.json \
 
 **頻度の考え方**：EAは毎時更新、Macは起動時pull。だからVPSは「Macが起動した時にそこそこ新鮮」であれば足りる。毎時pushはcommit履歴を汚すので、まず1日2回で開始 → フォワードで「鮮度が足りない」と感じたら increase。＝**やってみて詰める**枠。
 
-### schtasks 登録コマンド（フェーズ2で実行・bash.exe実パス確認済 2026-06-19）
+### schtasks 登録コマンド（フェーズ2で実行済 2026-06-19）
+> `.bat` ラッパー経由（`scripts/vps_data_pool_push.bat`）＝schtasks の `/TR` でbashの二重引用符エスケープを回避。
 ```cmd
-schtasks /Create /TN "ADXSCORE_DataPool_AM" /TR "\"C:\Program Files\Git\bin\bash.exe\" -lc \"/c/Users/Administrator/adxscore-heatmap/scripts/vps_data_pool_push.sh\"" /SC DAILY /ST 08:10 /RL HIGHEST /F
-schtasks /Create /TN "ADXSCORE_DataPool_PM" /TR "\"C:\Program Files\Git\bin\bash.exe\" -lc \"/c/Users/Administrator/adxscore-heatmap/scripts/vps_data_pool_push.sh\"" /SC DAILY /ST 23:10 /RL HIGHEST /F
+schtasks /Create /TN "ADXSCORE_DataPool_AM" /TR "C:\Users\Administrator\adxscore-heatmap\scripts\vps_data_pool_push.bat" /SC DAILY /ST 08:10 /F
+schtasks /Create /TN "ADXSCORE_DataPool_PM" /TR "C:\Users\Administrator\adxscore-heatmap\scripts\vps_data_pool_push.bat" /SC DAILY /ST 23:10 /F
 ```
 > ⚠️ RDP切断中も動かすには、登録後にタスクのプロパティで「**ユーザーがログオンしているかどうかにかかわらず実行する**」にチェック（パスワード要）。`git push` の認証情報がAdministratorに紐づくため `/RU SYSTEM` は避ける。
 > ⚠️ `/ST` はVPSローカル時刻。VPSのTZがJSTでなければ時刻を補正する。
@@ -216,6 +217,12 @@ schtasks /Create /TN "ADXSCORE_DataPool_PM" /TR "\"C:\Program Files\Git\bin\bash
 - コピーロジック ドライラン 3/3成功・git不変
 - スクリプトに `DRY_RUN=1`（本実行前の最終確認用）を実装
 > 💡 **実行条件は「ユーザーがログオンしているときのみ実行」推奨**：RDPは"切断"でセッション維持＝切断中も動く／Session0を避けてcredential復号が確実。VPS再起動後の無人実行が要るなら自動ログオン or「関わらず実行」+パスワードに切替。
+
+### ✅ フェーズ2 実行完了（2026-06-19 14:2x）
+- 初回本実行 push 成功（commit `5fd8a44` / daily 3本）
+- `.bat` ラッパー新設（`scripts/vps_data_pool_push.bat`）＋ schtasks AM(08:10)/PM(23:10) 2タスク登録（Status Ready・Next Run正常）
+- `schtasks /Run` 実機テスト：bat→bash→スクリプト全経路通過・**Last Result 0**・「no change skip」も正常動作
+- → **VPS→git 動脈ON＆自動化稼働**。残りフェーズ3（Mac pull→成績合流→docs公開）は次回Mac起動時。
 
 ---
 
