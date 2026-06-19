@@ -39,54 +39,41 @@ echo ""
 MT5_FILES="/Users/aro/Library/Application Support/net.metaquotes.wine.metatrader5/drive_c/Program Files/MetaTrader 5/MQL5/Files"
 DEST="mt5_data"
 
-# ── Step 1: MT5 → mt5_data/ 同期 ──────────────────────────
+# ── Step 1: 日次データプール daily/ の受信確認 ────────────────
+# daily/ の③(signal_fires / daily_aggregate / daily_mfe_mae_48h)は
+# VPSのEA(DailyBatch/SignalFire)が毎時焼いて push する「正本」。
+# Macは git pull で受信するだけ＝ここではコピーせず存在確認のみ行う。
+#   設計: data/vps/日次動脈_DESIGN_v1.md §1 / 原則「daily/はVPS正本・Macは上書きしない」
+# ※Macは日次EAを回さない。Mac MT5は週次(手描きWaveLog)専用＝VPSとの専管住み分け。
 if [ "$DO_SYNC" = true ]; then
-  echo "▶ Step 1: MT5 → mt5_data/daily/ 同期"
-  mkdir -p "$DEST/daily"
-
-  DAILY_FILES=(
+  echo "▶ Step 1: 日次データプール daily/ 受信確認（VPS正本・Macは上書きしない）"
+  POOL_FILES=(
+    "daily_aggregate.csv"     # C2: 日次集計 D1/H4/H1 ADX/DI/ATR
     "daily_mfe_mae_48h.csv"   # C1: 非トレード日 48h MFE/MAE
-    "daily_aggregate.csv"      # C2: 日次集計 D1/H4/H1 ADX/DI/ATR
+    "signal_fires.csv"        # シグナル発火ログ
   )
-
-  COPIED=0
   MISSING=0
-  for fname in "${DAILY_FILES[@]}"; do
-    src="$MT5_FILES/$fname"
-    dst="$DEST/daily/$fname"
-    if [ ! -f "$src" ]; then
-      echo "  ⚠️  未生成: $fname (MT5 で対応スクリプトを実行)"
+  for fname in "${POOL_FILES[@]}"; do
+    if [ ! -f "$DEST/daily/$fname" ]; then
+      echo "  ⚠️  未受信: mt5_data/daily/$fname"
       MISSING=$((MISSING+1))
-      continue
+    else
+      MTIME=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$DEST/daily/$fname")
+      echo "  ✅ $fname  ($MTIME)"
     fi
-    cp "$src" "$dst"
-    SIZE=$(du -h "$dst" | cut -f1)
-    MTIME=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$dst")
-    echo "  📋 コピー: $fname  ($SIZE, $MTIME)"
-    COPIED=$((COPIED+1))
   done
-
-  echo ""
-  echo "  結果: コピー=$COPIED, 未生成=$MISSING"
 
   if [ $MISSING -gt 0 ]; then
     echo ""
-    echo "💡 未生成のCSVは MT5 で以下を実行して生成:"
-    echo "   daily_mfe_mae_48h.csv  → XAUUSD_Daily_MFE_MAE_v1   (XAUUSD H1 チャート)"
-    echo "   daily_aggregate.csv    → XAUUSD_Daily_Aggregate_v1 (XAUUSD H1 チャート)"
-    echo ""
+    echo "❌ daily/ のデータプールが未受信です（$MISSING 本不足）。"
+    echo "   先に 'git pull --rebase origin main' で VPS のプールを受信してください。"
+    echo "   ※daily/ はVPSが正本。Mac MT5 からはコピーしません（設計書§1）。"
+    exit 1
   fi
 else
-  echo "▶ Step 1: MT5 同期スキップ (--no-sync)"
+  echo "▶ Step 1: daily/ 受信確認スキップ (--no-sync)"
 fi
 echo ""
-
-# signal_fires.csv は検証タイミングのみ生成される (Signal_Fire_Logger)
-# 存在すれば同期し、シグナル検証カレンダーも再生成する
-if [ "$DO_SYNC" = true ] && [ -f "$MT5_FILES/signal_fires.csv" ]; then
-  cp "$MT5_FILES/signal_fires.csv" "$DEST/daily/signal_fires.csv"
-  echo "  📋 コピー: signal_fires.csv → daily/"
-fi
 
 # ── Step 2: HTML 生成 ──────────────────────────────────────
 echo "▶ Step 2: HTML 生成 (generate_daily_calendar.py)"
