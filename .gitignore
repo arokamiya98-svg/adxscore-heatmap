@@ -5,3 +5,6 @@ data/trades/
 
 # 自動同期 watcher のログ
 auto_sync.log
+
+# VPS data pool push のログ
+vps_pool.log

@@ -24,6 +24,22 @@ log(){ echo "[$(ts)] $*" | tee -a "$LOG"; }
 cd "$REPO" || { log "ERROR: repo not found ($REPO)"; exit 1; }
 mkdir -p "$POOL"
 
+# DRY_RUN=1 で読み取りのみ（コピー/pull/push せず対象を表示）= フェーズ2の安全テスト用
+#   使い方: DRY_RUN=1 bash scripts/vps_data_pool_push.sh
+DRY_RUN="${DRY_RUN:-0}"
+if [ "$DRY_RUN" = "1" ]; then
+  log "=== DRY_RUN（読み取りのみ・git不変）==="
+  for f in "${DAILY_FILES[@]}"; do
+    if [ -f "$MT5_FILES/$f" ]; then
+      log "  would copy: $f ($(wc -l <"$MT5_FILES/$f")行 / $(date -r "$MT5_FILES/$f" '+%m-%d %H:%M'))"
+    else
+      log "  MISSING: $f（EA未稼働?）"
+    fi
+  done
+  log "DRY_RUN end"
+  exit 0
+fi
+
 # 1. MT5 Files → daily/ コピー（_EA suffix は検証名残なので拾わない）
 copied=0
 for f in "${DAILY_FILES[@]}"; do

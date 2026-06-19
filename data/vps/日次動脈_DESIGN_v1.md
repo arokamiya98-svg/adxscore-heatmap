@@ -210,6 +210,13 @@ schtasks /Create /TN "ADXSCORE_DataPool_PM" /TR "\"C:\Program Files\Git\bin\bash
 > ⚠️ `/ST` はVPSローカル時刻。VPSのTZがJSTでなければ時刻を補正する。
 > 削除は `schtasks /Delete /TN "ADXSCORE_DataPool_AM" /F`（PM も同様）。
 
+### ✅ フェーズ2 予行チェック（2026-06-19 VPSで実施・pushせず確認）
+- **bash.exe -lc 経由で `git fetch` 認証通過** ＝ タスクスケジューラ起動経路でpush可能（`credential.helper=manager` / Credential Managerに `git:https://github.com` 保存済）
+- EA日次3本すべて稼働・新鮮（signal_fires 392 / daily_aggregate 85 / daily_mfe_mae 85 行）
+- コピーロジック ドライラン 3/3成功・git不変
+- スクリプトに `DRY_RUN=1`（本実行前の最終確認用）を実装
+> 💡 **実行条件は「ユーザーがログオンしているときのみ実行」推奨**：RDPは"切断"でセッション維持＝切断中も動く／Session0を避けてcredential復号が確実。VPS再起動後の無人実行が要るなら自動ログオン or「関わらず実行」+パスワードに切替。
+
 ---
 
 ## 8. Mac側の組み替え点（実装時チェックリスト）
