@@ -195,7 +195,7 @@ git add docs/heatmap_v14.html data/weekly_waves.json \
 |------|------|
 | プログラム | `C:\Program Files\Git\bin\bash.exe` |
 | 引数 | `-lc "/c/Users/Administrator/adxscore-heatmap/scripts/vps_data_pool_push.sh"` |
-| トリガー | **1日2回**（JST 08:10 / 23:10）＝東京・NY両クローズ後 ※要調整 |
+| トリガー | **24時間 毎時**（2026-06-20 1日2回→毎時化 / あろさん承認）。`ADXSCORE_DataPool_AM` を `Repetition Interval=PT1H` 無期限化、`_PM` は Disabled で温存。08:10/23:10 のクローズ後・日中という意図は毎時に内包。週末クローズ中は `no change → skip`（sh L55-57）で自動push無し＝間引き不要 |
 | 実行条件 | 「ユーザーがログオンしているかに関わらず実行」（RDP切断中も動く） |
 | 電源条件 | 「バッテリ/AC問わず実行」（VPSは常時AC） |
 
@@ -326,3 +326,15 @@ FX_*.csv（iPhone書出し）
 - FXベースラインskip 対策（12.1）
 - `_EA` suffix掃除 / 系統A設計ズレ（`mt5_data/{trade_input,trades_enriched}.csv` を data/trades/寄せ or §1修正）
 - push頻度の調整（1日2回で開始→体感で増減）
+- **ServerToJst が現在オフセット固定**（12.5）— 表示用なら実害なし。過去足の当時DST時刻を厳密に出すなら要対応。優先度: 低。
+
+### 12.5 系統B 仮想MFE/MAE 起点のD1始値化（実機検証済・2026-06-20 / ブン）
+
+コー実装（`signals/XAUUSD_DailyBatch_EA_v1.mq5` 正本）で、仮想エントリー起点を「JST14:00固定」→「その日のD1足始値（市場オープン）」へ変更。VPSで F7再コンパイル＋再アタッチ＋daily CSV 2本再生成済み。ブンが実機CSV（`daily_mfe_mae_48h.csv` 120行 / 全期間 2026-01-02〜06-19）で4点裏取り:
+
+- **① 起点価格＝D1始値**: ソース `Mfe_ProcessDay`（L723-727）で `virtual_entry_price = iOpen(D1, sh_d1)` / `virtual_entry_jst = ServerToJst(iTime(D1, sh_d1))`。aggregateにD1始値列が無いため列突合は不可だが、価格は全期間レンジ4081〜5422内・突合できた84日で「open-to-open移動が 3×d1_atr22 超」ゼロ＝妥当。2/2の568usdジャンプ（5382→4814）は1/30金→2/2月の実在週末ギャップ（当時ゴールド急落）でiOpen由来の実価格。
+- **② DST追従**: 全120行が `virtual_entry_jst=06:00:00` で一貫。**ただしこれは「DST追従が完璧」ではなく、`ServerToJst`（L1075）が `TimeTradeServer()-TimeGMT()` を実行時に一度だけ取る固定オフセットで全行に一律適用するため、過去履歴も現在オフセットで一律06:00に揃う**という構造（過去足の当時DST状態は見ていない）。生成器は `virtual_entry_jst` を日付キーとしてのみ使い時刻部は表示用→**実害なし**。ガタつき・途中切替も無し。
+- **③ 生成器互換**: `generate_daily_calendar_v3.py` L173-188 の `daily_mfe_mae_map` 構築ロジックを実データでドライラン → 120日 parse成功・date-parseエラー0・6/19の6キー全て非None。p95正規化（L199-210）も非クラッシュ（BAR_NORM_BASE=320.64 / BAR_MAX_OBS=979.99）。**ヘッダ24列・使用列名は不変**（起点ロジックだけ変更）＝列契約は崩れていない。
+- **④ 方向の素直さ**: 6/19（下落日）buy_mfe(8.28) < buy_mae(89.45)、sell優位が素直に出た＝14:00局所谷拾い問題の解消を確認。bars_traced は 6/19=21・6/18=44(partial)・6/17以前=48(フル)＝48h未経過の正常グラデーション。
+
+**残課題**: ②のServerToJst固定オフセット（12.4に追加・優先度低・表示用なら放置可）。aggregateにD1始値列が無く列レベルの直接突合ができない点は、必要なら系統B EAにd1_open列追加で厳密照合可（要設計判断＝メインおぱ案件）。
