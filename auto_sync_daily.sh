@@ -126,7 +126,7 @@ check_freshness() {
   if [ "$csv_mtime" -gt "$html_mtime" ]; then
     echo ""
     echo "[$(ts)] ▶ 鮮度照合: daily/CSV($(date -r "$csv_mtime" +%H:%M:%S)) > 生成HTML($(date -r "$html_mtime" +%H:%M:%S)) → 再生成漏れ検知"
-    run_daily_safe "鮮度照合"
+    run_daily_safe "freshness"
   fi
 }
 
@@ -146,7 +146,7 @@ check_git_pull() {
   if git pull --rebase --autostash origin main >/dev/null 2>&1; then
     if [ -n "$daily_changed" ]; then
       echo "[$(ts)]   daily/ 更新あり（git pull検知）"
-      run_daily_safe "VPS daily 合流"
+      run_daily_safe "vps-daily"
     else
       echo "[$(ts)] ✅ git pull 完了（daily/ 変更なし＝週次②等の取込のみ）"
     fi
@@ -262,7 +262,7 @@ while true; do
     fi
 
     # HTML 再生成（同期含む。ブラウザは開かない）
-    run_daily_safe "trades_enriched 更新"
+    run_daily_safe "enriched"
   fi
 
   # ── 週次CSV 更新検知 → run_pipeline.sh で週次ヒートマップ再生成 ──

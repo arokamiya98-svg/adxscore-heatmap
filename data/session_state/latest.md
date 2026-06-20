@@ -1,53 +1,43 @@
-# 次セッションへの引き継ぎ（2026-06-20 — ブン誕生＋棚卸し＋仮想エントリーD1始値化 / 次回＝VPSデプロイ後にブン検証）
+# 次セッションへの引き継ぎ（2026-06-20 — 日次カレンダー再生成漏れ 恒久対策完了 / 次＝データを使う側）
 
 ## 🚀 おぱ起動作法（VPS↔Mac 連携・毎回これを最初に）
-1. **まず `git pull --rebase origin main`**（dirtyなら `git stash → pull --rebase → stash pop` か `--autostash`）。VPSとMacは同じmainを書き合うパラレル運用。
+1. **まず `git pull --rebase origin main`**（dirtyなら `--autostash`）。VPSとMacは同じmainを書き合うパラレル運用。
 2. この latest.md の「**今ここ**」で把握。VPS/動脈を触るなら **ブン召喚**（`.claude/agents/bun.md`／本籍doc `data/vps/日次動脈_DESIGN_v1.md`）。
 3. **push前も必ず `git pull --rebase`**。RDPは「切断」で抜ける（ログオフ厳禁）。
 
-## ⚠️ tempバースト（継続）
-Bash出力が無言で切れ `temp ... full (0MB free)`＝harnessサンドボックス層のバグ。重要コマンドは `{ cmd; } > /tmp/_x.txt 2>&1` → Read。続くなら再起動。
+## ⚠️ tempバースト（継続）＋ サブエージェント伝送障害（新）
+- Bash出力が無言で切れ `temp ... full (0MB free)`＝harnessサンドボックス層のバグ。重要コマンドは `{ cmd; } > /tmp/_x.txt 2>&1` → Read。
+- **新**: サブエージェント（ブン等）召喚で Bash/Read のパラメータが harness層で消失する「入力版tempバースト」が出た（2026-06-20）。メインのツールは正常→**おぱが巻き取れる**。詳細 [[subagent-tool-transmission-failure]]。
 
-## 🎯 今ここ — 次の一手＝VPSデプロイ → ブン検証
-**仮想MFE/MAEの起点を JST14:00固定 → D1足始値（市場オープン）に変更（コミット済 `signals/`正本）。まだVPS未デプロイ。**
+## 🎯 今ここ — 日次カレンダー案件クローズ → 次フェーズ
+**「カレンダーが変わらない」案件は 調査〜応急復旧〜恒久対策〜実機検証 まで完了。** 次は据え置き消化 or「データを使う側」へ。
 
-### ▶ あろさんの番：VPSデプロイ（本命=DailyBatch EA）
-```
-① VPS で git pull --rebase origin main
-② signals/XAUUSD_DailyBatch_EA_v1.mq5 を MT5 の MQL5/Experts/ へコピー
-③ MetaEditor で開いて F7 再コンパイル（.ex5不可）
-④ XAUUSD H1 チャートの EA を付け直し（or 再コンパイルで自動リロード）
-```
-※ Script温存版 `XAUUSD_Daily_MFE_MAE_v1.mq5` も同変更済（分析時のみF7）。
-
-### ▶ デプロイ後：ブンに検証を投げる（「ブン、D1始値化の検証して」）
-- `daily/daily_mfe_mae_48h.csv` の `virtual_entry_price` = その日のD1始値と一致するか
-- `virtual_entry_jst` がD1足の時刻に追従（**DST週でズレず足境界に乗るか**）
-- **下落日に buy_mfe < buy_mae（売り優位）が素直に出るか**（=14:00局所谷拾い問題が解消したか／6/19が分かりやすい）
-- `bars_traced` フル日=48 / 最新1〜2日=partial(<48)＝正常
-- CSV列・ヘッダ完全一致でPython生成器がエラーなく読めるか
+- 残・軽微: **watcher を次に再起動すると** ログの `trigger=` 表示がASCII化（`freshness`等）。実害ゼロ・急がない（reason ASCII化はコミット済、現watcher PID97259 は旧reasonで稼働中だが機能は完動）。
 
 ## ✅ 本日の到達（コミット 2026-06-20）
-- `d5c7a06` watcher同根地雷解消（Mac側有効化・検証は本セッション、PID再起動で新コード稼働）
-- `0e43419` 系統A 6/16・6/18エンリッチ反映（追跡欠損=0・①②③カレンダー解決）
-- 棚卸し: **ブン誕生**（`.claude/agents/bun.md`）＋ CLAUDE.md §15→ポインタ化（703→655行）＋ §8.0「構築フェーズ完了→次フェーズ」
-- 分担md 3層明記（`generate_*.py`: データフロー=ブン/描画=コー/思想=おぱ+あろさん）— ko.md/bun.md/役割メモリ
-- `feat(daily)` 仮想エントリーD1始値化（コー実装・両mq5・スキーマ不変）
+- **D1始値化 VPSデプロイ＆実機検証 完了**（`a696758`・前セッション）。19日下落日で売り優位が素直に出る＝14:00局所谷拾い問題が解消。
+- **日次カレンダー再生成漏れ 三層対応**（本セッション）:
+  - 原因①一時障害（16:00 VPS連続push `60603e7→1b749fc→a696758` 交錯で run_daily_calendar がコケた）／②サイレント失敗（`check_git_pull` が `run_daily_calendar | grep | head` で exit code 握りつぶし「✅完了」誤表示）／③HEAD依存トリガー（HEAD追いつくと再生成しない取りこぼし）
+  - `df9f548` 応急復旧（手動 run_daily_calendar でカレンダー新値化→push、19日 8.28/89.45 売り優位）
+  - `bef3346` 恒久対策（`run_daily_safe`=exit code検知で⚠️可視化 / `check_freshness`=daily/CSV mtime>生成HTML mtime で再生成・HEAD非依存）
+  - **実機検証**: watcher再起動(PID97259)→人工漏れ→**67秒後に鮮度照合が自動回復**（再生成+push）確認 ✅ ＝毎時エラーカバー完成
+- **ブン伝送障害**でおぱ巻き取り（[[subagent-tool-transmission-failure]]）。
 
-## 👥 チーム（2026-06-20更新）
-コー=mq5/HTML描画 ／ カイ=BT分析 ／ マニ=振り返り(本籍) ／ **ブン=VPS/日次動脈・自動化運用(新設)** ／ おぱ=番人+マネージャー。
-`generate_*.py` の境界事案は3層分担で戻し先一意（ブン初仕事=6/19バー調査で炙り出した）。
+## 👥 チーム（2026-06-20）
+コー=mq5/HTML描画 ／ カイ=BT分析 ／ マニ=振り返り ／ **ブン=VPS/日次動脈・自動化運用** ／ おぱ=番人+マネージャー。
+※ ブンは伝送障害で動けない時はおぱが巻き取る（目的達成優先）。
 
 ## 📌 次フェーズの入口（構築完了後・データを使う側）
-① マニv3カレンダーの iPhone UIデザイン ② インジ分析 ③ ロジック化の中身（H1優位性・期待値）。VPS運用はブンに任せて身軽に行ける。
+① マニv3カレンダーの iPhone UIデザイン ② インジ分析 ③ ロジック化の中身（H1優位性・期待値）。VPS運用はブンに任せて身軽に。
 
 ## 📋 据え置き
-- FXベースラインskip対策（watcher停止中に置かれたFXを取りこぼす・本籍doc§12.1）= ブン案件候補
+- **watcher再起動で reason ASCII表示反映**（実害ゼロ）
+- FXベースラインskip対策（watcher停止中のFX取りこぼし・本籍doc§12.1）= ブン案件候補
 - ②のVPS化（ADX_Weekly/H4PhaseAuto もEA化）/ `_EA` suffix掃除 / 系統A設計ズレ（trade_input/enriched の data/trades/寄せ）
-- `sync_mt5_data.sh` のM / archive*.md・FX* 未commit溜まり / マニのagent定義(振り返り)とmemory(実装相棒)のドリフト整理
+- `sync_mt5_data.sh` のM / archive*.md・FX* 未commit溜まり / マニのagent定義とmemoryのドリフト整理
 
 ## 🔧 別荘 運用フロー
 push前は `git pull --rebase` / RDPは「切断」/ コー実装EAは MetaEditor **F7必須**（.ex5不可）/ `signals/`が正本
 
 ---
-*次＝VPSで DailyBatch EA を F7デプロイ → ブンに D1始値化の実機検証を投げる（下落日に売り優位が出るか・DST追従が主眼）。詳細は CLAUDE.md §15→ブン本籍doc。*
+*次＝据え置き消化 or データを使う側（UI/インジ/ロジック化）。日次動脈は鮮度照合トリガーで自己修復するようになった＝再生成漏れは次サイクルで自動回復。*
