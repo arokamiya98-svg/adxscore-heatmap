@@ -87,6 +87,49 @@ sync_icloud_imports() {
 
 ts() { date +"%H:%M:%S"; }
 
+# ── run_daily_calendar を exit code 検知付きで実行（穴2修正）──
+# 旧コードは `run_daily_calendar | grep | head` のパイプで exit code を握りつぶし、
+# 失敗しても無条件「✅完了」と出していた（サイレント失敗）。ここで rc を直接取得して
+# 成否を判定し、失敗は ⚠️ で可視化する。set -e 下で watcher 自体が死なないよう
+# `|| rc=$?` でガード（|| があると set -e は発動しない）。
+run_daily_safe() {
+  local reason="$1"
+  local rc=0
+  echo "[$(ts)]   run_daily_calendar.sh --no-open 実行（trigger=$reason）"
+  ./run_daily_calendar.sh --no-open > /tmp/_watcher_rdc.txt 2>&1 || rc=$?
+  grep -E "(OK 出力|トレード日数|期間|日次CSV|完了|Error|Traceback|❌|失敗)" /tmp/_watcher_rdc.txt | head -10 || true
+  if [ "$rc" -eq 0 ]; then
+    echo "[$(ts)] ✅ 日次カレンダー再生成完了（trigger=$reason）"
+  else
+    echo "[$(ts)] ⚠️ run_daily_calendar 失敗 rc=$rc（trigger=$reason・次サイクルで鮮度照合が自動再試行）"
+    echo "[$(ts)]    末尾: $(tail -3 /tmp/_watcher_rdc.txt 2>/dev/null | tr '\n' ' ')"
+  fi
+}
+
+# ── 鮮度照合トリガー（HEAD進行に依存しない再生成保証）──
+# 旧 check_git_pull は「HEADがorigin/mainより遅れてるか」だけをトリガーにしていたため、
+# watcher以外がpullしてHEADが追いつくと再生成を取りこぼした。さらに一時障害(git交錯)で
+# run_daily_calendar がコケても HEAD は進むので二度と再生成されなかった。
+# 対策: daily/CSV が生成HTMLより新しければ無条件で再生成。誰がpullしようと・一時障害が
+# あっても、次サイクルで CSV>HTML を検知して自動回復する（毎時エラーカバー思想）。
+check_freshness() {
+  local csv_latest csv_mtime gen_html html_mtime
+  csv_latest=$(ls -t mt5_data/daily/*.csv 2>/dev/null | head -1)
+  [ -z "$csv_latest" ] && return 0
+  csv_mtime=$(stat -f %m "$csv_latest" 2>/dev/null || echo 0)
+  gen_html="data/trades/processed/daily_calendar_v3.html"
+  if [ -f "$gen_html" ]; then
+    html_mtime=$(stat -f %m "$gen_html" 2>/dev/null || echo 0)
+  else
+    html_mtime=0
+  fi
+  if [ "$csv_mtime" -gt "$html_mtime" ]; then
+    echo ""
+    echo "[$(ts)] ▶ 鮮度照合: daily/CSV($(date -r "$csv_mtime" +%H:%M:%S)) > 生成HTML($(date -r "$html_mtime" +%H:%M:%S)) → 再生成漏れ検知"
+    run_daily_safe "鮮度照合"
+  fi
+}
+
 # ── VPS が push した daily/ を git pull で取込 ──
 # Mac MT5 には出ないCSV（系統B/C）はファイル監視では拾えない。VPSが GitHub main へ
 # push する → ここで origin/main の進行を検知 → pull → daily/ に差分あれば日次カレンダー再生成。
@@ -102,9 +145,8 @@ check_git_pull() {
   echo "[$(ts)] ▶ origin/main 更新検知 → git pull --rebase --autostash"
   if git pull --rebase --autostash origin main >/dev/null 2>&1; then
     if [ -n "$daily_changed" ]; then
-      echo "[$(ts)]   daily/ 更新あり → run_daily_calendar.sh --no-open"
-      ./run_daily_calendar.sh --no-open 2>&1 | grep -E "(OK 出力|トレード日数|期間|日次CSV|完了)" | head -10
-      echo "[$(ts)] ✅ 日次カレンダー再生成完了（VPS daily 合流）"
+      echo "[$(ts)]   daily/ 更新あり（git pull検知）"
+      run_daily_safe "VPS daily 合流"
     else
       echo "[$(ts)] ✅ git pull 完了（daily/ 変更なし＝週次②等の取込のみ）"
     fi
@@ -220,9 +262,7 @@ while true; do
     fi
 
     # HTML 再生成（同期含む。ブラウザは開かない）
-    echo "[$(ts)]   run_daily_calendar.sh --no-open 実行"
-    ./run_daily_calendar.sh --no-open 2>&1 | grep -E "(OK 出力|トレード日数|期間|日次CSV|完了)" | head -10
-    echo "[$(ts)] ✅ パイプライン完了 — ブラウザは Cmd+R で再読み込み"
+    run_daily_safe "trades_enriched 更新"
   fi
 
   # ── 週次CSV 更新検知 → run_pipeline.sh で週次ヒートマップ再生成 ──
@@ -263,6 +303,8 @@ while true; do
   if [ "$GIT_CHECK_COUNTER" -ge "$GIT_CHECK_INTERVAL" ]; then
     GIT_CHECK_COUNTER=0
     check_git_pull
+    # 鮮度照合: check_git_pull が(HEAD依存で)取りこぼしても、CSV>HTMLなら再生成して自動回復
+    check_freshness
   fi
 
   sleep $POLL_INTERVAL
