@@ -182,18 +182,13 @@ def adx_score(h1_avg_adx, h4_pct_above20, h4_pct_above25):
 
 ### 日次動脈 EA/Script（系統A/B/C・signals/ にミラー）
 
-日次カレンダーを支える3系統。**EA本体はVPS無人化用**（毎時 OnTimer 60分・初回15秒）、**Script版は分析用に温存**。データフロー詳細は §15「日次動脈／VPS無人化運用」参照。
+日次カレンダーを支える3系統（EA本体=VPS無人化用 / Script版=分析用に温存）。**詳細・地雷・運用はブン（`.claude/agents/bun.md`）と本籍doc `data/vps/日次動脈_DESIGN_v1.md` に委譲。**
 
-| 系統 | ファイル | 型 | 出力CSV（`mt5_data/`） | 管理 | 状態 |
-|------|---------|----|----------------------|------|------|
-| **A 成績** | `Trade_Snapshot_Builder.mq5` | Script | `trades_enriched.csv` | Mac専管（iPhone入力由来）| ✅ 現用 |
-| **B 集計** | `XAUUSD_DailyBatch_EA_v1.mq5` | **EA** | `daily/daily_aggregate.csv` ＋ `daily/daily_mfe_mae_48h.csv` | VPS push | ✅ **VPS無人化 2026-06-19**（回帰バイト一致）|
-| ↳ B 温存 | `XAUUSD_Daily_Aggregate_v1.mq5` / `XAUUSD_Daily_MFE_MAE_v1.mq5` | Script | （上記を個別生成）| 分析用 | 🟡 温存 |
-| **C シグナル** | `Signal_Fire_Logger_EA_v1.mq5` | **EA** | `daily/signal_fires.csv` | VPS push | ✅ **VPS無人化稼働** |
-| ↳ C 温存 | `Signal_Fire_Logger_v1.mq5` | Script | （同上）| 分析用 | 🟡 温存 |
+- **A 成績**: `Trade_Snapshot_Builder.mq5`(Script) → `trades_enriched.csv`。**Mac専管**（iPhone入力由来・VPSは構造的に成績を持てない）。WaveLog/CSV送信とは別に半手動エンリッチ要（前処理→MT5実行→watcher後処理）。
+- **B 集計**: `XAUUSD_DailyBatch_EA_v1.mq5`(EA) → `daily/daily_aggregate.csv` + `daily/daily_mfe_mae_48h.csv`。VPS push（無人化 2026-06-19）。
+- **C シグナル**: `Signal_Fire_Logger_EA_v1.mq5`(EA) → `daily/signal_fires.csv`。VPS push（無人化稼働）。
 
-> ⚠️ EA再コンパイルは **MetaEditor F7必須**（コマンドライン .ex5 はロード不可）。`signals/` が正本、オリジナルEAは MT5本体側。
-> ⚠️ 系統A（`trades_enriched`）は**Mac専管**＝VPSは構造的に成績を持てない（iPhone入力由来）。系統B/Cの③日次CSVは `mt5_data/daily/` でVPSがpush。
+> ⚠️ EA再コンパイルは **MetaEditor F7必須**（.ex5不可）。`signals/` が正本。Script温存版（`XAUUSD_Daily_Aggregate/MFE_MAE_v1`・`Signal_Fire_Logger_v1`）は分析用。
 
 ### BT 関連 (data/bt/)
 
@@ -385,6 +380,11 @@ ADXSCORE/
 - heatmap_v14 ATR Zone行追加
 - あろさん感覚3本立て続けに統計裏付け = フェーズ2の方向性に確信
 ```
+
+> **▼ インフラ構築フェーズ＝完了（2026-06-20 棚卸し）**
+> VPS↔Mac 日次動脈・VPS無人化・git配管の**構築は完成系に到達し自走中**。運用は**ブン（自動化プール専門エージェント）に委譲**＝メインおぱの常時コンテキストから外した。
+> → 次フェーズは「**データを使う側**」: ① マニv3カレンダーの iPhone UIデザイン ② インジケータ分析 ③ ロジック化の中身（H1優位性・期待値の深掘り）。
+> 構築の知識が要る時だけブンを召喚すればよく、UI・分析・戦略相談の回は動脈運用脳をロードせずに進められる。
 
 ### 8.1 全体構造（3層モデル）
 
@@ -634,68 +634,20 @@ data/session_state/
 
 ---
 
-## 15. 日次動脈 / VPS無人化運用（2026-06-19 フル稼働）
+## 15. 日次動脈 / VPS無人化運用（→ ブン担当・2026-06-20 棚卸し済）
 
-> VPSのMT5 EAが毎時焼く日次CSVを **git経由でMacへ運び**、Macがトレード成績を合流させて日次カレンダーを公開する自動動脈。フェーズ1〜3＋Step1恒久対応まで完了＝**素の `./run_daily_calendar.sh` が安全に回る**。
-> 詳細設計: `data/vps/日次動脈_DESIGN_v1.md` ／ VPS無人化の母体: `data/vps/VPS_UNMANNED_DESIGN.md`
+> VPSのMT5 EAが毎時焼く日次CSVを git経由でMacへ運び、Macが成績を合流させて日次カレンダーを公開する自動動脈。**フル稼働・自走中**（素の `./run_daily_calendar.sh` が安全に回る）。
 
-### 15.1 3つの場所の役割分担
+**運用の詳細・地雷・改修は「ブン」（自動化プール専門エージェント）に委譲した。** メインおぱは VPS/動脈/パイプラインを触る時だけブンを召喚する。通常セッション（UI・インジ分析・戦略相談など）はこの節を読み込む必要なし＝棚卸しでおぱを軽くした。
 
-```
-┌─ VPS = データプール製造機（24h全自動・個人情報ゼロ）──┐
-│  MT5 EA（系統B/C）→ daily/{signal_fires, daily_aggregate,│
-│                      daily_mfe_mae_48h}.csv（毎時上書き） │
-│  vps_data_pool_push.sh（schtasks AM8:10 / PM23:10）      │
-│    → mt5_data/daily/ コピー → git pull --rebase → push   │
-└──────────────────────────────────────────────────────────┘
-                   │ git（GitHub main）= 合流点
-                   ▼
-┌─ Mac = 成績合流機（立ち上げ時・成績を持つ側）──────────┐
-│  git pull → daily/ 受信確認                              │
-│  ＋ iPhone→iCloud→FX_*.csv → trade_input → enriched      │
-│  run_daily_calendar.sh → 成績オーバーレイ合流            │
-│    → data/trades/processed/*.html → docs/ → git push     │
-└──────────────────────────────────────────────────────────┘
-                   │ git push → GitHub Pages
-                   ▼
-            iPhone/iPad で日次カレンダー閲覧
-```
+- **本籍doc（全運用知識）**: `data/vps/日次動脈_DESIGN_v1.md`（3場所分担・CSV3分類・git方針・データフロー・schtasks・実装順序・完了条件・§12 運用メモ＆地雷・系統A半手動フロー）
+- VPS無人化の母体: `data/vps/VPS_UNMANNED_DESIGN.md`
+- **ブン定義**: `.claude/agents/bun.md`
 
-**なぜこの分担が必然か**: 成績（`trades_enriched`）は iPhone入力由来で `data/trades/`（.gitignore）にしか無く、VPSには存在しない。VPSは構造的に成績を持てない＝純データ生産に徹する（系統AがMac専管なのと同じ理由）。
-**個人情報の線引き（あろさん確定 2026-06-19）**: NGは具体的な口座番号のみ。成績・ロジック・損益・ロットは公開OK ＝ docs/ カレンダー公開は継続OK。
-
-### 15.2 CSV 3分類と git 方針
-
-| # | 分類 | ファイル | 生成 | git方針 |
-|---|------|---------|------|---------|
-| ① | 手描き波形 | `FractalWaveLog_*` | Mac手動MT5（認知ステップ）| **.gitignore**（Macローカル・再生成可）|
-| ② | 自動集計 | `ADX_Weekly_Above_v4`(+v3) / `H4PhaseAuto_weekly` | MT5自動（ライン不要）| **git追跡**・Macが `run_pipeline.sh` でpush |
-| ③ | 日次 | `daily/{signal_fires, daily_aggregate, daily_mfe_mae_48h}` | VPS EA（毎時）| **`mt5_data/daily/` に分離**・VPSがpush |
-
-**rebase衝突が構造的に消える理屈**: ①は管理外・②はMacのみ・③はVPSのみが書く → `mt5_data/` が常時クリーン → `git pull --rebase` が事故らない。
-> ※ §10「CSV出力の注意点」はエンコード、ここ §15.2 は git運用、で棲み分け。
-
-### 15.3 日次ルーティン ＋ おぱ起動作法
-
-- **VPS側（全自動・無人）**: schtasks `ADXSCORE_DataPool_AM`(8:10) / `_PM`(23:10) が `vps_data_pool_push.bat` を発火 → daily/ をpush。RDP切断中も動く（※再起動後はRDPログオンまで発火しない）。
-- **Mac側（立ち上げ時）**: `git pull` → `./run_daily_calendar.sh`（**`--no-sync` 不要・素で安全**）→ 成績合流 → docs公開 → push。
-
-**🚀 おぱ起動作法（VPS↔Mac パラレル運用・毎回これを最初に）**:
-1. **まず `git pull --rebase origin main`**（dirtyなら `git stash → pull --rebase → stash pop`）。VPSとMacは同じmainを書き合う。
-2. **push前も必ず `git pull --rebase`**。
-3. RDPは「**切断**」で抜ける（ログオフ厳禁＝schtasks継続のため）。コー実装EAは MetaEditor **F7再コンパイル必須**（`.ex5` はロード不可）。`signals/` が正本。
-
-### 15.4 運用メモ＆地雷
-
-- ⚠️ **「追跡欠損」表示＝正常**: 最新1〜2日が48h未経過の追跡途中（毎時更新で翌日埋まる）＝動脈が最新を運んでる証拠。**ジェネレータに固定件数の assert を置かない**（データ増加が常態 / 動的整合性へ）。
-- ⚠️ **temp バースト**: Bash出力が無言で切れ `temp ... full (0MB free)` が出るのは物理でなく Claude Code サンドボックス層の断続バグ。重要コマンドはファイル化（`> _diag.txt` → Read）／出力を小さく保つ／続くなら再起動。
-- ⚠️ **Step1恒久対応（`dafbbf2`）**: Mac の `run_daily_calendar.sh` Step1 は daily/ を「受信確認のみ」（上書きしない）。欠損時は `git pull` を促して停止。
-- `docs/*.html` は生成時刻が毎回変わり実行毎にM化（実データ差分なし）＝auto-publishで正規commit、検証時は `git checkout docs/` で破棄可。
-
-### 15.5 完了条件・残課題
-
-- **完了条件（達成済 ✅）**: VPSがRDP切断中もdaily/を自動push / Macはpullだけで最新取得 / `mt5_data/` が両マシン常時クリーン / 日次カレンダー3枚がVPSデータ＋Mac成績で公開更新。
-- **残課題**: ②のVPS化（ADX_Weekly / H4PhaseAuto も EA化でデータプール拡大＝次の大トラック候補）/ `auto_sync_daily.sh` の日次監視を「git pull検知」へ寄せる（Step1と同根の地雷）/ `_EA` suffix掃除 / push頻度の調整（1日2回で開始→体感で増減）。
+**最小限おさえる3点（VPS関連を触る時の入口・詳細はブンと本籍doc）**:
+1. **CSV 3分類**: ①手描き波形=Macローカル(.gitignore) / ②自動集計=Macのみ書く(git追跡) / ③日次daily=VPSのみ書く。この住み分けで `mt5_data/` が常時クリーン＝`git pull --rebase` 無事故。
+2. **起動作法**: VPS↔Macはパラレル運用（同じmainを書き合う）。`git pull --rebase` で始め、push前も `git pull --rebase`。RDPは「切断」で抜ける（ログオフ厳禁＝schtasks継続）。
+3. **個人情報の線引き（あろさん確定 2026-06-19）**: NGは具体的な口座番号のみ。成績・損益・ロット・ロジックは公開OK ＝ docs/ カレンダー公開は継続OK。
 
 ---
 

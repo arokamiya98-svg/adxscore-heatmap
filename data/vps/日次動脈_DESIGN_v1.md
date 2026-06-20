@@ -284,3 +284,45 @@ schtasks /Create /TN "ADXSCORE_DataPool_PM" /TR "C:\Users\Administrator\adxscore
 3. `mt5_data/` が両マシンで常時クリーン（pull --rebase が無事故）
 4. 日次カレンダー3枚が、VPSデータ＋Mac成績の合流で公開更新される
 ```
+
+---
+
+## 12. 運用メモ＆地雷（稼働後の学び・2026-06-20 追記）
+
+> このdocが**ブン（自動化プール専門エージェント）の本籍**。CLAUDE.md §15 はこのdocへのポインタに縮小済み。動脈を触る時はまずここを読む。
+
+### 12.1 既知の地雷
+
+- **「追跡欠損」表示＝正常**: 最新1〜2日が48h未経過の追跡途中（毎時更新で翌日埋まる）＝動脈が最新を運んでる証拠。**ジェネレータに固定件数の assert を置かない**（データ増加が常態 / 動的整合性へ）。
+- **temp バースト**: Bash出力が無言で切れ `temp ... full (0MB free)` が出るのは物理でなく Claude Code サンドボックス層の断続バグ。重要コマンドはファイル化（`> _diag.txt` → Read）／出力を小さく保つ／続くなら再起動。[[claude-temp-burst-enospc]]
+- **watcher はメモリ常駐**: `auto_sync_daily.sh` を変更したら **kill→再起動**しないと旧コードが走り続ける。再起動: `pkill -f "bash ./auto_sync_daily.sh"` → `nohup ./auto_sync_daily.sh >> auto_sync.log 2>&1 &` → `grep -c "VPS push取込" auto_sync.log` で新バナー確認。ログイン項目ランチャー（`pgrep || nohup`）は一度きり＝自動復活しない。
+- **FXベースラインskip（要対策）**: watcherは起動時に「今ある最新FX」をベースライン記録（`LAST_FX_SIG` 初期化）し、それ以降に届いたものだけ拾う。watcher停止中/再起動前に置かれた `FX_*.csv` は「既知」扱いでスキップ → `trade_input.csv` が更新されない → 系統Aエンリッチが自動で走らない。Step1/watcherと同根の「停止中取りこぼし」系。対策候補: 起動時に「最新FX vs trade_input の最終トレード日」を突合し、未処理なら初回処理する。
+- **Step1恒久対応（`dafbbf2`）**: Mac の `run_daily_calendar.sh` Step1 は daily/ を「受信確認のみ」（上書きしない）。欠損時は `git pull` を促して停止。
+- **docs auto-publish のM化**: `docs/*.html` は生成時刻が毎回変わり実行毎にM化（実データ差分なし）＝auto-publishで正規commit、検証時は `git checkout docs/` で破棄可。
+
+### 12.2 watcher 同根地雷の解消（`d5c7a06` 完了・2026-06-20）
+
+- 日次TARGETS から VPS由来3つ（signal_fires / daily_aggregate / daily_mfe_mae_48h）を除外 → Mac MT5監視は `trades_enriched.csv`（系統A）だけに（VPS由来は Mac MT5 Files に出ない＝空振りの正体）。
+- `check_git_pull()` 新設: 60秒毎に origin/main 進行を検知 → `pull --rebase --autostash` → `mt5_data/daily/` に差分あれば `run_daily_calendar.sh --no-open`。`daily_changed` は pull 前に判定。`set -e` 下でも `|| return 0` ガードで watcher が死なない。
+- 本番実証: watcher が自分の push 取込を検知してログに `▶ origin/main 更新検知 → git pull` を出すのを確認済（2026-06-20）。
+
+### 12.3 系統A 半手動フロー（Mac専管・忘れがち）
+
+WaveLog（週次・手描き）／CSV送信 とは**別に**、成績エンリッチには MT5 `Trade_Snapshot_Builder` の手動実行が要る:
+
+```
+FX_*.csv（iPhone書出し）
+  → prepare_trade_input.py（前処理）→ mt5_data/trade_input.csv → MT5 Files/ へ配置
+  → MT5 で Trade_Snapshot_Builder 実行（手動GUI）→ trades_enriched.csv
+  → watcher 検知 → prepare_trade_input.py（後処理 --enriched/--enriched-full マージ）
+  → enriched_full 更新 → run_daily_calendar.sh → 16日の追跡欠損/トレードバー復活
+```
+
+`prepare_trade_input.py` は2モード: 前処理（`--input`+`--output`）／後処理（+`--enriched`+`--enriched-full`）。
+
+### 12.4 残課題（次トラック候補）
+
+- ②のVPS化（ADX_Weekly / H4PhaseAuto も EA化＝データプール拡大・次の大トラック）
+- FXベースラインskip 対策（12.1）
+- `_EA` suffix掃除 / 系統A設計ズレ（`mt5_data/{trade_input,trades_enriched}.csv` を data/trades/寄せ or §1修正）
+- push頻度の調整（1日2回で開始→体感で増減）
