@@ -16,8 +16,8 @@
 //|    - Sleep(2000) は移植せず HandlesReady()（9ハンドル            |
 //|      BarsCalculated>0 ゲート）で代替                              |
 //|    - 共通ヘルパ（JstToServer / ServerToJst / FormatJstDate /     |
-//|      FormatJstDateTime / WriteUtf8Bom / WriteUtf8String /        |
-//|      ParseHHMM）は1本に統一                                       |
+//|      FormatJstDateTime / WriteUtf8Bom / WriteUtf8String）は1本に  |
+//|      統一（ParseHHMM は D1始値方式化 2026-06-20 で廃止）          |
 //|    - 中身が違う同名は Agg_ / Mfe_ 接頭辞で分離                    |
 //|                                                                  |
 //|  研究目的（絶対固定 / MFE_MAE ヘッダーより継承）:                 |
@@ -71,7 +71,9 @@ input group "=== Aggregate DI 方向判定 ==="
 input double  DI_Spread_Flat_Thresh    = 1.0;        // |spread| < これ なら FLAT 扱い
 
 input group "=== MFE/MAE ==="
-input string  Virtual_Entry_Time_JST   = "14:00";    // 仮想エントリー時刻 (JST)
+//--- 仮想エントリー起点は「その日の D1 足始値 (市場オープン)」固定。      ---
+//    旧 Virtual_Entry_Time_JST="14:00" は 2026-06-20 廃止 (D1始値方式へ)。 ---
+//    DST は D1 足境界が処理 → 固定時刻の server 変換ハードコードは不要。    ---
 input int     H1_Trace_Bars_48h        = 48;         // H1 48本 = 48時間相当
 
 //+==================================================================+
@@ -293,40 +295,30 @@ void Agg_ReleaseHandles()
 //|   入力: day_jst_midnight = その日の JST 00:00                    |
 //|                                                                  |
 //|   処理:                                                            |
-//|     1. JST 14:00 の H1足存在チェック → 無ければ skip (土日等)    |
+//|     1. その日 (JST 00:00〜24:00) に H4/H1 足が存在するか →       |
+//|        無ければ skip (土日・休場)。                              |
+//|        ※ 2026-06-20: 旧「JST 14:00 の H1足存在」判定から、       |
+//|          下流 H4/H1 集計レンジに足があるかの判定へ統一。          |
+//|          (集計レンジ JST 00:00〜24:00 / D1値取得ロジックは不変)  |
 //|     2. JST 23:00 server時刻で D1足取得（その時点確定の D1値）    |
 //|     3. JST 00:00〜24:00 範囲の H4/H1 足を走査して max/close/mean |
 //|     4. 1行書き出し                                                |
 //+==================================================================+
 void Agg_ProcessDay(int fout, datetime day_jst_midnight)
 {
-   //--- 営業日判定: JST 14:00 server時刻に H1足があるか? ---
-   datetime jst_1400 = day_jst_midnight + (datetime)(14 * 3600);
-   datetime srv_1400 = JstToServer(jst_1400);
-   int sh_h1_1400 = iBarShift(_Symbol, PERIOD_H1, srv_1400, true);  // exact=true で厳密一致
-   if(sh_h1_1400 < 0)
+   //--- 営業日判定: その日 (JST 00:00〜24:00) に H1足が存在するか? ---
+   //   集計レンジ [range_start, range_end) の直前足を引いて、
+   //   それがレンジ内に収まっていれば営業日とみなす。
+   datetime biz_range_start = JstToServer(day_jst_midnight);
+   datetime biz_range_end   = JstToServer(day_jst_midnight + 86400);
+   int sh_h1_biz = iBarShift(_Symbol, PERIOD_H1, biz_range_end - 1, false);
+   if(sh_h1_biz < 0 || iTime(_Symbol, PERIOD_H1, sh_h1_biz) < biz_range_start)
    {
-      // exact=false で再試行 → 直前バーの開始時刻と1時間以内ならOK
-      sh_h1_1400 = iBarShift(_Symbol, PERIOD_H1, srv_1400, false);
-      if(sh_h1_1400 < 0)
-      {
-         g_agg_rows_skipped++;
-         if(Verbose)
-            PrintFormat("[SKIP] %s (no H1 bar at JST 14:00)",
-                        FormatJstDate(day_jst_midnight));
-         return;
-      }
-      datetime bar_t = iTime(_Symbol, PERIOD_H1, sh_h1_1400);
-      // 1時間以上前のバーなら、その日の14時にバーが無いと判断
-      if(srv_1400 - bar_t >= 3600)
-      {
-         g_agg_rows_skipped++;
-         if(Verbose)
-            PrintFormat("[SKIP] %s (no H1 bar at JST 14:00, nearest=%s)",
-                        FormatJstDate(day_jst_midnight),
-                        TimeToString(bar_t, TIME_DATE|TIME_MINUTES));
-         return;
-      }
+      g_agg_rows_skipped++;
+      if(Verbose)
+         PrintFormat("[SKIP] %s (no H1 bar in JST day range)",
+                     FormatJstDate(day_jst_midnight));
+      return;
    }
 
    string date_str = FormatJstDate(day_jst_midnight);  // "yyyy-mm-dd"
@@ -653,18 +645,9 @@ void Mfe_GenerateCsv()
    g_mfe_rows_partial = 0;
 
    Print("==== [Mfe] daily_mfe_mae_48h generate ====");
-   PrintFormat("Lookback: %d days, Virtual entry: %s JST",
-               Lookback_Days, Virtual_Entry_Time_JST);
+   PrintFormat("Lookback: %d days, Virtual entry: D1 OPEN (market open of the day)",
+               Lookback_Days);
    PrintFormat("Time-segmented MFE/MAE: 12h / 24h / 36h / 48h (H1 only)");
-
-   //--- 仮想エントリー時刻パース (HH:MM) ---
-   int entry_hh = 0, entry_mm = 0;
-   if(!ParseHHMM(Virtual_Entry_Time_JST, entry_hh, entry_mm))
-   {
-      PrintFormat("[FATAL] [Mfe] Virtual_Entry_Time_JST のパース失敗: %s (形式: HH:MM)",
-                  Virtual_Entry_Time_JST);
-      return;
-   }
 
    //--- 出力 CSV オープン (UTF-8 BOM) ---
    int fout = FileOpen(Mfe_Output_File, FILE_WRITE|FILE_BIN, ',');
@@ -677,52 +660,24 @@ void Mfe_GenerateCsv()
    Mfe_WriteHeaderUtf8(fout);
 
    //--- DST 境界跨ぎ警告 ---
+   //   ※ 仮想エントリー起点は D1 足の境界（市場オープン）に変更。
+   //      DST 切替は MT5 が D1 足の境界処理で自動吸収するため、
+   //      固定時刻の server 変換ハードコードは不要になった。
    if(Use_Auto_Server_Offset && Verbose)
    {
       long ofs = (long)(TimeTradeServer() - TimeGMT());
       PrintFormat("[INFO] [Mfe] Current server-GMT offset = %d sec (= %.2f h). "
-                  "DST境界を跨ぐ期間内ではズレに注意.",
+                  "起点=D1足始値。DST は足境界で吸収.",
                   (int)ofs, ofs/3600.0);
    }
 
-   //--- 走査範囲: 今日 - Lookback_Days  〜 今日 ---
-   //   JST 基準の日付を1日ずつシフトしながら走査                     ---
-   //   起点: 今日 (JST) - Lookback_Days 日前 0:00 JST              ---
-   datetime now_server = TimeTradeServer();
-   datetime now_jst    = ServerToJst(now_server);
-   //--- 今日 (JST) 0:00 ---
-   MqlDateTime today_jst_dt;
-   TimeToStruct(now_jst, today_jst_dt);
-   today_jst_dt.hour = 0;
-   today_jst_dt.min  = 0;
-   today_jst_dt.sec  = 0;
-   datetime today_jst_0000 = StructToTime(today_jst_dt);
-
-   //--- 走査開始日 (JST 0:00) ---
-   datetime start_jst_0000 = today_jst_0000 - (datetime)((Lookback_Days - 1) * 86400);
-
-   //--- ループ: 1日ずつ仮想エントリーを試行 ---
-   for(int d = 0; d < Lookback_Days; d++)
+   //--- 走査範囲: 直近 Lookback_Days 本の D1 足を、古い順に処理 ---
+   //   営業日 = D1 足が存在する日（土日・休場は D1 足が無い → 自動 skip）。
+   //   shift = Lookback_Days-1 (古い側) → 0 (最新側=進行中の当日 D1 足)。
+   //   進行中の当日 D1 足は 48h 未経過 → bars_traced<48 の partial として出力。
+   for(int sh_d1 = Lookback_Days - 1; sh_d1 >= 0; sh_d1--)
    {
-      datetime day_jst_0000 = start_jst_0000 + (datetime)(d * 86400);
-
-      //--- その日の仮想エントリー時刻 (JST) を組み立てる ---
-      MqlDateTime ve_dt;
-      TimeToStruct(day_jst_0000, ve_dt);
-      ve_dt.hour = entry_hh;
-      ve_dt.min  = entry_mm;
-      ve_dt.sec  = 0;
-      datetime virtual_entry_jst = StructToTime(ve_dt);
-
-      //--- 未来日付なら出力しない (今日 14:00 がまだ来てない場合等) ---
-      if(virtual_entry_jst > now_jst)
-      {
-         if(Verbose) PrintFormat("[SKIP] future entry %s",
-                                  FormatJstDateTime(virtual_entry_jst));
-         continue;
-      }
-
-      Mfe_ProcessDay(fout, virtual_entry_jst);
+      Mfe_ProcessDay(fout, sh_d1);
    }
 
    FileClose(fout);
@@ -730,7 +685,7 @@ void Mfe_GenerateCsv()
    Print("==== [Mfe] daily_mfe_mae_48h Complete ====");
    PrintFormat("  written = %d", g_mfe_rows_written);
    PrintFormat("  partial (some bars missing in 48h) = %d", g_mfe_rows_partial);
-   PrintFormat("  skipped (no bar at 14:00) = %d", g_mfe_rows_skipped);
+   PrintFormat("  skipped (no D1 bar) = %d", g_mfe_rows_skipped);
    PrintFormat("  Output: %s/MQL5/Files/%s",
                TerminalInfoString(TERMINAL_DATA_PATH), Mfe_Output_File);
 }
@@ -739,59 +694,52 @@ void Mfe_GenerateCsv()
 //| Mfe_ProcessDay                                                   |
 //|   1日分の仮想エントリー → 48h MFE/MAE 計算 → 1行書き出し         |
 //|                                                                  |
-//|   営業日判定: その時刻のH1足が取得できるか否か                   |
-//|     (土日・祝日・年末年始は MT5 が足を持たないので自動スキップ)  |
+//|   起点 (2026-06-20 変更): その日の D1 足の始値 (= 市場オープン)。 |
+//|     virtual_entry_price = iOpen(D1, sh_d1)                       |
+//|     virtual_entry_jst   = ServerToJst(iTime(D1, sh_d1))         |
+//|     固定時刻のハードコード変換は廃止。DST は足が処理。           |
+//|                                                                  |
+//|   営業日判定: その日の D1 足が存在するか否か                     |
+//|     (土日・祝日・年末年始は MT5 が D1 足を持たない → 自動 skip)  |
+//|                                                                  |
+//|   48h 追跡: D1 始値の時刻に対応する H1 足から前方 48 本 (48h固定).|
+//|     D1 始値 = その日の先頭 H1 足の Open。その H1 足自身を含めて   |
+//|     48 本を追跡するため、trace 関数へは entry_shift = sh_h1+1 を  |
+//|     渡す (関数内 start_shift = entry_shift-1 = sh_h1 となる)。    |
 //+==================================================================+
-void Mfe_ProcessDay(int fout, datetime virtual_entry_jst)
+void Mfe_ProcessDay(int fout, int sh_d1)
 {
    string sym = _Symbol;
 
-   //--- JST → server 時刻 ---
-   datetime virtual_entry_server = JstToServer(virtual_entry_jst);
+   //--- 営業日判定: その日の D1 足が存在するか ---
+   datetime d1_bar_server = iTime(sym, PERIOD_D1, sh_d1);
+   if(d1_bar_server == 0)
+   {
+      if(Verbose) PrintFormat("[SKIP] no D1 bar at shift %d", sh_d1);
+      g_mfe_rows_skipped++;
+      return;
+   }
 
-   //--- H1 足の shift を取得 (指定時刻以下の最大バー) ---
-   int sh_h1 = iBarShift(sym, PERIOD_H1, virtual_entry_server, false);
+   //--- 仮想エントリー時刻 (JST) = D1 足の始値時刻 ---
+   datetime virtual_entry_jst = ServerToJst(d1_bar_server);
+
+   //--- 仮想エントリー価格 = その日の D1 足の始値 (Open) ---
+   double entry_open = iOpen(sym, PERIOD_D1, sh_d1);
+   if(entry_open <= 0)
+   {
+      if(Verbose) PrintFormat("[SKIP] iOpen(D1) fail @ %s",
+                               FormatJstDateTime(virtual_entry_jst));
+      g_mfe_rows_skipped++;
+      return;
+   }
+
+   //--- D1 始値時刻に対応する H1 足 shift (= その日の先頭 H1 足) ---
+   int sh_h1 = iBarShift(sym, PERIOD_H1, d1_bar_server, false);
    if(sh_h1 < 0)
    {
-      if(Verbose) PrintFormat("[SKIP] iBarShift fail @ %s (server=%s)",
+      if(Verbose) PrintFormat("[SKIP] iBarShift(H1) fail @ %s (server=%s)",
                                FormatJstDateTime(virtual_entry_jst),
-                               TimeToString(virtual_entry_server, TIME_DATE|TIME_MINUTES));
-      g_mfe_rows_skipped++;
-      return;
-   }
-
-   //--- 取得したH1足の時刻 (server) ---
-   datetime h1_bar_server = iTime(sym, PERIOD_H1, sh_h1);
-   if(h1_bar_server == 0)
-   {
-      if(Verbose) PrintFormat("[SKIP] iTime fail @ %s",
-                               FormatJstDateTime(virtual_entry_jst));
-      g_mfe_rows_skipped++;
-      return;
-   }
-
-   //--- 営業日判定 ---
-   //   仮想エントリー時刻が属するH1足の時刻が、想定時刻から大きくずれている場合スキップ
-   //   (例: 土日に呼ばれた場合、直近の金曜H1足が返ってくるので、それを除外)
-   //   許容: 仮想エントリー時刻 - 6時間 〜 仮想エントリー時刻 の範囲
-   //   (休場時間帯を考慮し、当日中の足のみ採用)
-   long diff_sec = (long)virtual_entry_server - (long)h1_bar_server;
-   if(diff_sec < 0 || diff_sec > 6 * 3600)
-   {
-      if(Verbose) PrintFormat("[SKIP non-trading] %s (last_bar=%s, diff=%dh)",
-                               FormatJstDateTime(virtual_entry_jst),
-                               TimeToString(h1_bar_server, TIME_DATE|TIME_MINUTES),
-                               (int)(diff_sec / 3600));
-      g_mfe_rows_skipped++;
-      return;
-   }
-
-   //--- 仮想エントリー価格 (そのH1足の close) ---
-   double entry_close = iClose(sym, PERIOD_H1, sh_h1);
-   if(entry_close <= 0)
-   {
-      if(Verbose) PrintFormat("[SKIP] iClose fail @ %s",
-                               FormatJstDateTime(virtual_entry_jst));
+                               TimeToString(d1_bar_server, TIME_DATE|TIME_MINUTES));
       g_mfe_rows_skipped++;
       return;
    }
@@ -800,6 +748,11 @@ void Mfe_ProcessDay(int fout, datetime virtual_entry_jst)
    //   時間別セグメント (12h / 24h / 36h / 48h) も同時に計算するため、
    //   全48本の high/low を一度に取得して4段階に集約する
    //   (BUY 基準で MFE/MAE を算出し、SELL は対称関係で導出)
+   //   ※ entry_shift = sh_h1+1 を渡すことで、D1 始値の H1 足自身を
+   //     含めて前方 48 本を追跡する (その日のレンジを頭から捉える)。
+   double entry_close = entry_open;   // 起点価格 = D1 始値
+   int    entry_shift = sh_h1 + 1;
+
    double buy_mfe_12=0, buy_mae_12=0;
    double buy_mfe_24=0, buy_mae_24=0;
    double buy_mfe_36=0, buy_mae_36=0;
@@ -807,7 +760,7 @@ void Mfe_ProcessDay(int fout, datetime virtual_entry_jst)
    int    buy_mfe_idx_48 = -1, buy_mae_idx_48 = -1;
    int    bars_traced = 0;
 
-   bool ok = Mfe_TraceMaeMfe_Segmented(sh_h1, H1_Trace_Bars_48h, entry_close,
+   bool ok = Mfe_TraceMaeMfe_Segmented(entry_shift, H1_Trace_Bars_48h, entry_close,
                                     buy_mfe_12, buy_mae_12,
                                     buy_mfe_24, buy_mae_24,
                                     buy_mfe_36, buy_mae_36,
@@ -1128,23 +1081,6 @@ datetime ServerToJst(datetime server_time)
       offset_sec = (long)(Manual_Server_Offset_Hours * 3600);
    datetime utc = server_time - (datetime)offset_sec;
    return utc + (datetime)(JST_Offset_Hours * 3600);
-}
-
-//+==================================================================+
-//| ParseHHMM                                                        |
-//|   "HH:MM" → hh, mm                                              |
-//+==================================================================+
-bool ParseHHMM(const string &s, int &hh, int &mm)
-{
-   int colon = StringFind(s, ":");
-   if(colon < 0) return false;
-   string h_str = StringSubstr(s, 0, colon);
-   string m_str = StringSubstr(s, colon + 1);
-   hh = (int)StringToInteger(h_str);
-   mm = (int)StringToInteger(m_str);
-   if(hh < 0 || hh > 23) return false;
-   if(mm < 0 || mm > 59) return false;
-   return true;
 }
 
 //+==================================================================+
