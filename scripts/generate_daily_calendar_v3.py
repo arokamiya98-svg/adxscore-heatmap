@@ -1857,6 +1857,15 @@ details.past-months[open] > summary .pm-closed { display: none; }
   #tab-calendar.active .legend { order: 10; }
   /* ⑤ セル内テキストの窮屈さ緩和（5列フィットで狭くなった分フォントを詰める） */
   .cell { font-size: 9px; }
+  /* ⑥ MAE/MFE・値動きレンジの数値をセル幅に収める（はみ出し＝見切れ解消） */
+  .cell .h4-main .mfe-mae-nums { font-size: 10px; gap: 5px; }
+  .cell .h4-main .range-nums { font-size: 9px; gap: 6px; }
+  .cell .h4-main .mfe-mae-box, .cell .h4-main .range-box { padding: 0 3px; }
+  /* ⑦ シグナル行・結果(トレード)行を1行に収める（はみ出し防止・枠内に収める） */
+  .cell .signal, .cell .result { overflow: hidden; white-space: nowrap; }
+  .cell .signal .tag { font-size: 7px; padding: 1px 3px; }
+  .cell .result { font-size: 9px; gap: 3px; padding: 1px 4px; }
+  .cell .result .lot-info { font-size: 7px; }
 }
 </style></head><body>
 """)

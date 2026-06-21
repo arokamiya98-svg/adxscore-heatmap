@@ -944,11 +944,20 @@ details.past-months[open] > summary .pm-closed { display: none; }
   #tab-calendar.active .legend { order: 10; }
   /* ⑤ セル内テキストの窮屈さ緩和（5列フィットで狭くなった分フォントを詰める） */
   .cell { font-size: 9px; }
+  /* ⑥ MAE/MFE・値動きレンジの数値をセル幅に収める（はみ出し＝見切れ解消） */
+  .cell .h4-main .mfe-mae-nums { font-size: 10px; gap: 5px; }
+  .cell .h4-main .range-nums { font-size: 9px; gap: 6px; }
+  .cell .h4-main .mfe-mae-box, .cell .h4-main .range-box { padding: 0 3px; }
+  /* ⑦ シグナル行・結果(トレード)行を1行に収める（はみ出し防止・枠内に収める） */
+  .cell .signal, .cell .result { overflow: hidden; white-space: nowrap; }
+  .cell .signal .tag { font-size: 7px; padding: 1px 3px; }
+  .cell .result { font-size: 9px; gap: 3px; padding: 1px 4px; }
+  .cell .result .lot-info { font-size: 7px; }
 }
 </style></head><body>
 
 <h1>DAILY RESEARCH CALENDAR — マニ v3 (v2ベース+シグナル統合)</h1>
-<div class="sub">入力: FX_20260618_125439.csv / 日次集計: 102日 / 仮想MFE/MAE: 120日 / 期間: 2026-03-17 〜 2026-06-18 / 生成: 2026-06-22 08:14 / 全体比正規化基準(p95): 321 USD / 最大観測値: 980 USD / <span id="v3-fire-summary" data-pass="273" data-supp="125" data-total="398">シグナル発火: 273件 (pass_all のみ表示 / 抑制 125件 非表示)</span> 2025-03-07〜2026-06-19</div>
+<div class="sub">入力: FX_20260618_125439.csv / 日次集計: 102日 / 仮想MFE/MAE: 120日 / 期間: 2026-03-17 〜 2026-06-18 / 生成: 2026-06-22 08:25 / 全体比正規化基準(p95): 321 USD / 最大観測値: 980 USD / <span id="v3-fire-summary" data-pass="273" data-supp="125" data-total="398">シグナル発火: 273件 (pass_all のみ表示 / 抑制 125件 非表示)</span> 2025-03-07〜2026-06-19</div>
 <div class="tabs">
 <button class="tab-btn" data-tab="calendar">カレンダー</button>
 <button class="tab-btn" data-tab="overview">全体像</button>
