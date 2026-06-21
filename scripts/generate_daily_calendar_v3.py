@@ -934,6 +934,7 @@ def month_weekdays(year, month):
 html = []
 html.append("""<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Daily Research Calendar — マニ v3 (v2ベース+シグナル統合)</title>
 <style>
 * { box-sizing: border-box; }
@@ -1859,6 +1860,20 @@ details.past-months[open] > summary .pm-closed { display: none; }
   padding: 8px 10px; border-radius: 4px;
 }
 
+/* ===== v3-mobile: iPhone縦持ち 最小限レスポンシブ（2026-06-22 あろさん要望） ===== */
+@media (max-width: 640px) {
+  body { padding: 10px; }
+  /* ① タップ窓（ドリルドロワー）全画面化：右400px固定だとiPhone幅で読めない問題の解消 */
+  #drill { width: 100%; left: 0; right: 0; }
+  #drill .drill-head { position: sticky; top: 0; background: #08111c; z-index: 3; }
+  /* ② カレンダーは5列維持して横スクロール（俯瞰性キープ・7段組セルの潰れ防止） */
+  .month { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .dow-row, .week-group { min-width: 560px; }
+  /* ③ 円グラフ 2列→1列 */
+  .pie-grid { grid-template-columns: 1fr; }
+  /* ④ 詳細分析タブ フィルタの横はみ出し対策 */
+  .filter-bar { flex-wrap: wrap; }
+}
 </style></head><body>
 """)
 
@@ -1966,8 +1981,8 @@ emitted_dot_fids = []
 emitted_fold_count = 0
 emitted_supp_dot_count = 0  # v3-Step2 B2 検証用
 _in_past_fold = False  # v3-Step2 B3: 過去月 <details> ラッパー状態
-for m_start in month_iter(start, end):
-    # v3-Step2 B3: 過去月の折りたたみ開始/終了
+for m_start in reversed(list(month_iter(start, end))):  # v3: 最新月を先頭に（降順表示・あろさん要望 2026-06-22）
+    # v3-Step2 B3: 過去月の折りたたみ開始/終了（降順では過去月が末尾に連続→ループ後の閉じ 2343-2345 が機能）
     if m_start < default_start_month and not _in_past_fold:
         html.append('<details class="past-months"><summary>'
                     '<span class="pm-closed">過去を表示 ▸</span><span class="pm-open">過去を隠す ▾</span>'
