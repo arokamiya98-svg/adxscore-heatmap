@@ -817,27 +817,24 @@ def h1_bg_style(rec):
     }
 
 def d1_band_color(rec):
-    """D1 帯色: 概念的に正しい色マッピング（v0.8）
+    """D1 帯色: ATR Phase を色相の主役にした色マッピング（v0.9 / 2026-06-22 あろさん要望）
 
-    あろさん指摘:
-      「ATRは値幅情報。BU=青、PD=赤は本来間違い。
-       価格は PD でも大下落になる（ボラ縮小しながら下落も可能）」
+    あろさん指摘（v0.9 で深化）:
+      「ATRは値幅情報。BU/PD は赤青(DI/ADX=方向)と役割が違う。
+       BU/PD を赤青以外で独立して色分けせよ（ADXと被る・役割が違う）」
       [[atr-is-band-not-direction]]
 
-    色設計（概念整理後）:
-      - 色相     = DI 方向（青=UP / 赤=DOWN）        ← 価格方向
-      - 鮮やかさ = ATR Phase（BU=メイン鮮やか / PD=サブ淡い）  ← 値幅情報
+    色設計（v0.9 — Phase を色相の主役に昇格 / 旧v0.8「色相=DI方向・濃淡=Phase」から転換）:
+      - 色相 = ATR Phase（BU=琥珀 / PD=紫 / RANGE=灰）   ← 値幅局面（帯の主役）
+      - DI 方向（UP/DOWN）は色から分離し label テキストで保持 ← 赤青はDI/ADX(セル内)方向専用に解放
 
-      | ATR | DI    | 色            | 意味           |
-      |-----|-------|---------------|----------------|
-      | BU  | UP    | メイン青(鮮) | 拡張×上昇      |
-      | BU  | DOWN  | メイン赤(鮮) | 拡張×下落      |
-      | PD  | UP    | サブ青(淡)   | 縮小×上昇      |
-      | PD  | DOWN  | サブ赤(淡)   | 縮小×下落      |
-      | -   | -     | グレー       | RANGE/データ欠 |
+      | ATR Phase | 色        | 意味                   |
+      |-----------|-----------|------------------------|
+      | BU        | 琥珀(鮮)  | 拡張（値幅エネルギー） |
+      | PD        | 紫        | 収縮（値幅収束）       |
+      | RANGE     | グレー    | D1 ADX<18 トレンド不在 |
 
-      RANGE = D1 ADX < 18（ADX閾値未達、トレンド不在）
-              ※ATR凪（収束）とは別概念
+      ※方向情報は捨てず label に "/ UP" "/ DOWN" として残す。色では赤青を一切使わない。
     """
     if not rec:
         return None
@@ -855,34 +852,16 @@ def d1_band_color(rec):
             "adx_txt": adx_txt,
         }
 
-    # v0.8: 色相は DI 方向、鮮やかさは ATR Phase
-    # メイン青  rgba(80,160,255, 0.40)  ← BU UP（拡張×上昇）
-    # メイン赤  rgba(220,100,120, 0.40) ← BU DOWN（拡張×下落）
-    # サブ青    rgba(80,130,200, 0.18)  ← PD UP（縮小×上昇）淡め
-    # サブ赤    rgba(180,90,110, 0.18)  ← PD DOWN（縮小×下落）淡め
+    # v0.9: 色相=ATR Phase（BU琥珀 / PD紫）。方向は色から分離し label テキストへ
     if pattern == "BU":
-        if di_dir == "UP":
-            col = "rgba(80,160,255,0.40)"   # メイン青（鮮やか）
-            label = f"D1 BU / UP (拡張×上昇)"
-        elif di_dir == "DOWN":
-            col = "rgba(220,100,120,0.40)"  # メイン赤（鮮やか）
-            label = f"D1 BU / DOWN (拡張×下落)"
-        else:
-            col = "rgba(150,150,180,0.30)"  # 方向不明（中立）
-            label = f"D1 BU / —"
-        return {"color": col, "label": label, "pattern": "BU", "adx_txt": adx_txt}
+        col = "rgba(235,175,55,0.45)"   # 琥珀＝拡張（値幅エネルギー）
+        sub = " / UP (拡張×上昇)" if di_dir == "UP" else " / DOWN (拡張×下落)" if di_dir == "DOWN" else " / —"
+        return {"color": col, "label": f"D1 BU{sub}", "pattern": "BU", "adx_txt": adx_txt}
 
     if pattern == "PD":
-        if di_dir == "UP":
-            col = "rgba(80,130,200,0.18)"   # サブ青（淡い）
-            label = f"D1 PD / UP (縮小×上昇)"
-        elif di_dir == "DOWN":
-            col = "rgba(180,90,110,0.18)"   # サブ赤（淡い）
-            label = f"D1 PD / DOWN (縮小×下落)"
-        else:
-            col = "rgba(100,100,130,0.18)"  # 方向不明（淡い中立）
-            label = f"D1 PD / —"
-        return {"color": col, "label": label, "pattern": "PD", "adx_txt": adx_txt}
+        col = "rgba(150,110,205,0.40)"  # 紫＝収縮（値幅収束）
+        sub = " / UP (縮小×上昇)" if di_dir == "UP" else " / DOWN (縮小×下落)" if di_dir == "DOWN" else " / —"
+        return {"color": col, "label": f"D1 PD{sub}", "pattern": "PD", "adx_txt": adx_txt}
 
     return {"color": "rgba(100,100,120,0.20)", "label": f"D1 {pattern}", "pattern": pattern, "adx_txt": adx_txt}
 
@@ -1876,6 +1855,8 @@ details.past-months[open] > summary .pm-closed { display: none; }
         .active 付きで詳細度を効かせ、タブ非表示(display:none)を壊さない */
   #tab-calendar.active { display: flex; flex-direction: column; }
   #tab-calendar.active .legend { order: 10; }
+  /* ⑤ セル内テキストの窮屈さ緩和（5列フィットで狭くなった分フォントを詰める） */
+  .cell { font-size: 9px; }
 }
 </style></head><body>
 """)
@@ -1915,13 +1896,11 @@ for phase, (cls, lbl) in PHASE_BADGE.items():
     html.append(f'<span class="ph {cls}">{lbl}</span>')
 html.append('</div>')
 # v0.8: D1 帯凡例を概念整理後の4パターン表示に
-html.append('<div class="grp"><span class="ttl">D1 帯 (色相=DI / 鮮やかさ=ATR Phase):</span>')
-html.append('<span class="d1band" style="background:rgba(80,160,255,0.5);"></span>BU/UP (拡張×上昇) ')
-html.append('<span class="d1band" style="background:rgba(220,100,120,0.5);"></span>BU/DOWN (拡張×下落) ')
-html.append('<span class="d1band" style="background:rgba(80,130,200,0.25);"></span>PD/UP (縮小×上昇) ')
-html.append('<span class="d1band" style="background:rgba(180,90,110,0.25);"></span>PD/DOWN (縮小×下落) ')
-html.append('<span class="d1band" style="background:rgba(120,120,135,0.4);"></span>RANGE ')
-html.append('<span style="opacity:0.55;font-size:9px;display:block;margin-top:4px;">※ATR=値幅情報 / DI=価格方向。PDでも下落・上昇は別軸で起こる</span>')
+html.append('<div class="grp"><span class="ttl">D1 帯 (色=ATR Phase / 方向はラベル文字):</span>')
+html.append('<span class="d1band" style="background:rgba(235,175,55,0.45);"></span>BU 拡張(琥珀) ')
+html.append('<span class="d1band" style="background:rgba(150,110,205,0.40);"></span>PD 収縮(紫) ')
+html.append('<span class="d1band" style="background:rgba(120,120,135,0.28);"></span>RANGE (灰/ADX&lt;18) ')
+html.append('<span style="opacity:0.55;font-size:9px;display:block;margin-top:4px;">※色=値幅局面(BU/PD)。方向(UP/DOWN)はラベル文字で表示。赤青はDI/ADX(方向)専用に分離。</span>')
 html.append('</div>')
 # v1.1: トレード日 中央 MFE/MAE バー凡例（全体比正規化に統一）
 html.append('<div class="grp"><span class="ttl">トレード日 中央 (H4 48h固定):</span>')

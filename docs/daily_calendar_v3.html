@@ -942,11 +942,13 @@ details.past-months[open] > summary .pm-closed { display: none; }
         .active 付きで詳細度を効かせ、タブ非表示(display:none)を壊さない */
   #tab-calendar.active { display: flex; flex-direction: column; }
   #tab-calendar.active .legend { order: 10; }
+  /* ⑤ セル内テキストの窮屈さ緩和（5列フィットで狭くなった分フォントを詰める） */
+  .cell { font-size: 9px; }
 }
 </style></head><body>
 
 <h1>DAILY RESEARCH CALENDAR — マニ v3 (v2ベース+シグナル統合)</h1>
-<div class="sub">入力: FX_20260618_125439.csv / 日次集計: 102日 / 仮想MFE/MAE: 120日 / 期間: 2026-03-17 〜 2026-06-18 / 生成: 2026-06-22 08:01 / 全体比正規化基準(p95): 321 USD / 最大観測値: 980 USD / <span id="v3-fire-summary" data-pass="273" data-supp="125" data-total="398">シグナル発火: 273件 (pass_all のみ表示 / 抑制 125件 非表示)</span> 2025-03-07〜2026-06-19</div>
+<div class="sub">入力: FX_20260618_125439.csv / 日次集計: 102日 / 仮想MFE/MAE: 120日 / 期間: 2026-03-17 〜 2026-06-18 / 生成: 2026-06-22 08:14 / 全体比正規化基準(p95): 321 USD / 最大観測値: 980 USD / <span id="v3-fire-summary" data-pass="273" data-supp="125" data-total="398">シグナル発火: 273件 (pass_all のみ表示 / 抑制 125件 非表示)</span> 2025-03-07〜2026-06-19</div>
 <div class="tabs">
 <button class="tab-btn" data-tab="calendar">カレンダー</button>
 <button class="tab-btn" data-tab="overview">全体像</button>
@@ -970,13 +972,11 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <span class="ph ph-leave">離脱</span>
 <span class="ph ph-bottom">底</span>
 </div>
-<div class="grp"><span class="ttl">D1 帯 (色相=DI / 鮮やかさ=ATR Phase):</span>
-<span class="d1band" style="background:rgba(80,160,255,0.5);"></span>BU/UP (拡張×上昇) 
-<span class="d1band" style="background:rgba(220,100,120,0.5);"></span>BU/DOWN (拡張×下落) 
-<span class="d1band" style="background:rgba(80,130,200,0.25);"></span>PD/UP (縮小×上昇) 
-<span class="d1band" style="background:rgba(180,90,110,0.25);"></span>PD/DOWN (縮小×下落) 
-<span class="d1band" style="background:rgba(120,120,135,0.4);"></span>RANGE 
-<span style="opacity:0.55;font-size:9px;display:block;margin-top:4px;">※ATR=値幅情報 / DI=価格方向。PDでも下落・上昇は別軸で起こる</span>
+<div class="grp"><span class="ttl">D1 帯 (色=ATR Phase / 方向はラベル文字):</span>
+<span class="d1band" style="background:rgba(235,175,55,0.45);"></span>BU 拡張(琥珀) 
+<span class="d1band" style="background:rgba(150,110,205,0.40);"></span>PD 収縮(紫) 
+<span class="d1band" style="background:rgba(120,120,135,0.28);"></span>RANGE (灰/ADX&lt;18) 
+<span style="opacity:0.55;font-size:9px;display:block;margin-top:4px;">※色=値幅局面(BU/PD)。方向(UP/DOWN)はラベル文字で表示。赤青はDI/ADX(方向)専用に分離。</span>
 </div>
 <div class="grp"><span class="ttl">トレード日 中央 (H4 48h固定):</span>
 <span style="color:#5ab8ff;font-weight:700;">伸 MFE</span>
@@ -1022,7 +1022,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <div class="dow">金</div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(150,150,180,0.30);"><span>D1 BU / —</span><span class="d1-adx">ADX22</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / —</span><span class="d1-adx">ADX22</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-06-01" title="2026-06-01 (月) | スコア=34.6 | H1 ADX mean/max=20.9/24.1 | H4 ADX46 mean/max=18.3/19.2 | H4 DI spread=-6.7 | D1 pattern=BU | D1 ADX22=22.1 | H4 Phase=BU | src=日次CSV | 仮想エントリー(JST14:00) 4538.84 | BUY 48h MFE/MAE=10.2/91.3 | SELL 48h MFE/MAE=91.3/10.2">
 <div class="day-hdr">
@@ -1176,7 +1176,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(150,150,180,0.30);"><span>D1 BU / —</span><span class="d1-adx">ADX26</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / —</span><span class="d1-adx">ADX26</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-06-08" title="2026-06-08 (月) | スコア=42.2 | H1 ADX mean/max=24.3/26.5 | H4 ADX46 mean/max=20.0/21.1 | H4 DI spread=-10.8 | D1 pattern=BU | D1 ADX22=26.2 | H4 Phase=BU | src=日次CSV | 仮想エントリー(JST14:00) 4325.78 | BUY 48h MFE/MAE=37.6/93.4 | SELL 48h MFE/MAE=93.4/37.6">
 <div class="day-hdr">
@@ -1327,7 +1327,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(150,150,180,0.30);"><span>D1 BU / —</span><span class="d1-adx">ADX33</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / —</span><span class="d1-adx">ADX33</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-06-15" title="2026-06-15 (月) | スコア=47.6 | H1 ADX mean/max=16.5/22.2 | H4 ADX46 mean/max=28.5/30.4 | H4 DI spread=+0.6 | D1 pattern=BU | D1 ADX22=33.4 | H4 Phase=BU | src=日次CSV | 仮想エントリー(JST14:00) 4271.48 | BUY 48h MFE/MAE=97.9/62.2 | SELL 48h MFE/MAE=62.2/97.9">
 <div class="day-hdr">
@@ -1677,7 +1677,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <div class="dow">金</div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX19</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX19</span></div>
 <div class="week-cells">
 <div class="cell outside" data-date="2026-04-27" title="2026-04-27 (月) | スコア=11.2 | H1 ADX mean/max=13.4/15.6 | H4 ADX46 mean/max=12.3/12.6 | H4 DI spread=-8.2 | D1 pattern=PD | D1 ADX22=15.2 | H4 Phase=BU | src=日次CSV | 仮想エントリー(JST14:00) 4697.68 | BUY 48h MFE/MAE=32.2/143.0 | SELL 48h MFE/MAE=143.0/32.2">
 <div class="day-hdr">
@@ -1792,7 +1792,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX20</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX20</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-05-04" title="2026-05-04 (月) | スコア=28.5 | H1 ADX mean/max=16.5/22.8 | H4 ADX46 mean/max=16.2/16.9 | H4 DI spread=-11.4 | D1 pattern=PD | D1 ADX22=19.7 | H4 Phase=収束底 | src=日次CSV | 仮想エントリー(JST14:00) 4632.79 | BUY 48h MFE/MAE=5.4/132.2 | SELL 48h MFE/MAE=132.2/5.4">
 <div class="day-hdr">
@@ -2273,7 +2273,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX20</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX20</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-05-25" title="2026-05-25 (月) | スコア=12.6 | H1 ADX mean/max=9.5/10.6 | H4 ADX46 mean/max=22.0/22.7 | H4 DI spread=-3.8 | D1 pattern=PD | D1 ADX22=19.7 | H4 Phase=BU | src=日次CSV | 仮想エントリー(JST14:00) 4536.34 | BUY 48h MFE/MAE=43.9/53.9 | SELL 48h MFE/MAE=53.9/43.9">
 <div class="day-hdr">
@@ -2436,7 +2436,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <div class="dow">金</div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX30</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX30</span></div>
 <div class="week-cells">
 <div class="cell outside" data-date="2026-03-30" title="2026-03-30 (月) | スコア=38.8 | H1 ADX mean/max=14.6/18.7 | H4 ADX46 mean/max=27.8/29.2 | H4 DI spread=-2.1 | D1 pattern=PD | D1 ADX22=34.2 | H4 Phase=BU | src=日次CSV | H4 MFE 48h=184.3 USD | H4 MAE 48h=57.5 USD">
 <div class="day-hdr">
@@ -2575,7 +2575,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX26</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX26</span></div>
 <div class="week-cells">
 <div class="cell has-trade" data-date="2026-04-06" title="2026-04-06 (月) | スコア=29.0 | H1 ADX mean/max=16.9/20.4 | H4 ADX46 mean/max=19.8/20.5 | H4 DI spread=+4.3 | D1 pattern=PD | D1 ADX22=25.9 | H4 Phase=収束底 | src=日次CSV | H4 MFE 48h=158.3 USD | H4 MAE 48h=91.5 USD">
 <div class="day-hdr">
@@ -2725,7 +2725,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX21</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX21</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2026-04-13" title="2026-04-13 (月) | スコア=5.6 | H1 ADX mean/max=10.2/12.8 | H4 ADX46 mean/max=12.0/12.3 | H4 DI spread=+3.8 | D1 pattern=PD | D1 ADX22=20.6 | src=日次CSV | 仮想エントリー(JST14:00) 4639.93 | BUY 48h MFE/MAE=210.8/0.0 | SELL 48h MFE/MAE=0.0/210.8 | シグナル発火 1件 (pass 1/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -2871,7 +2871,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX19</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX19</span></div>
 <div class="week-cells">
 <div class="cell has-fires has-trade" data-date="2026-04-20" title="2026-04-20 (月) | スコア=20.5 | H1 ADX mean/max=15.3/17.5 | H4 ADX46 mean/max=18.5/18.7 | H4 DI spread=+7.5 | D1 pattern=PD | D1 ADX22=19.1 | H4 Phase=BU | src=日次CSV | H4 MFE 48h=41.9 USD | H4 MAE 48h=122.6 USD | シグナル発火 3件 (pass 0/抑制 3) → クリックで詳細">
 <div class="day-hdr">
@@ -3272,7 +3272,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX44</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX44</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2026-03-02" title="2026-03-02 (月) | スコア=53.8 | H1 ADX mean/max=30.5/35.2 | H4 ADX46 mean/max=16.2/17.6 | H4 DI spread=+9.1 | D1 pattern=PD | D1 ADX22=43.6 | H4 Phase=収束底 | src=日次CSV | 仮想エントリー(JST14:00) 5301.23 | BUY 48h MFE/MAE=117.8/305.1 | SELL 48h MFE/MAE=305.1/117.8 | シグナル発火 8件 (pass 5/抑制 3) → クリックで詳細">
 <div class="day-hdr">
@@ -3431,7 +3431,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX39</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX39</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-03-09" title="2026-03-09 (月) | スコア=7.3 | H1 ADX mean/max=11.5/13.7 | H4 ADX46 mean/max=10.4/10.7 | H4 DI spread=-5.6 | D1 pattern=PD | D1 ADX22=39.5 | H4 Phase=収束底 | src=日次CSV | 仮想エントリー(JST14:00) 5180.18 | BUY 48h MFE/MAE=58.3/165.2 | SELL 48h MFE/MAE=165.2/58.3">
 <div class="day-hdr">
@@ -3583,7 +3583,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(150,150,180,0.30);"><span>D1 BU / —</span><span class="d1-adx">ADX31</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / —</span><span class="d1-adx">ADX31</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2026-03-16" title="2026-03-16 (月) | スコア=45.4 | H1 ADX mean/max=27.5/29.4 | H4 ADX46 mean/max=17.4/19.4 | H4 DI spread=-13.0 | D1 pattern=BU | D1 ADX22=30.9 | H4 Phase=BU | src=日次CSV | 仮想エントリー(JST14:00) 5005.86 | BUY 48h MFE/MAE=38.4/38.1 | SELL 48h MFE/MAE=38.1/38.4 | シグナル発火 4件 (pass 4/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -3739,7 +3739,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(150,150,180,0.30);"><span>D1 BU / —</span><span class="d1-adx">ADX33</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / —</span><span class="d1-adx">ADX33</span></div>
 <div class="week-cells">
 <div class="cell has-trade" data-date="2026-03-23" title="2026-03-23 (月) | スコア=74.3 | H1 ADX mean/max=27.5/32.1 | H4 ADX46 mean/max=35.0/36.0 | H4 DI spread=-18.0 | D1 pattern=BU | D1 ADX22=33.2 | H4 Phase=収束底 | src=日次CSV | H4 MFE 48h=391.9 USD | H4 MAE 48h=145.4 USD">
 <div class="day-hdr">
@@ -3886,7 +3886,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX34</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX34</span></div>
 <div class="week-cells">
 <div class="cell has-fires has-trade" data-date="2026-03-30" title="2026-03-30 (月) | スコア=38.8 | H1 ADX mean/max=14.6/18.7 | H4 ADX46 mean/max=27.8/29.2 | H4 DI spread=-2.1 | D1 pattern=PD | D1 ADX22=34.2 | H4 Phase=BU | src=日次CSV | H4 MFE 48h=184.3 USD | H4 MAE 48h=57.5 USD | シグナル発火 1件 (pass 0/抑制 1) → クリックで詳細">
 <div class="day-hdr">
@@ -4096,7 +4096,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX56</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX56</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-02-02" title="2026-02-02 (月) | スコア=57.9 | H1 ADX=26.9 | H4 ADX46=17.8 | H4 DI spread=+3.7 | D1 pattern=BU | D1 ADX22=55.5 | H4 Phase=収束底 | 仮想エントリー(JST14:00) 4814.30 | BUY 48h MFE/MAE=179.5/411.6 | SELL 48h MFE/MAE=411.6/179.5">
 <div class="day-hdr">
@@ -4246,7 +4246,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX50</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX50</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-02-09" title="2026-02-09 (月) | スコア=46.6 | H1 ADX=22.6 | H4 ADX46=15.9 | H4 DI spread=+5.6 | D1 pattern=PD | D1 ADX22=50.3 | H4 Phase=BU | 仮想エントリー(JST14:00) 4984.18 | BUY 48h MFE/MAE=102.1/37.8 | SELL 48h MFE/MAE=37.8/102.1">
 <div class="day-hdr">
@@ -4398,7 +4398,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX40</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX40</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-02-16" title="2026-02-16 (月) | スコア=28.9 | H1 ADX=14.4 | H4 ADX46=13.7 | H4 DI spread=+9.7 | D1 pattern=PD | D1 ADX22=40.1 | H4 Phase=収束底 | 仮想エントリー(JST14:00) 5037.66 | BUY 48h MFE/MAE=15.0/195.4 | SELL 48h MFE/MAE=195.4/15.0">
 <div class="day-hdr">
@@ -4548,7 +4548,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(100,100,130,0.18);"><span>D1 PD / —</span><span class="d1-adx">ADX40</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / —</span><span class="d1-adx">ADX40</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2026-02-23" title="2026-02-23 (月) | スコア=40.3 | H1 ADX mean/max=26.6/28.7 | H4 ADX46 mean/max=15.8/16.9 | H4 DI spread=+12.3 | D1 pattern=PD | D1 ADX22=40.3 | H4 Phase=PD | src=日次CSV | 仮想エントリー(JST14:00) 5109.28 | BUY 48h MFE/MAE=140.4/17.7 | SELL 48h MFE/MAE=17.7/140.4 | シグナル発火 5件 (pass 1/抑制 4) → クリックで詳細">
 <div class="day-hdr">
@@ -4723,7 +4723,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <div class="dow">金</div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX43</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX43</span></div>
 <div class="week-cells">
 <div class="cell outside" data-date="2025-12-29" title="2025-12-29 (月) | スコア=53.1 | H1 ADX=22.1 | H4 ADX46=20.9 | H4 DI spread=+3.5 | D1 pattern=PD | D1 ADX22=42.7 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -4814,7 +4814,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX45</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX45</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2026-01-05" title="2026-01-05 (月) | スコア=52.2 | H1 ADX=21.9 | H4 ADX46=20.7 | H4 DI spread=+9.5 | D1 pattern=PD | D1 ADX22=45.3 | H4 Phase=収束底 | 仮想エントリー(JST14:00) 4361.13 | BUY 48h MFE/MAE=139.3/34.2 | SELL 48h MFE/MAE=34.2/139.3 | シグナル発火 10件 (pass 10/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -4977,7 +4977,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX49</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX49</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2026-01-12" title="2026-01-12 (月) | スコア=24.9 | H1 ADX=15.9 | H4 ADX46=23.7 | H4 DI spread=-0.6 | D1 pattern=PD | D1 ADX22=48.7 | H4 Phase=BU | 仮想エントリー(JST14:00) 4518.74 | BUY 48h MFE/MAE=116.0/13.8 | SELL 48h MFE/MAE=13.8/116.0 | シグナル発火 4件 (pass 4/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -5147,7 +5147,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX53</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX53</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-01-19" title="2026-01-19 (月) | スコア=87.1 | H1 ADX=30.8 | H4 ADX46=32.0 | H4 DI spread=+16.2 | D1 pattern=BU | D1 ADX22=53.0 | H4 Phase=BU | 仮想エントリー(JST14:00) 4627.25 | BUY 48h MFE/MAE=218.2/45.4 | SELL 48h MFE/MAE=45.4/218.2">
 <div class="day-hdr">
@@ -5301,7 +5301,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX61</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX61</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2026-01-26" title="2026-01-26 (月) | スコア=88.6 | H1 ADX=29.3 | H4 ADX46=38.8 | H4 DI spread=+4.3 | D1 pattern=BU | D1 ADX22=60.8 | 仮想エントリー(JST14:00) 5009.29 | BUY 48h MFE/MAE=181.2/31.3 | SELL 48h MFE/MAE=31.3/181.2">
 <div class="day-hdr">
@@ -5457,7 +5457,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <div class="dow">金</div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX35</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX35</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2025-12-01" title="2025-12-01 (月) | スコア=36.6 | H1 ADX=18.3 | H4 ADX46=15.0 | H4 DI spread=+5.1 | D1 pattern=PD | D1 ADX22=35.1 | H4 Phase=PD | シグナル発火 4件 (pass 0/抑制 4) → クリックで詳細">
 <div class="day-hdr">
@@ -5552,7 +5552,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX34</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX34</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-12-08" title="2025-12-08 (月) | スコア=24.7 | H1 ADX=12.3 | H4 ADX46=14.0 | H4 DI spread=+8.6 | D1 pattern=PD | D1 ADX22=33.8 | H4 Phase=BU">
 <div class="day-hdr">
@@ -5649,7 +5649,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX38</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX38</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-12-15" title="2025-12-15 (月) | スコア=50.2 | H1 ADX=20.0 | H4 ADX46=21.8 | H4 DI spread=+7.8 | D1 pattern=PD | D1 ADX22=37.6 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -5748,7 +5748,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX46</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX46</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-12-22" title="2025-12-22 (月) | スコア=96.4 | H1 ADX=33.2 | H4 ADX46=36.2 | H4 DI spread=+16.8 | D1 pattern=PD | D1 ADX22=45.9 | H4 Phase=PD">
 <div class="day-hdr">
@@ -5841,7 +5841,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX43</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX43</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2025-12-29" title="2025-12-29 (月) | スコア=53.1 | H1 ADX=22.1 | H4 ADX46=20.9 | H4 DI spread=+3.5 | D1 pattern=PD | D1 ADX22=42.7 | H4 Phase=収束底 | シグナル発火 6件 (pass 1/抑制 5) → クリックで詳細">
 <div class="day-hdr">
@@ -6038,7 +6038,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX31</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX31</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-11-03" title="2025-11-03 (月) | スコア=25.8 | H1 ADX=14.4 | H4 ADX46=8.2 | H4 DI spread=+3.7 | D1 pattern=PD | D1 ADX22=30.8 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -6130,7 +6130,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX35</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX35</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-11-10" title="2025-11-10 (月) | スコア=80.0 | H1 ADX=33.3 | H4 ADX46=24.0 | H4 DI spread=+2.8 | D1 pattern=PD | D1 ADX22=34.7 | H4 Phase=BU">
 <div class="day-hdr">
@@ -6234,7 +6234,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX31</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX31</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-11-17" title="2025-11-17 (月) | スコア=35.5 | H1 ADX=19.0 | H4 ADX46=9.5 | H4 DI spread=+0.9 | D1 pattern=PD | D1 ADX22=31.1 | H4 Phase=BU">
 <div class="day-hdr">
@@ -6327,7 +6327,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX34</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX34</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-11-24" title="2025-11-24 (月) | スコア=47.1 | H1 ADX=21.4 | H4 ADX46=17.8 | H4 DI spread=+11.0 | D1 pattern=PD | D1 ADX22=33.8 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -6431,7 +6431,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <div class="dow">金</div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX56</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX56</span></div>
 <div class="week-cells">
 <div class="cell outside" data-date="2025-09-29" title="2025-09-29 (月) | スコア=81.2 | H1 ADX=26.3 | H4 ADX46=34.1 | H4 DI spread=+14.3 | D1 pattern=BU | D1 ADX22=55.8 | H4 Phase=BU">
 <div class="day-hdr">
@@ -6527,7 +6527,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX59</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX59</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-10-06" title="2025-10-06 (月) | スコア=100.0 | H1 ADX=36.9 | H4 ADX46=42.9 | H4 DI spread=+13.5 | D1 pattern=BU | D1 ADX22=58.8 | H4 Phase=BU">
 <div class="day-hdr">
@@ -6617,7 +6617,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX64</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX64</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-10-13" title="2025-10-13 (月) | スコア=99.5 | H1 ADX=34.8 | H4 ADX46=54.1 | H4 DI spread=+16.6 | D1 pattern=BU | D1 ADX22=64.2 | H4 Phase=BU">
 <div class="day-hdr">
@@ -6707,7 +6707,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX60</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX60</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-10-20" title="2025-10-20 (月) | スコア=59.8 | H1 ADX=21.2 | H4 ADX46=26.6 | H4 DI spread=+5.1 | D1 pattern=BU | D1 ADX22=60.2 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -6797,7 +6797,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX43</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX43</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-10-27" title="2025-10-27 (月) | スコア=19.3 | H1 ADX=19.7 | H4 ADX46=13.3 | H4 DI spread=-0.5 | D1 pattern=BU | D1 ADX22=43.3 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -6898,7 +6898,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <div class="dow">金</div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX37</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX37</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2025-09-01" title="2025-09-01 (月) | スコア=69.3 | H1 ADX=25.1 | H4 ADX46=27.7 | H4 DI spread=+14.8 | D1 pattern=BU | D1 ADX22=36.7 | H4 Phase=BU | シグナル発火 3件 (pass 2/抑制 1) → クリックで詳細">
 <div class="day-hdr">
@@ -6997,7 +6997,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX48</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX48</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-09-08" title="2025-09-08 (月) | スコア=71.4 | H1 ADX=20.7 | H4 ADX46=35.3 | H4 DI spread=+9.1 | D1 pattern=BU | D1 ADX22=47.9 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -7092,7 +7092,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX51</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX51</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-09-15" title="2025-09-15 (月) | スコア=36.2 | H1 ADX=14.6 | H4 ADX46=19.7 | H4 DI spread=+4.1 | D1 pattern=BU | D1 ADX22=50.8 | H4 Phase=BU">
 <div class="day-hdr">
@@ -7186,7 +7186,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX53</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX53</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2025-09-22" title="2025-09-22 (月) | スコア=65.9 | H1 ADX=25.6 | H4 ADX46=24.8 | H4 DI spread=+9.9 | D1 pattern=BU | D1 ADX22=52.7 | H4 Phase=PD | シグナル発火 4件 (pass 4/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -7280,7 +7280,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX56</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX56</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2025-09-29" title="2025-09-29 (月) | スコア=81.2 | H1 ADX=26.3 | H4 ADX46=34.1 | H4 DI spread=+14.3 | D1 pattern=BU | D1 ADX22=55.8 | H4 Phase=BU | シグナル発火 1件 (pass 1/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -7759,7 +7759,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX20</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX20</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-08-25" title="2025-08-25 (月) | スコア=10.4 | H1 ADX=14.0 | H4 ADX46=7.7 | H4 DI spread=+4.2 | D1 pattern=BU | D1 ADX22=19.9 | H4 Phase=BU">
 <div class="day-hdr">
@@ -8937,7 +8937,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <div class="dow">金</div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX40</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX40</span></div>
 <div class="week-cells">
 <div class="cell outside" data-date="2025-04-28" title="2025-04-28 (月) | スコア=18.1 | H1 ADX=18.7 | H4 ADX46=15.4 | H4 DI spread=-4.3 | D1 pattern=PD | D1 ADX22=40.0 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -9028,7 +9028,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX33</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX33</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-05-05" title="2025-05-05 (月) | スコア=72.5 | H1 ADX=33.3 | H4 ADX46=18.9 | H4 DI spread=+6.2 | D1 pattern=PD | D1 ADX22=33.3 | H4 Phase=PD">
 <div class="day-hdr">
@@ -9119,7 +9119,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(180,90,110,0.18);"><span>D1 PD / DOWN (縮小×下落)</span><span class="d1-adx">ADX26</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / DOWN (縮小×下落)</span><span class="d1-adx">ADX26</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2025-05-12" title="2025-05-12 (月) | スコア=33.7 | H1 ADX=21.8 | H4 ADX46=12.7 | H4 DI spread=-1.9 | D1 pattern=PD | D1 ADX22=25.5 | H4 Phase=BU | シグナル発火 2件 (pass 2/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -9218,7 +9218,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX22</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX22</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2025-05-19" title="2025-05-19 (月) | スコア=45.8 | H1 ADX=28.9 | H4 ADX46=16.5 | H4 DI spread=+12.9 | D1 pattern=PD | D1 ADX22=22.3 | H4 Phase=収束底 | シグナル発火 2件 (pass 2/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -9423,7 +9423,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <div class="dow">金</div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX51</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX51</span></div>
 <div class="week-cells">
 <div class="cell outside" data-date="2025-03-31" title="2025-03-31 (月) | スコア=50.1 | H1 ADX=25.2 | H4 ADX46=28.2 | H4 DI spread=-2.0 | D1 pattern=BU | D1 ADX22=50.6">
 <div class="day-hdr">
@@ -9510,7 +9510,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX46</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX46</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-04-07" title="2025-04-07 (月) | スコア=66.6 | H1 ADX=27.1 | H4 ADX46=23.2 | H4 DI spread=+13.0 | D1 pattern=BU | D1 ADX22=46.2 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -9600,7 +9600,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX50</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX50</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2025-04-14" title="2025-04-14 (月) | スコア=91.1 | H1 ADX=32.6 | H4 ADX46=32.3 | H4 DI spread=+12.4 | D1 pattern=BU | D1 ADX22=50.5 | H4 Phase=PD | シグナル発火 1件 (pass 1/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -9692,7 +9692,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX52</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX52</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-04-21" title="2025-04-21 (月) | スコア=76.2 | H1 ADX=29.1 | H4 ADX46=27.0 | H4 DI spread=+4.1 | D1 pattern=BU | D1 ADX22=51.7 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -9782,7 +9782,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX40</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX40</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-04-28" title="2025-04-28 (月) | スコア=18.1 | H1 ADX=18.7 | H4 ADX46=15.4 | H4 DI spread=-4.3 | D1 pattern=PD | D1 ADX22=40.0 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -9973,7 +9973,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX35</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX35</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-03-03" title="2025-03-03 (月) | スコア=9.0 | H1 ADX=14.5 | H4 ADX46=9.5 | H4 DI spread=-0.7 | D1 pattern=PD | D1 ADX22=35.0 | H4 Phase=収束底">
 <div class="day-hdr">
@@ -10064,7 +10064,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX33</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX33</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2025-03-10" title="2025-03-10 (月) | スコア=50.6 | H1 ADX=21.9 | H4 ADX46=19.8 | H4 DI spread=+12.5 | D1 pattern=PD | D1 ADX22=32.8 | H4 Phase=BU | シグナル発火 2件 (pass 2/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -10176,7 +10176,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,130,200,0.18);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX41</span></div>
+<div class="d1-band" style="background:rgba(150,110,205,0.40);"><span>D1 PD / UP (縮小×上昇)</span><span class="d1-adx">ADX41</span></div>
 <div class="week-cells">
 <div class="cell has-fires" data-date="2025-03-17" title="2025-03-17 (月) | スコア=75.9 | H1 ADX=26.1 | H4 ADX46=30.8 | H4 DI spread=+3.1 | D1 pattern=PD | D1 ADX22=40.8 | H4 Phase=BU | シグナル発火 1件 (pass 1/抑制 0) → クリックで詳細">
 <div class="day-hdr">
@@ -10381,7 +10381,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </div>
 </div>
 <div class="week-group">
-<div class="d1-band" style="background:rgba(80,160,255,0.40);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX51</span></div>
+<div class="d1-band" style="background:rgba(235,175,55,0.45);"><span>D1 BU / UP (拡張×上昇)</span><span class="d1-adx">ADX51</span></div>
 <div class="week-cells">
 <div class="cell" data-date="2025-03-31" title="2025-03-31 (月) | スコア=50.1 | H1 ADX=25.2 | H4 ADX46=28.2 | H4 DI spread=-2.0 | D1 pattern=BU | D1 ADX22=50.6">
 <div class="day-hdr">
