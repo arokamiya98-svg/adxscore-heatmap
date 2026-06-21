@@ -708,6 +708,12 @@ h1 { font-size: 14px; color: #5a9adf; margin: 0 0 4px; letter-spacing: .08em; }
   font-family: inherit; cursor: pointer;
 }
 .filter-bar select:hover { border-color: #4a6090; }
+.filter-bar input.f-date {
+  background: #0a1320; color: #c8d8e8; border: 1px solid #1a3454;
+  border-radius: 4px; padding: 4px 6px; font-size: 11px; font-family: inherit;
+}
+.filter-bar input.f-date:hover { border-color: #4a6090; }
+.filter-bar .f-date-sep { color: #4a6a8a; margin: 0 3px; }
 .f-reset {
   background: #2a3050; color: #b0c0d8; border: 1px solid #4a5070;
   padding: 4px 12px; border-radius: 4px; font-size: 10px;
@@ -957,7 +963,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 </style></head><body>
 
 <h1>DAILY RESEARCH CALENDAR — マニ v3 (v2ベース+シグナル統合)</h1>
-<div class="sub">入力: FX_20260618_125439.csv / 日次集計: 102日 / 仮想MFE/MAE: 120日 / 期間: 2026-03-17 〜 2026-06-18 / 生成: 2026-06-22 08:25 / 全体比正規化基準(p95): 321 USD / 最大観測値: 980 USD / <span id="v3-fire-summary" data-pass="273" data-supp="125" data-total="398">シグナル発火: 273件 (pass_all のみ表示 / 抑制 125件 非表示)</span> 2025-03-07〜2026-06-19</div>
+<div class="sub">入力: FX_20260618_125439.csv / 日次集計: 102日 / 仮想MFE/MAE: 120日 / 期間: 2026-03-17 〜 2026-06-18 / 生成: 2026-06-22 08:44 / 全体比正規化基準(p95): 321 USD / 最大観測値: 980 USD / <span id="v3-fire-summary" data-pass="273" data-supp="125" data-total="398">シグナル発火: 273件 (pass_all のみ表示 / 抑制 125件 非表示)</span> 2025-03-07〜2026-06-19</div>
 <div class="tabs">
 <button class="tab-btn" data-tab="calendar">カレンダー</button>
 <button class="tab-btn" data-tab="overview">全体像</button>
@@ -10594,7 +10600,7 @@ details.past-months[open] > summary .pm-closed { display: none; }
 <div class="detail-sub">フィルターで絞り込み → ピボット軸で集計 → クロス分析。<b>N=30 規模、方向性として統計的有意性なし</b>。<b>シグナル評価のため</b>表示（戦略修正のためではない）。</div>
 </div>
 <div class="filter-bar">
-<label>期間 <select id="f-period"><option value="all">全期間</option><option value="apr+">4月以降</option><option value="may+">5月以降</option></select></label>
+<label>期間 <input type="date" id="f-date-from" class="f-date"><span class="f-date-sep">〜</span><input type="date" id="f-date-to" class="f-date"></label>
 <label>反省タグ <select id="f-pattern"><option value="all">全て</option><option>PAT-A</option><option>PAT-B</option><option>PAT-C</option><option>PAT-D</option><option>ATR収束底</option><option>その他</option><option>未分類</option></select></label>
 <label>D1パターン <select id="f-d1"><option value="all">全て</option><option>BU</option><option>PD</option></select></label>
 <label>勝敗 <select id="f-won"><option value="all">全て</option><option value="win">勝</option><option value="loss">負</option><option value="zero">建値</option></select></label>
@@ -10696,7 +10702,8 @@ details.past-months[open] > summary .pm-closed { display: none; }
     return sign + '¥' + Math.abs(v).toLocaleString('ja-JP');
   }
   function applyFilters() {
-    const period = $('f-period').value;
+    const dFrom = $('f-date-from').value;  // "" or "YYYY-MM-DD"
+    const dTo   = $('f-date-to').value;
     const pat = $('f-pattern').value;
     const d1  = $('f-d1').value;
     const won = $('f-won').value;
@@ -10705,8 +10712,8 @@ details.past-months[open] > summary .pm-closed { display: none; }
     const ord = $('f-order').value;
     const dow = $('f-dow').value;
     return TRADES.filter(t => {
-      if (period === 'apr+' && t.date < '2026-04-01') return false;
-      if (period === 'may+' && t.date < '2026-05-01') return false;
+      if (dFrom && t.date < dFrom) return false;
+      if (dTo   && t.date > dTo)   return false;
       if (pat !== 'all' && t.pattern !== pat) return false;
       if (d1  !== 'all' && t.d1_pattern !== d1) return false;
       if (won !== 'all' && t.won !== won) return false;
@@ -10795,16 +10802,20 @@ details.past-months[open] > summary .pm-closed { display: none; }
     }).join('') || '<tr><td colspan="11" style="text-align:center;color:#5a6a8a;padding:14px;">該当トレードなし</td></tr>';
   }
   // Listener
-  ['f-period','f-pattern','f-d1','f-won','f-atr','f-align','f-order','f-dow','p-axis'].forEach(id => {
+  ['f-date-from','f-date-to','f-pattern','f-d1','f-won','f-atr','f-align','f-order','f-dow','p-axis'].forEach(id => {
     const el = $(id);
     if (el) el.addEventListener('change', refresh);
   });
   const resetBtn = $('f-reset');
   if (resetBtn) {
     resetBtn.addEventListener('click', function(){
-      ['f-period','f-pattern','f-d1','f-won','f-atr','f-align','f-order','f-dow'].forEach(id => {
+      ['f-pattern','f-d1','f-won','f-atr','f-align','f-order','f-dow'].forEach(id => {
         const el = $(id);
         if (el) el.value = 'all';
+      });
+      ['f-date-from','f-date-to'].forEach(id => {
+        const el = $(id);
+        if (el) el.value = '';
       });
       refresh();
     });

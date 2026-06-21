@@ -1621,6 +1621,12 @@ h1 { font-size: 14px; color: #5a9adf; margin: 0 0 4px; letter-spacing: .08em; }
   font-family: inherit; cursor: pointer;
 }
 .filter-bar select:hover { border-color: #4a6090; }
+.filter-bar input.f-date {
+  background: #0a1320; color: #c8d8e8; border: 1px solid #1a3454;
+  border-radius: 4px; padding: 4px 6px; font-size: 11px; font-family: inherit;
+}
+.filter-bar input.f-date:hover { border-color: #4a6090; }
+.filter-bar .f-date-sep { color: #4a6a8a; margin: 0 3px; }
 .f-reset {
   background: #2a3050; color: #b0c0d8; border: 1px solid #4a5070;
   padding: 4px 12px; border-radius: 4px; font-size: 10px;
@@ -2786,11 +2792,9 @@ html.append('</div>')
 
 # フィルター UI
 html.append('<div class="filter-bar">')
-html.append('<label>期間 <select id="f-period">'
-            '<option value="all">全期間</option>'
-            '<option value="apr+">4月以降</option>'
-            '<option value="may+">5月以降</option>'
-            '</select></label>')
+html.append('<label>期間 <input type="date" id="f-date-from" class="f-date">'
+            '<span class="f-date-sep">〜</span>'
+            '<input type="date" id="f-date-to" class="f-date"></label>')
 html.append('<label>反省タグ <select id="f-pattern">'
             '<option value="all">全て</option>'
             '<option>PAT-A</option><option>PAT-B</option><option>PAT-C</option>'
@@ -2948,7 +2952,8 @@ html.append(r"""<script>
     return sign + '¥' + Math.abs(v).toLocaleString('ja-JP');
   }
   function applyFilters() {
-    const period = $('f-period').value;
+    const dFrom = $('f-date-from').value;  // "" or "YYYY-MM-DD"
+    const dTo   = $('f-date-to').value;
     const pat = $('f-pattern').value;
     const d1  = $('f-d1').value;
     const won = $('f-won').value;
@@ -2957,8 +2962,8 @@ html.append(r"""<script>
     const ord = $('f-order').value;
     const dow = $('f-dow').value;
     return TRADES.filter(t => {
-      if (period === 'apr+' && t.date < '2026-04-01') return false;
-      if (period === 'may+' && t.date < '2026-05-01') return false;
+      if (dFrom && t.date < dFrom) return false;
+      if (dTo   && t.date > dTo)   return false;
       if (pat !== 'all' && t.pattern !== pat) return false;
       if (d1  !== 'all' && t.d1_pattern !== d1) return false;
       if (won !== 'all' && t.won !== won) return false;
@@ -3047,16 +3052,20 @@ html.append(r"""<script>
     }).join('') || '<tr><td colspan="11" style="text-align:center;color:#5a6a8a;padding:14px;">該当トレードなし</td></tr>';
   }
   // Listener
-  ['f-period','f-pattern','f-d1','f-won','f-atr','f-align','f-order','f-dow','p-axis'].forEach(id => {
+  ['f-date-from','f-date-to','f-pattern','f-d1','f-won','f-atr','f-align','f-order','f-dow','p-axis'].forEach(id => {
     const el = $(id);
     if (el) el.addEventListener('change', refresh);
   });
   const resetBtn = $('f-reset');
   if (resetBtn) {
     resetBtn.addEventListener('click', function(){
-      ['f-period','f-pattern','f-d1','f-won','f-atr','f-align','f-order','f-dow'].forEach(id => {
+      ['f-pattern','f-d1','f-won','f-atr','f-align','f-order','f-dow'].forEach(id => {
         const el = $(id);
         if (el) el.value = 'all';
+      });
+      ['f-date-from','f-date-to'].forEach(id => {
+        const el = $(id);
+        if (el) el.value = '';
       });
       refresh();
     });
