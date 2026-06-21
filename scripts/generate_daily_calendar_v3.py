@@ -1860,19 +1860,22 @@ details.past-months[open] > summary .pm-closed { display: none; }
   padding: 8px 10px; border-radius: 4px;
 }
 
-/* ===== v3-mobile: iPhone縦持ち 最小限レスポンシブ（2026-06-22 あろさん要望） ===== */
+/* ===== v3-mobile: iPhone縦持ち 最小限レスポンシブ（2026-06-22 あろさん要望・v2） ===== */
 @media (max-width: 640px) {
-  body { padding: 10px; }
+  body { padding: 6px; }
   /* ① タップ窓（ドリルドロワー）全画面化：右400px固定だとiPhone幅で読めない問題の解消 */
   #drill { width: 100%; left: 0; right: 0; }
   #drill .drill-head { position: sticky; top: 0; background: #08111c; z-index: 3; }
-  /* ② カレンダーは5列維持して横スクロール（俯瞰性キープ・7段組セルの潰れ防止） */
-  .month { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .dow-row, .week-group { min-width: 560px; }
+  /* ② 5列を画面幅にフィット（横スクロール廃止＝見切れ解消 / padding・gap詰めでセル幅を確保） */
+  .month { padding: 6px; }
+  .week-cells { gap: 2px; }
   /* ③ 円グラフ 2列→1列 */
   .pie-grid { grid-template-columns: 1fr; }
-  /* ④ 詳細分析タブ フィルタの横はみ出し対策 */
   .filter-bar { flex-wrap: wrap; }
+  /* ④ 凡例(legend)をカレンダーの下へ：DOMは動かさずCSS orderで最後尾に送る（PCは従来どおり上）。
+        .active 付きで詳細度を効かせ、タブ非表示(display:none)を壊さない */
+  #tab-calendar.active { display: flex; flex-direction: column; }
+  #tab-calendar.active .legend { order: 10; }
 }
 </style></head><body>
 """)
