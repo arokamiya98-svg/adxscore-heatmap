@@ -2442,8 +2442,8 @@ PIE_COLORS_RESULT = {
 # get_rec(d) の d1_pattern + d1_adx22 で RANGE 判定
 phase_counts = {"BU": 0, "PD": 0, "RANGE": 0, "その他": 0}
 PIE_COLORS_PHASE = {
-    "BU":     "#5ab8ff",
-    "PD":     "#a8c8e8",
+    "BU":     "#ebaf37",
+    "PD":     "#966ecd",
     "RANGE":  "#7878a0",
     "その他": "#4a4a5a",
 }
