@@ -160,23 +160,23 @@ body{{
 .cm{{font-size:.68rem;font-weight:700;padding:4px 5px;letter-spacing:.02em;}}
 
 /* ═══ FibTZ 予測 (BU/PD) ═══ */
-.ft-BU{{background:#001a38;color:#5ab8ff;border-color:#1a5090;font-weight:700;letter-spacing:.04em;}}
-.ft-PD{{background:#1e0410;color:#f07080;border-color:#601828;font-weight:700;letter-spacing:.04em;}}
-.ft-X {{background:#050a14;color:#1e3a5f;}}
+.ft-BU{{background:#241900;color:#ebaf37;border-color:#5a4108;font-weight:700;letter-spacing:.04em;}}
+.ft-PD{{background:#180a2c;color:#b48ae8;border-color:#3a1e60;font-weight:700;letter-spacing:.04em;}}
+.ft-X {{background:#101015;color:#54545f;}}
 
 /* ═══ D1 PHASE ═══ */
-.d-BU-on {{background:#001835;color:#64b5f6;border-color:#1a4a8a;border-bottom:3px solid #4a9aff!important;}}
-.d-BU-off{{background:#000e1a;color:#1e4a6a;border-color:#0a2040;}}
-.d-PD-on {{background:#200008;color:#ef6060;border-color:#5a0a0a;border-bottom:3px solid #ef4040!important;}}
-.d-PD-off{{background:#100004;color:#4a1515;border-color:#280006;}}
-.d-X     {{background:#050a14;color:#1e3a5f;}}
+.d-BU-on {{background:#241900;color:#ebaf37;border-color:#5a4108;border-bottom:3px solid #f0b429!important;}}
+.d-BU-off{{background:#161000;color:#6b531a;border-color:#332600;}}
+.d-PD-on {{background:#180a2c;color:#b48ae8;border-color:#3a1e60;border-bottom:3px solid #9d6ee0!important;}}
+.d-PD-off{{background:#0e0620;color:#4d3a6a;border-color:#221038;}}
+.d-X     {{background:#101015;color:#54545f;}}
 
 /* ═══ H4 WAVE ═══ */
-.h-BU-on {{background:#001e10;color:#4dffa0;border-color:#0a4025;border-bottom:3px solid #00e676!important;}}
-.h-BU-off{{background:#001208;color:#1a5a30;border-color:#063020;}}
-.h-PD-on {{background:#1a0630;color:#b07af8;border-color:#3a1060;border-bottom:3px solid #9050f0!important;}}
-.h-PD-off{{background:#0d0320;color:#301050;border-color:#1a0840;}}
-.h-X     {{background:#050a0e;color:#122820;}}
+.h-BU-on {{background:#241900;color:#ebaf37;border-color:#5a4108;border-bottom:3px solid #f0b429!important;}}
+.h-BU-off{{background:#161000;color:#6b531a;border-color:#332600;}}
+.h-PD-on {{background:#180a2c;color:#b48ae8;border-color:#3a1e60;border-bottom:3px solid #9d6ee0!important;}}
+.h-PD-off{{background:#0e0620;color:#4d3a6a;border-color:#221038;}}
+.h-X     {{background:#101015;color:#54545f;}}
 
 /* ═══ ATR Zone 3区分（凪 / 中 / 拡張） ═══ */
 .az-nag{{background:#001a38;color:#5ab8ff;border-color:#1a5090;font-weight:600;}}
@@ -185,8 +185,8 @@ body{{
 .az-X  {{background:#050a14;color:#1e3a5f;}}
 
 /* ═══ H4 Phase Auto v2（5段階: BU / PD / 凪 / 収束底 / 凪離脱 / —） ═══ */
-.hp-BU      {{background:#001a38;color:#5ab8ff;border-color:#1a5090;font-weight:700;letter-spacing:.04em;}}
-.hp-PD      {{background:#200008;color:#ef6060;border-color:#5a0a0a;font-weight:700;letter-spacing:.04em;}}
+.hp-BU      {{background:#241900;color:#ebaf37;border-color:#5a4108;font-weight:700;letter-spacing:.04em;}}
+.hp-PD      {{background:#180a2c;color:#b48ae8;border-color:#3a1e60;font-weight:700;letter-spacing:.04em;}}
 .hp-nagi    {{background:#1a1a28;color:#9aaabc;border-color:#2a3a50;letter-spacing:.04em;}}
 .hp-syusoku {{background:#001a14;color:#5affc0;border-color:#1a6048;font-weight:700;letter-spacing:.04em;}}
 .hp-fake    {{background:#280014;color:#ffaa00;border-color:#601830;font-weight:700;letter-spacing:.04em;animation:fake-blink 2s ease-in-out infinite;}}
@@ -270,9 +270,9 @@ tr.la .rl{{background:#060c12;border-right-color:#0a2a3a;color:#2a6a8a;}}
   <div class="leg-s">
     <h3>🌍 D1 Phase</h3>
     <div class="leg-r">
-      <span class="lc d-BU-on" style="border-bottom:3px solid #4a9aff">BU ON</span>
+      <span class="lc d-BU-on" style="border-bottom:3px solid #f0b429">BU ON</span>
       <span class="lc d-BU-off">BU off</span>
-      <span class="lc d-PD-on" style="border-bottom:3px solid #ef4040">PD ON</span>
+      <span class="lc d-PD-on" style="border-bottom:3px solid #9d6ee0">PD ON</span>
       <span class="lc d-PD-off">PD off</span>
     </div>
     <div class="ld2">下枠線=ADX(22)≥20 → トレンドON</div>
@@ -305,9 +305,9 @@ tr.la .rl{{background:#060c12;border-right-color:#0a2a3a;color:#2a6a8a;}}
   <div class="leg-s">
     <h3>📈 H4 Wave (手動)</h3>
     <div class="leg-r">
-      <span class="lc h-BU-on" style="border-bottom:3px solid #00e676">BU ON</span>
+      <span class="lc h-BU-on" style="border-bottom:3px solid #f0b429">BU ON</span>
       <span class="lc h-BU-off">BU off</span>
-      <span class="lc h-PD-on" style="border-bottom:3px solid #9050f0">PD ON</span>
+      <span class="lc h-PD-on" style="border-bottom:3px solid #9d6ee0">PD ON</span>
       <span class="lc h-PD-off">PD off</span>
       <span class="lc h-X">—</span>
     </div>
@@ -412,8 +412,8 @@ function buildCards(){{
   [
     {{lb:'現在週',v:CUR.replace('-W',' W'),n:'',f:'#7ab8ff',b:'#080d16'}},
     {{lb:'TIER',v:c.tier||'—',n:t.n,f:t.f,b:t.b}},
-    {{lb:'D1 Phase',v:c.d1_pattern||'—',n:`ADX${{c.d1_adx22!=null?c.d1_adx22.toFixed(0):'?'}} ${{c.d1_adx22>=20?'ON':'off'}}`,f:c.d1_pattern==='BU'?'#64b5f6':'#ef6060',b:c.d1_pattern==='BU'?'#001835':'#200008'}},
-    {{lb:'H4 Wave',v:c.h4_pattern||'—',n:`ADX${{c.h4_adx46!=null?c.h4_adx46.toFixed(0):'?'}}`,f:c.h4_pattern==='BU'?'#4dffa0':'#b07af8',b:c.h4_pattern==='BU'?'#001e10':'#1a0630'}},
+    {{lb:'D1 Phase',v:c.d1_pattern||'—',n:`ADX${{c.d1_adx22!=null?c.d1_adx22.toFixed(0):'?'}} ${{c.d1_adx22>=20?'ON':'off'}}`,f:c.d1_pattern==='BU'?'#ebaf37':c.d1_pattern==='PD'?'#b48ae8':'#8a8a98',b:c.d1_pattern==='BU'?'#241900':c.d1_pattern==='PD'?'#180a2c':'#101015'}},
+    {{lb:'H4 Wave',v:c.h4_pattern||'—',n:`ADX${{c.h4_adx46!=null?c.h4_adx46.toFixed(0):'?'}}`,f:c.h4_pattern==='BU'?'#ebaf37':c.h4_pattern==='PD'?'#b48ae8':'#8a8a98',b:c.h4_pattern==='BU'?'#241900':c.h4_pattern==='PD'?'#180a2c':'#101015'}},
     {{lb:'H4 ADX×DI',v:(ax.lbl==='HOT'?'⚠ ':'')+ax.lbl,n:c.h4_adx46!=null?`${{c.h4_adx46.toFixed(0)}} DI±${{c.h4_di_plus?.toFixed(0)}}/${{c.h4_di_minus?.toFixed(0)}}`:'—',f:axFg,b:axBg}},
     {{lb:'ADX Score',v:c.adx_score!=null?c.adx_score:'—',n:c.h1_avg_adx!=null?`H1ADX ${{c.h1_avg_adx.toFixed(1)}} / H4≥25:${{c.h4_pct25?.toFixed(0)}}%`:'MT5データ待ち',f:c.adx_score>=75?'#FFD700':c.adx_score>=60?'#69F0AE':c.adx_score>=45?'#82AAFF':c.adx_score>=30?'#FFA726':'#6a3030',b:c.adx_score>=75?'#1e1600':c.adx_score>=60?'#001e08':'#001428'}},
   ].forEach(x=>{{
