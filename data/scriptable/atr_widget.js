@@ -51,7 +51,11 @@ function writeJson(path, obj) {
 }
 
 async function loadState() {
-  return await readJsonSafe(STATE_PATH, { week_count: 0, last_reset: null });
+  return await readJsonSafe(STATE_PATH, {
+    week_count: 0,
+    last_reset: null,
+    prev_status: { h1_atr16: null, h1_atr32: null, h4_atr8: null },
+  });
 }
 function saveState(state) { writeJson(STATE_PATH, state); }
 
@@ -216,6 +220,12 @@ const URL_INC      = "scriptable:///run/atr_widget?action=increment";
 const URL_RESET    = "scriptable:///run/atr_widget?action=reset";
 const URL_SETTINGS = "scriptable:///run/atr_widget?action=settings";
 
+// 内部判定用：value と threshold から "red"/"green"/null を返す（下抜け通知のエッジ検出用）
+function statusOf(value, threshold) {
+  if (value == null) return null;
+  return value >= threshold ? "red" : "green";
+}
+
 function statusEmojiAtr(value, threshold) {
   if (value == null) return "⚪";
   return value >= threshold ? "🔴" : "🟢";
@@ -370,6 +380,25 @@ function addCountRow(widget, count, ideal, limit) {
   resetText.url = URL_RESET;
 }
 
+// ---------------- 下抜け通知 ----------------
+// 🔴加熱 → 🟢落ち着き へ切り替わったラインを 1通知にまとめて配信する。
+// ウィジェット文脈から Notification が飛ぶかは実機確認事項
+// （飛ばない場合はショートカットのバックグラウンド実行に切り替える保険を取る）。
+async function fireSettleNotification(crossed) {
+  const n = new Notification();
+  const names = crossed.map(c => c.label).join(", ");
+  n.title = `💧 落ち着き下抜け: ${names}`;
+  n.body = crossed
+    .map(c => `${c.label}  ${c.value.toFixed(2)} 🟢  (閾値 ${c.threshold.toFixed(1)})`)
+    .join("\n");
+  n.sound = "default";
+  try {
+    await n.schedule();
+  } catch (e) {
+    console.warn(`Notification schedule failed: ${e}`);
+  }
+}
+
 // ---------------- メイン ----------------
 async function main() {
   // 1. State load + 週次リセット判定
@@ -435,6 +464,33 @@ async function main() {
   }
   data.state = state;
   data.config = config;
+
+  // 4.5 下抜け通知（🔴加熱 → 🟢落ち着き のエッジを各ライン独立で検出）
+  //  - 自動更新／背景タップ時のみ判定（手動の +1・リセット・設定変更では鳴らさない）
+  //  - settings で閾値を変えた直後の見かけ上の遷移で誤発火しないよう action を限定
+  //  - prev_status は有効値のときだけ更新 = API一時失敗を跨いでも遷移を取りこぼさない
+  if (!state.prev_status) {
+    state.prev_status = { h1_atr16: null, h1_atr32: null, h4_atr8: null };
+  }
+  const notifyLines = [
+    { key: "h1_atr16", label: "H1(16)", value: data.h1_atr16, threshold: config.h1_atr16_high },
+    { key: "h1_atr32", label: "H1(32)", value: data.h1_atr32, threshold: config.h1_atr32_high },
+    { key: "h4_atr8",  label: "H4(8)",  value: data.h4_atr8,  threshold: config.h4_atr8_high },
+  ];
+  const doNotify = (action === null || action === undefined);
+  const crossedDown = [];
+  for (const ln of notifyLines) {
+    const now = statusOf(ln.value, ln.threshold);
+    const prev = state.prev_status[ln.key] ?? null;
+    if (doNotify && prev === "red" && now === "green") {
+      crossedDown.push(ln);
+    }
+    if (now !== null) state.prev_status[ln.key] = now;
+  }
+  saveState(state);
+  if (crossedDown.length > 0) {
+    await fireSettleNotification(crossedDown);
+  }
 
   // 5. ウィジェット構築 & 登録
   const widget = buildWidget(data);
