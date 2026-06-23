@@ -4,6 +4,8 @@
 //
 // 仕様: data/scriptable/SPEC_atr_widget_v1.md
 // 実装指示: data/scriptable/コー_impl_spec.md
+// 2026-06-23: readJsonSafe/checkWeeklyReset を壊れ state 耐性化
+//   （state.json の "null" 固着 → 毎回 line107 で死ぬ問題の根治・自己修復）
 //---------------------------------------------------
 
 const CONFIG = {
@@ -39,7 +41,13 @@ async function readJsonSafe(path, fallback) {
     if (!FM.fileExists(path)) return fallback;
     if (!FM.isFileDownloaded(path)) await FM.downloadFileFromiCloud(path);
     const text = FM.readString(path);
-    return JSON.parse(text);
+    const parsed = JSON.parse(text);
+    // JSON.parse("null") は例外を投げず null を返す。state ファイルが "null" や
+    // 壊れた非オブジェクトに化けると loadState() が null を返し、
+    // checkWeeklyReset(null) の state.last_reset で落ち続ける（自己修復不能）。
+    // オブジェクト以外は fallback に倒して根を断つ。
+    if (parsed === null || typeof parsed !== "object") return fallback;
+    return parsed;
   } catch (e) {
     console.warn(`readJsonSafe failed for ${path}: ${e}`);
     return fallback;
@@ -100,6 +108,14 @@ function getLastResetIso() {
 
 // state を必要に応じてリセットして返す
 function checkWeeklyReset(state) {
+  // 二重防御：readJsonSafe 側で弾く想定だが、ここでも壊れた state を正常化する
+  if (!state || typeof state !== "object") {
+    state = {
+      week_count: 0,
+      last_reset: null,
+      prev_status: { h1_atr16: null, h1_atr32: null, h4_atr8: null },
+    };
+  }
   const lastResetIso = getLastResetIso();
   if (!state.last_reset || state.last_reset < lastResetIso) {
     state.week_count = 0;
