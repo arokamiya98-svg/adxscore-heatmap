@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.aro.adxscore.hourly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/aro/Desktop/ADXSCORE/hourly_sync.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/aro/Desktop/ADXSCORE</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HOME</key>
+        <string>/Users/aro</string>
+    </dict>
+
+    <!-- 毎時 Minute=10 に1回発火（VPS の :00 push 完了後に受信するためオフセット） -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Minute</key>
+        <integer>10</integer>
+    </dict>
+
+    <!-- 単発ジョブ。デーモンにしない（KeepAlive=false） -->
+    <key>KeepAlive</key>
+    <false/>
+
+    <!-- ログイン直後にも1回 -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/aro/Desktop/ADXSCORE/hourly_sync.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/aro/Desktop/ADXSCORE/hourly_sync.log</string>
+</dict>
+</plist>
+<!--
+============================================================
+インストール（あろさんGO後・カットオーバー時に実施）
+============================================================
+このファイルはリポジトリ内の「コピー（正本）」。実機 launchd へは
+~/Library/LaunchAgents/ にコピーしてから load する。
+
+# 1. 旧 watcher を撤去（カットオーバー §4-D。GO後）
+launchctl unload ~/Library/LaunchAgents/com.aro.adxscore.watcher.plist 2>/dev/null
+rm -f ~/Library/LaunchAgents/com.aro.adxscore.watcher.plist
+#   ログイン項目 ADXSCORE_Watcher を「システム設定 > 一般 > ログイン項目」から解除
+#   rm -rf ~/Applications/ADXSCORE_Watcher.app
+
+# 2. 新 plist を LaunchAgents へコピーして load
+cp /Users/aro/Desktop/ADXSCORE/data/vps/launchd/com.aro.adxscore.hourly.plist \
+   ~/Library/LaunchAgents/com.aro.adxscore.hourly.plist
+launchctl load ~/Library/LaunchAgents/com.aro.adxscore.hourly.plist
+
+# 3. 確認
+launchctl list | grep adxscore.hourly
+#   → 毎時 Minute=10 に発火。手動テスト: launchctl start com.aro.adxscore.hourly
+
+# アンインストール（ロールバック §6）
+launchctl unload ~/Library/LaunchAgents/com.aro.adxscore.hourly.plist
+rm -f ~/Library/LaunchAgents/com.aro.adxscore.hourly.plist
+
+# ⚠️ TCC 注意: launchd 起動の /bin/bash が ~/Desktop/ADXSCORE を読めない場合
+#   （Operation not permitted がログに出る）、「システム設定 > プライバシーとセキュリティ
+#   > フルディスクアクセス」に /bin/bash を追加する。詳細は plist 同梱の README/報告参照。
+============================================================
+-->
