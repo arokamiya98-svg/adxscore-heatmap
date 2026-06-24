@@ -50,6 +50,8 @@ POLL_INTERVAL=2
 WRITE_SETTLE=2     # MT5 書き込み完了待ち（日次・単発出力）
 WEEKLY_SETTLE=10   # 週次は4スクリプト連続出力のためデバウンス長め
 GIT_CHECK_INTERVAL=60  # VPS push 取込: git fetch/pull は60秒に1回（2秒ポーリングとは別カウンタ）
+GIT_FETCH_TIMEOUT=15   # 穴1対策: git fetch の最大待ち秒（超過で強制中断→次サイクル再試行）
+GIT_PULL_TIMEOUT=45    # 穴1対策: git pull --rebase --autostash の最大待ち秒（超過で強制中断）
 
 # 入力 CSV の最新版（FX_*.csv）
 get_latest_input() {
@@ -130,12 +132,30 @@ check_freshness() {
   fi
 }
 
+# ── ポータブル timeout（macOSは timeout/gtimeout 非搭載のため自前実装）──
+# run_to <秒> <コマンド...> : 最大<秒>で実行、超過で TERM→2s後 KILL。戻り値=コマンドrc（timeout時は非0）。
+# 穴1対策: git は内蔵 timeout が無く、ロック競合/CPU飢餓で無限待ち → Bash約10分ハングの温床だった。
+# ここで強制的に断ち、watcher は「失敗扱い→次サイクル再試行」で自己回復する（既存の自己回復思想と整合）。
+# 出力は捨てる（囲う git 呼び出しは元々 >/dev/null silent）。kill 失敗は || true でガード（set -e 保険）。
+run_to() {
+  local secs="$1"; shift
+  "$@" >/dev/null 2>&1 &
+  local cmd_pid=$!
+  ( sleep "$secs"; kill -TERM "$cmd_pid" 2>/dev/null; sleep 2; kill -KILL "$cmd_pid" 2>/dev/null ) >/dev/null 2>&1 &
+  local killer_pid=$!
+  local rc=0
+  wait "$cmd_pid" 2>/dev/null || rc=$?
+  kill -TERM "$killer_pid" 2>/dev/null || true
+  wait "$killer_pid" 2>/dev/null || true
+  return $rc
+}
+
 # ── VPS が push した daily/ を git pull で取込 ──
 # Mac MT5 には出ないCSV（系統B/C）はファイル監視では拾えない。VPSが GitHub main へ
 # push する → ここで origin/main の進行を検知 → pull → daily/ に差分あれば日次カレンダー再生成。
 # set -e 下でも watcher が死なないよう、各 git 呼び出しは || / if でガードする。
 check_git_pull() {
-  git fetch origin main --quiet >/dev/null 2>&1 || return 0
+  run_to "$GIT_FETCH_TIMEOUT" git fetch origin main --quiet || return 0
   local local_head=$(git rev-parse HEAD 2>/dev/null || echo local)
   local remote_head=$(git rev-parse origin/main 2>/dev/null || echo remote)
   [ "$local_head" = "$remote_head" ] && return 0
@@ -143,7 +163,7 @@ check_git_pull() {
   local daily_changed=$(git diff --name-only HEAD origin/main -- mt5_data/daily/ 2>/dev/null)
   echo ""
   echo "[$(ts)] ▶ origin/main 更新検知 → git pull --rebase --autostash"
-  if git pull --rebase --autostash origin main >/dev/null 2>&1; then
+  if run_to "$GIT_PULL_TIMEOUT" git pull --rebase --autostash origin main; then
     if [ -n "$daily_changed" ]; then
       echo "[$(ts)]   daily/ 更新あり（git pull検知）"
       run_daily_safe "vps-daily"
@@ -151,7 +171,7 @@ check_git_pull() {
       echo "[$(ts)] ✅ git pull 完了（daily/ 変更なし＝週次②等の取込のみ）"
     fi
   else
-    echo "[$(ts)] ⚠️ git pull 失敗（watcher継続・次回 ${GIT_CHECK_INTERVAL}s 後に再試行）"
+    echo "[$(ts)] ⚠️ git pull 失敗/タイムアウト（watcher継続・次回 ${GIT_CHECK_INTERVAL}s 後に再試行）"
   fi
 }
 
