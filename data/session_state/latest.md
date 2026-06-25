@@ -29,7 +29,7 @@
 ## 📌 残タスク（次の一手）
 - **系統A watch の本物Snapshotテスト（あろさんGO判断・pending）**：`./update_mani.sh --watch` 起動→実MT5 Snapshot→`merge→generate→publish→自動exit` 完遂を実機確認（おぱテストは `touch` 擬似発火までは✅）。完遂したら系統A watch 日常採用GO。
 - **legacy `auto_sync_daily.sh` のアーカイブ**：新launchd運用が数日安定したら退避（ロールバック用に即削除しない）。
-- **次の毎時:10発火の確認**：launchd `com.aro.adxscore.hourly` が自動で回り続けてるか `hourly_sync.log` を時々見る（ExitStatus=0継続なら順調）。
+- ✅ **初の自動発火 確認済（2026-06-25 09:10:05→09:11:39・ExitStatus=0・常駐残らず）** — launchd自走を実証。以後は `hourly_sync.log` を時々見て ExitStatus=0継続なら順調。
 - **配色v0.9の「全体通し」横展開**（前回からの繰越）：① 全体像タブ円グラフ `d1_phase` 色（`generate_daily_calendar_v3.py` 2451-2453付近）② heatmap_v14 D1 Phaseレイヤー。色値 BU=`rgba(235,175,55)`/PD=`rgba(150,110,205)`/RANGE=灰。
 - 「データを使う側」他入口：インジ分析 / ロジック化（H1優位性・期待値）。
 
