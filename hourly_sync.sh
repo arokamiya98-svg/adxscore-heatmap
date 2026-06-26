@@ -27,13 +27,18 @@ cd "$(dirname "$0")"
 MT5_FILES="/Users/aro/Library/Application Support/net.metaquotes.wine.metatrader5/drive_c/Program Files/MetaTrader 5/MQL5/Files"
 DEST="mt5_data"
 
-# 週次CSV（MT5 Files → mt5_data 同期対象。run_pipeline.sh が sync_mt5_data.sh で同期する）
-WEEKLY_TARGETS=(
+# 週次再生成トリガ（2026-06-26 ②VPS書き移行で監視元を分離）
+#   ① 手描きwavelog: Mac MT5 Files を監視（あろさん手描き→Mac MT5実行→run_pipeline が sync で取込）
+#   ② 自動集計     : mt5_data/（git pull先）を監視（VPSが毎時EAで書き push → Step1 pull で受信）
+#                    ＝Macは②を作らない（受信のみ）。Mac MT5 の②出力は見ない。
+WAVELOG_TARGETS=(
   "FractalWaveLog_D1_v3_1.csv"
   "FractalWaveLog_D1_weekly.csv"
   "FractalWaveLog_H4_XAU.csv"
   "FractalWaveLog_H4_weekly.csv"
   "FractalWaveLog_H4_XAU_Vlines.csv"
+)
+AGG_TARGETS=(
   "H4PhaseAuto_weekly.csv"
   "ADX_Weekly_Above_v4.csv"
 )
@@ -132,9 +137,11 @@ else
   echo "[$(ts)] 日次: mt5_data/daily/*.csv 未受信（スキップ）"
 fi
 
-# ── Step 3: 週次（④）鮮度照合 → run_pipeline.sh ──────────────
-# MT5 Files の週次CSV が週次生成物(weekly_waves.json)より新しければ再生成。
-# run_pipeline.sh が sync_mt5_data.sh で MT5 Files → mt5_data 同期する。
+# ── Step 3: 週次（①手描き＋②自動集計）鮮度照合 → run_pipeline.sh ──
+# ① wavelog : Mac MT5 Files が weekly_waves.json より新しい（あろさん手描き→Mac MT5実行）
+# ② 自動集計: mt5_data/（VPS push→git pull受信）が weekly_waves.json より新しい
+#   run_pipeline.sh が ①は sync_mt5_data.sh で取込み、②は git pull 済みの mt5_data/ を読む。
+#   ※②は VPS から git pull で届く＝ここで MT5 Files を見ると Mac EA を外したとき検知漏れになる。
 WEEKLY_GEN="data/weekly_waves.json"
 if [ -f "$WEEKLY_GEN" ]; then
   WEEKLY_GEN_MTIME=$(stat -f %m "$WEEKLY_GEN" 2>/dev/null || echo 0)
@@ -142,18 +149,31 @@ else
   WEEKLY_GEN_MTIME=0
 fi
 WEEKLY_NEWER=false
-for f in "${WEEKLY_TARGETS[@]}"; do
+WEEKLY_REASON=""
+# ① 手描きwavelog（Mac MT5 Files 監視）
+for f in "${WAVELOG_TARGETS[@]}"; do
   SRC="$MT5_FILES/$f"
   if [ -f "$SRC" ]; then
     M=$(stat -f %m "$SRC" 2>/dev/null || echo 0)
     if [ "$M" -gt "$WEEKLY_GEN_MTIME" ]; then
-      WEEKLY_NEWER=true
-      break
+      WEEKLY_NEWER=true; WEEKLY_REASON="①wavelog:$f"; break
     fi
   fi
 done
+# ② 自動集計（mt5_data/ = VPS push→git pull受信 を監視）
+if [ "$WEEKLY_NEWER" = false ]; then
+  for f in "${AGG_TARGETS[@]}"; do
+    SRC="$DEST/$f"
+    if [ -f "$SRC" ]; then
+      M=$(stat -f %m "$SRC" 2>/dev/null || echo 0)
+      if [ "$M" -gt "$WEEKLY_GEN_MTIME" ]; then
+        WEEKLY_NEWER=true; WEEKLY_REASON="②agg(VPS受信):$f"; break
+      fi
+    fi
+  done
+fi
 if [ "$WEEKLY_NEWER" = true ]; then
-  echo "[$(ts)] ▶ 週次: MT5 Files 週次CSV > weekly_waves.json → run_pipeline.sh --no-open"
+  echo "[$(ts)] ▶ 週次: $WEEKLY_REASON > weekly_waves.json → run_pipeline.sh --no-open"
   rc=0
   ./run_pipeline.sh --no-open > /tmp/_hourly_pipe.txt 2>&1 || rc=$?
   grep -E "(Step|完了|iCloud|GitHub|push|更新|⚠️|Error|Traceback)" /tmp/_hourly_pipe.txt | head -15 || true

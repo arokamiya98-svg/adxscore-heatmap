@@ -39,10 +39,10 @@ VPSのMT5 EAが毎時焼く日次CSVを、**git経由でMacに渡し、Macがト
 | # | 分類 | ファイル | 生成者 | 手描き依存 | git方針 |
 |---|------|---------|--------|-----------|---------|
 | ① | 手描き波形 | `FractalWaveLog_D1_v3_1` / `_D1_weekly` / `_H4_XAU` / `_H4_weekly` / `_H4_XAU_Vlines` | Mac手動MT5 | ✅依存（認知ステップ） | **.gitignore**（Macローカル専用・再生成可） |
-| ② | 自動集計 | `ADX_Weekly_Above_v4`（+v3） / `H4PhaseAuto_weekly` | MT5自動（ライン不要） | ❌不要 | **git追跡 維持**（ADXスコア計算元・将来VPS化候補） |
+| ② | 自動集計 | `ADX_Weekly_Above_v4`（+v3） / `H4PhaseAuto_weekly` | **VPS EA（毎時）** | ❌不要 | **git追跡・VPSが `mt5_data/`直下にpush**（2026-06-26 VPS書き移行・§13。ADXスコア計算元） |
 | ③ | 日次 | `signal_fires` / `daily_aggregate` / `daily_mfe_mae_48h` | VPS EA（毎時） | ❌不要 | **`mt5_data/daily/` に分離・VPSがpush** |
 
-**設計の肝**：①は手描き＝認知ステップ（[[recognition-route-purity-and-manual-lines]]）でMacに残す資産。②は手描き非依存＝**系統B/Cの次にEA化できる自動化資産**だから、①と一緒くたに沈めない。③が今回の動脈本体。
+**設計の肝（軸＝あろさんの手作業 か / 自動化できる か）**：①は手描き＝認知ステップ（[[recognition-route-purity-and-manual-lines]]）でMacに残す**聖域**。②は手描き非依存＝自動化資産で、**2026-06-26 に系統B/C方式でEA化しVPS書きへ移行（§13）**。→ Mac手作業は①手描きと系統A Snapshotだけ、②③はVPS自動化に集約。③が動脈本体。
 
 **rebase衝突が構造的に消える理屈**：
 ```
@@ -51,7 +51,7 @@ VPSのMT5 EAが毎時焼く日次CSVを、**git経由でMacに渡し、Macがト
 ③ daily/ をVPSがcommit/push  → クリーン維持
 → mt5_data/ が常時クリーン → git pull --rebase が事故らない
 ```
-現状の火種は②が「Mac生成されてもcommitされず古いまま（M放置）」な点。これは `run_pipeline.sh` の add対象に②を足すだけで消える（§6）。
+当初の火種「②がMac生成されてもcommitされず古いまま（M放置）」は `run_pipeline.sh` add で一旦解消（§6）→ **2026-06-26 に②自体をVPS書きへ移行し、Macは②を書かない＝火種ごと消滅（§13）**。
 
 ---
 
@@ -98,8 +98,8 @@ mt5_data/
 ├── FractalWaveLog_H4_weekly.csv      │
 ├── FractalWaveLog_H4_XAU_Vlines.csv  ┘
 ├── ADX_Weekly_Above_v4.csv           ┐ ② 自動集計
-├── ADX_Weekly_Above_v3.csv           │ → git追跡維持
-├── H4PhaseAuto_weekly.csv            ┘   （Macがpush）
+├── ADX_Weekly_Above_v3.csv           │ → git追跡（v3は凍結フォールバック）
+├── H4PhaseAuto_weekly.csv            ┘   （VPSが毎時EAでpush・2026-06-26〜 §13）
 └── daily/                            ┐ ③ 日次データプール
     ├── signal_fires.csv              │ → git追跡
     ├── daily_aggregate.csv           │   （VPSがpush）
@@ -174,7 +174,9 @@ fi
 
 ---
 
-## 6. ②自動集計の push運用追加（Mac側・`run_pipeline.sh`）
+## 6. ②自動集計の push運用追加（Mac側・`run_pipeline.sh`）〔★2026-06-26 §13 で反転・歴史的記録〕
+
+> ⚠️ **2026-06-26 §13 で反転（Macは②を書かない）**：下記「②を `run_pipeline.sh` の add に足す」は移行**前**の運用。現在は add から②(v4/H4Phase)を**除外**し、②はVPSが `mt5_data/`直下に書く。以下は経緯として残す。
 
 現状 Step5 は `git add docs/heatmap_v14.html data/weekly_waves.json` のみ。ここに②を追加し、②のM放置を解消：
 
@@ -270,7 +272,7 @@ schtasks /Create /TN "ADXSCORE_DataPool_PM" /TR "C:\Users\Administrator\adxscore
 
 - [ ] **push頻度**：1日2回が適切か、毎時要るか（フォワードで体感）
 - [ ] **_EA suffixファイルの掃除**：`daily_aggregate_EA.csv` 等は回帰検証名残 → VPS Filesから削除して良い（無印と完全同一を確認済）
-- [ ] **②のVPS化（将来）**：ADX_Weekly / H4PhaseAuto も手描き不要 → 系統B/C方式でEA化すればデータプール拡大。今回の射程外、次の大トラック候補
+- [x] **②のVPS化**：ADX_Weekly / H4PhaseAuto を系統B/C方式でEA化しVPS書きへ移行＝**2026-06-26 完了（§13）**。データプール拡大。
 - [ ] **Mac watcherの監視方式**：git pull検知をどう実装するか（mtimeポーリング→`git fetch`比較 等）
 - [ ] **タスクスケジューラ vs 常駐watcher**：VPSはスケジューラ採用だが、将来「EA出力検知で即push」にするなら別実装
 - [ ] **conflict時の作法**：VPSは `daily/` のみ・Macは②docs のみ＝別ファイルで衝突しない設計だが、初回数サイクルは手動で挙動確認
@@ -322,7 +324,7 @@ FX_*.csv（iPhone書出し）
 
 ### 12.4 残課題（次トラック候補）
 
-- ②のVPS化（ADX_Weekly / H4PhaseAuto も EA化＝データプール拡大・次の大トラック）
+- ~~②のVPS化（ADX_Weekly / H4PhaseAuto も EA化）~~ → **2026-06-26 完了（§13）**
 - FXベースラインskip 対策（12.1）
 - `_EA` suffix掃除 / 系統A設計ズレ（`mt5_data/{trade_input,trades_enriched}.csv` を data/trades/寄せ or §1修正）
 - push頻度の調整（1日2回で開始→体感で増減）
@@ -338,3 +340,41 @@ FX_*.csv（iPhone書出し）
 - **④ 方向の素直さ**: 6/19（下落日）buy_mfe(8.28) < buy_mae(89.45)、sell優位が素直に出た＝14:00局所谷拾い問題の解消を確認。bars_traced は 6/19=21・6/18=44(partial)・6/17以前=48(フル)＝48h未経過の正常グラデーション。
 
 **残課題**: ②のServerToJst固定オフセット（12.4に追加・優先度低・表示用なら放置可）。aggregateにD1始値列が無く列レベルの直接突合ができない点は、必要なら系統B EAにd1_open列追加で厳密照合可（要設計判断＝メインおぱ案件）。
+
+---
+
+## 13. ②自動集計のVPS書き移行（2026-06-26 / ブン・配管＆ドキュメント）
+
+> 指示書: `data/vps/ブン指示書_②自動集計VPS書き移行_v1.md`。実機VPS操作（RDP/F7/アタッチ）はあろさん担当、ブンは配管・住み分け・手順書まで。
+
+### 13.0 根っこ（あろさん明言）
+CSVは「場所(Mac/VPS)」でなく「**あろさんの手作業 か / 自動化できる か**」で分ける。①手描きwavelog・系統A Snapshot＝**Mac聖域**（手で作る認知ステップ）／②自動集計・③daily＝**VPS自動化**。狙い＝手で作れない所は全部自動化し、あろさんは手描きとSnapshotに集中。→ ②を「Mac手動Script→push」から「**VPS毎時EA→push**」へ倒す。
+
+### 13.1 成果物EA（あろさんがVPS配置・F7コンパイル必須）
+- `signals/ADX_Weekly_Above_EA_v1.mq5` → `ADX_Weekly_Above_v4.csv`（H1アタッチ・UTF-16 FILE_CSV|FILE_UNICODE）
+- `signals/ARO_H4PhaseAuto_EA_v1.mq5` → `H4PhaseAuto_weekly.csv`（H4アタッチ・UTF-16 FILE_TXT|FILE_UNICODE）
+- 出力名はScript版と同一（_EA suffix無し）＝VPS push がそのまま拾える。
+
+### 13.2 (B) VPS push 配管拡張（`scripts/vps_data_pool_push.sh`）
+- `AGG_FILES`（v4 / H4Phase）を追加し、MT5 Files → `mt5_data/`**直下**へ `cp`（③は従来どおり `daily/`）。UTF-16はバイト保存でそのまま。
+- 無変更スキップ判定・`git add` を②③両方に拡張（`git add mt5_data/daily/ "${AGG_PATHS[@]}"`）。①手描きwavelogには触らない。
+- `.bat` はラッパー（`.sh` を呼ぶだけ）＝変更不要。`DRY_RUN=1` で②③の拾い状況を事前確認可。
+
+### 13.3 (C) Mac側の②書き停止（二重書き＝コンフリクト防止）★最重要
+移行前は Mac MT5の②EA出力を毎時 sync→push していた（19:10ログが現行犯）。これを**全経路停止**：
+| スクリプト | 変更 |
+|---|---|
+| `scripts/sync_mt5_data.sh` | `FILES` から②(v4/H4Phase)を除外＝MT5 Files→mt5_data の**実コピー停止**。①wavelog＋v3は残置 |
+| `run_pipeline.sh` Step5 | `git add` から②(v4/H4Phase)を除外＝②の**実push停止**。Macは自分の生成物(heatmap/weekly_waves.json)だけpush |
+| `hourly_sync.sh`（本番・launchd毎時10分） | 週次トリガを分離：**①wavelog=Mac MT5 Files監視 / ②=`mt5_data/`(git pull受信)監視**。②は受信で再生成が走る |
+| `auto_sync_daily.sh`（停止中・旧watcher） | ②監視を除外＋復活時注意書き（hourly_syncに置換済で通常非稼働＝kill/再起動不要） |
+
+> **トリガ鋳直しの肝**：移行後の②はVPS push→git pullで `mt5_data/`直下に届く。旧 `hourly_sync` Step3は「Mac MT5 Filesの②」を見ていたため、**Mac EAを外すと②受信を検知できずheatmapが古くなる**。監視元を `mt5_data/`（git pull先）へ移し、Mac EAの有無に依存せず②受信→heatmap再生成が回るようにした（§5完了条件「hourly_syncが②受信→heatmap再生成」を満たす）。
+
+### 13.4 v3 の扱い
+`ADX_Weekly_Above_v3.csv` は旧版フォールバック。Mac MT5は既に未生成（凍結・5/28）、VPSも書かない＝二重書き対象外。指示書の②スコープ（v4/H4Phase）外なので**触らず残置**（sync FILES／run_pipeline addとも列挙は残すが差分が出ず実質no-op）。retireするかは要判断＝メインおぱ案件。
+
+### 13.5 順序の鉄則・完了条件
+- 順序：**(B)(C)整備 → あろさんVPS配置（F7→アタッチ→AutoTrading ON→切断で抜ける）→ 観察**。(C)完了まで本番移行（VPS push）しない。
+- 進行中週(W26)は毎時動く＝②は毎時差分が常態（③と同じ）。**固定値件数assert禁止**（[[vps-daily-automation-ea-design]]）。
+- 完了確認：VPS 2本EAが毎時②CSV更新→push / Mac hourly_syncが②受信→W26のADXスコア・H4Phaseが毎時動くheatmap再生成 / Mac側②書き経路停止（二重書き無し）をpushログで確認 / 1〜2hコンフリクト無し。

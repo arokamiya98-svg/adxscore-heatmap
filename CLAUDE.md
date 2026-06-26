@@ -290,8 +290,8 @@ ADXSCORE/
 ├── auto_sync_daily.sh                ← Mac常駐watcher（週次/日次/iCloud入口を監視）
 ├── mt5_data/                          ← MT5/VPS由来CSV
 │   ├── FractalWaveLog_*.csv           ← ① 手描き波形（.gitignore・Macローカル専用・再生成可）
-│   ├── ADX_Weekly_Above_v4.csv        ← ② 自動集計（ADXスコア元・git追跡・Macがpush）
-│   ├── H4PhaseAuto_weekly.csv         ← ② 自動集計（H4 Phase 5段階）
+│   ├── ADX_Weekly_Above_v4.csv        ← ② 自動集計（ADXスコア元・git追跡・VPSが毎時EAでpush 2026-06-26〜）
+│   ├── H4PhaseAuto_weekly.csv         ← ② 自動集計（H4 Phase 5段階・VPSが毎時EAでpush 2026-06-26〜）
 │   ├── trade_input.csv / trades_enriched.csv  ← 系統A 成績（Mac専管・iPhone入力由来）
 │   └── daily/                         ← ③ 日次データプール（VPS EA毎時→VPSがpush）
 │       ├── signal_fires.csv
@@ -645,7 +645,7 @@ data/session_state/
 - **ブン定義**: `.claude/agents/bun.md`
 
 **最小限おさえる3点（VPS関連を触る時の入口・詳細はブンと本籍doc）**:
-1. **CSV 3分類**: ①手描き波形=Macローカル(.gitignore) / ②自動集計=Macのみ書く(git追跡) / ③日次daily=VPSのみ書く。この住み分けで `mt5_data/` が常時クリーン＝`git pull --rebase` 無事故。
+1. **CSV 3分類（軸＝あろさんの手作業 か / 自動化できる か）**: ①手描き波形=**Mac聖域**(.gitignore・あろさん手描き＝認知ステップ) / ②自動集計=**VPSが毎時EAで書く**(git追跡・2026-06-26 VPS書き移行) / ③日次daily=VPSのみ書く。①だけMac手作業、②③はVPS自動化＝Macは②③とも受信のみ。この住み分けで `mt5_data/` が常時クリーン＝`git pull --rebase` 無事故。
 2. **起動作法**: VPS↔Macはパラレル運用（同じmainを書き合う）。`git pull --rebase` で始め、push前も `git pull --rebase`。RDPは「切断」で抜ける（ログオフ厳禁＝schtasks継続）。
 3. **個人情報の線引き（あろさん確定 2026-06-19）**: NGは具体的な口座番号のみ。成績・損益・ロット・ロジックは公開OK ＝ docs/ カレンダー公開は継続OK。
 

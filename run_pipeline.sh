@@ -69,10 +69,12 @@ echo ""
 echo "▶ Step 5: GitHub Pages に自動push"
 cd "$(dirname "$0")"
 if git rev-parse --git-dir > /dev/null 2>&1; then
+  # ② 自動集計（ADX_Weekly_Above_v4 / H4PhaseAuto_weekly）は 2026-06-26 VPS書き移行で add 除外。
+  #   VPSが毎時EAで書き push する → Mac は受信のみ＝ここで push すると二重書きになる。
+  #   Mac が push するのは自分の生成物（heatmap_v14.html / weekly_waves.json）。
+  #   v3 は凍結フォールバック（差分が出ないので実質no-op）。
   git add docs/heatmap_v14.html data/weekly_waves.json \
-          mt5_data/ADX_Weekly_Above_v4.csv \
-          mt5_data/ADX_Weekly_Above_v3.csv \
-          mt5_data/H4PhaseAuto_weekly.csv
+          mt5_data/ADX_Weekly_Above_v3.csv
   git commit -m "weekly update $(date '+%Y-%m-%d')" 2>/dev/null || echo "  (変更なし)"
   git push origin main && echo "🚀 GitHub Pages 更新完了！" || echo "⚠️  push 失敗（手動で git push してね）"
 else

@@ -22,13 +22,19 @@ echo ""
 mkdir -p "$DEST"
 
 # コピー対象ファイル一覧
+# ── ② 自動集計（ADX_Weekly_Above_v4 / H4PhaseAuto_weekly）は 2026-06-26 VPS書き移行で除外 ──
+#   ブン指示書_②自動集計VPS書き移行_v1。②は VPS が毎時EA(ADX_Weekly_Above_EA_v1 /
+#   ARO_H4PhaseAuto_EA_v1)で書き、vps_data_pool_push.sh が push する → Mac は git pull で受信のみ。
+#   ここで Mac MT5 Files からコピーすると②を両マシンが書く＝二重書きでコンフリクトになるため停止。
+#   ※ ADX_Weekly_Above_v3.csv は旧版フォールバック（Mac MT5は既に未生成＝凍結・VPSも書かない）。
+#     無害なため列挙のみ残置（src 未生成なら "未生成" 表示でスキップされる）。
 FILES=(
-  "FractalWaveLog_D1_v3_1.csv"       # D1 波形レベル（必須）
-  "FractalWaveLog_D1_weekly.csv"      # D1 週次時系列（v3.2スクリプトで生成）
-  "FractalWaveLog_H4_XAU.csv"        # H4 波形レベル（必須）
-  "FractalWaveLog_H4_weekly.csv"     # H4 週次時系列（H4 v3.1スクリプトで生成）
-  "ADX_Weekly_Above_v4.csv"          # H1/H4 ADX週次集計 v4（ADXスコア計算元・H1=32 H4=46）
-  "ADX_Weekly_Above_v3.csv"          # H1/H4 ADX週次集計 v3（旧版・フォールバック用）
+  "FractalWaveLog_D1_v3_1.csv"       # ① D1 波形レベル（必須・Mac聖域）
+  "FractalWaveLog_D1_weekly.csv"      # ① D1 週次時系列（v3.2スクリプトで生成）
+  "FractalWaveLog_H4_XAU.csv"        # ① H4 波形レベル（必須）
+  "FractalWaveLog_H4_weekly.csv"     # ① H4 週次時系列（H4 v3.1スクリプトで生成）
+  "FractalWaveLog_H4_XAU_Vlines.csv" # ① H4 縦線データ（H4 v3.1 補助出力）
+  "ADX_Weekly_Above_v3.csv"          # ② 旧版フォールバック（凍結・VPSも書かない・無害残置）
 )
 
 COPIED=0

@@ -36,14 +36,16 @@ TARGETS=("trades_enriched.csv")
 
 # 監視対象（週次マップ用）— 更新されたら run_pipeline.sh で週次ヒートマップを再生成
 # WaveLog にライン引き → MT5 週次スクリプトを回す → ここが検知して自動で最新版＆push
+# ⚠️ 本スクリプトは hourly_sync.sh（launchd com.aro.adxscore.hourly）に置換済の旧watcher（常駐版）で
+#    通常は稼働しない。② 自動集計（H4PhaseAuto_weekly / ADX_Weekly_Above_v4）は 2026-06-26 VPS書き
+#    移行で Mac は受信のみ＝ここで Mac MT5 Files を監視しない（①手描きwavelogのみ）。
+#    万一この旧watcherを復活させる場合は hourly_sync.sh Step3（②は mt5_data/ を監視）を移植すること。
 WEEKLY_TARGETS=(
   "FractalWaveLog_D1_v3_1.csv"
   "FractalWaveLog_D1_weekly.csv"
   "FractalWaveLog_H4_XAU.csv"
   "FractalWaveLog_H4_weekly.csv"
   "FractalWaveLog_H4_XAU_Vlines.csv"
-  "H4PhaseAuto_weekly.csv"
-  "ADX_Weekly_Above_v4.csv"
 )
 
 POLL_INTERVAL=2
