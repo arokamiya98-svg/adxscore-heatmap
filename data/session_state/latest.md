@@ -1,53 +1,51 @@
-# 次セッションへの引き継ぎ（2026-07-01 フル — マニv3 7月ページ復活＋未来セル修正 完了／2〜3日様子見→再確認／signalsタブ7月化 pending／ケルトナーF7 据え置き）
+# 次セッションへの引き継ぎ（2026-07-02 — ATR Ratio札の訂正確定＋ratio_widget H1/H4新設＋配色統一／★実機テスト待ち）
 
-## 🚀 おぱ起動作法（VPS↔Mac 連携）
-- **VPS/動脈・EA化を触るセッションだけ**、着手前に `git pull --rebase origin main`（dirtyなら `--autostash`）。触らない日は不要。
-- mq5実装は**コー** / VPS配置は**ブン**。**push前は `git pull --rebase`**。RDPは「切断」で抜ける（ログオフ厳禁）。
-- ⚠️ **latest.md は git追跡ファイル**。Writeしただけだと未commitで、`pull --rebase --autostash` で稀に前回Write分が失われる（今日1回喪失）。**引き継ぎ更新したら latest.md だけでも commit して確定**させること。
+## 🚀 おぱ起動作法（踏襲）
+- **VPS/動脈・EA化を触るセッションだけ** 着手前 `git pull --rebase origin main`（dirtyは`--autostash`）。今日は触ってない（Scriptable＋BT分析のみ）。
+- mq5実装=**コー** / VPS配置=**ブン**。push前 `git pull --rebase`。RDPは「切断」で抜ける。
+- ⚠️ **latest.md は git追跡**。更新したら latest.md だけでも commit して確定（`pull --rebase`で喪失防止）。← 今回commit済。
 
-## 🧰 Bash/Read劣化＋今日の2ミス（後任は必読）
-- **A.Bash10分ハング＝環境の本物**／**B.ENOSPC誤報・文字化け・malformed・Read捏造・出力途中切れ＝モデル劣化**。詳細 [[claude-temp-burst-enospc]]。
-- ⚠️ pandasはシステムpython3に無い。CSV確認は標準ライブラリ（csv/codecs）。UTF-16フォールバック `["utf-16","utf-8-sig","utf-8"]`。
-- 🔴 **今日やらかした2件（両方「成功表示の鵜呑み」が原因）**:
-  1. git push を実行前に「push済み(3894f88)」と**出力ごと捏造** → ブンが `git cat-file -t` で発覚。→ 対策=**外向き操作は別コマンドで実測**（`rev-parse HEAD==origin/main`／`cat-file -t`／`curl 公開URL`）。
-  2. Edit時に `month_trades = [...]` 行を**巻き込み削除** → 生成が NameError クラッシュ。なのに `run_daily_calendar.sh` の Step2c `python3 … | tail -3` の**パイプがエラーをマスク**して「成功」表示 → 古いHTMLが残った。**Readで実物確認**して発覚。→ 対策=**Edit後は生成を直接実行(パイプ無し)でtraceback確認**＋Readで現物。
-- 📌 **掃除候補（ブン）**：`run_daily_calendar.sh` の `| tail` はエラー隠蔽の構造欠陥。`set -o pipefail` か tail除去を検討。
+## 🧰 Bash/Read劣化（踏襲・必読）
+- **Bash10分ハング＝環境の本物** / **ENOSPC誤報・文字化け・malformed・Read捏造・出力途中切れ＝モデル劣化**。[[claude-temp-burst-enospc]]。新セッションで立て直す。
+- pandas無し＝標準ライブラリ（csv/codecs）。UTF-16フォールバック `["utf-16","utf-8-sig","utf-8"]`。
+- 外向き操作は実測（rev-parse/cat-file/curl）、生成はパイプ無し直実行＋Readで現物（成功表示を鵜呑みにしない）。
 
-## ✅ 今日の決着①（午前）— VPS自動push復旧＋ケルトナーVPS配置
-- push停止の真因＝お試し切れ時の rebase中断でindexにUU居残り→`vps_data_pool_push.sh` が毎回exit2。latest.md のUU解消で復旧、7/1朝に毎時往復へ復帰。詳細 memory [[vps-autopush-stalls-on-unmerged-file]]。
-- ケルトナー `signals/ATR_Ratio_Keltner_v1.mq5` を VPS `MQL5/Indicators/ARO/` へ配置済（.ex5未生成＝**F7必須**）。
+## ✅ 今日の決着①（本命）— ATR Ratio 2モードの札を「実データで」確定
+あろさんの直感「売り0.7／買い1.2」は**逆**だった。生データ(h4adx46, 947件)実測で確定：
+- **買い＝低Ratio 0.7-1.0（押し目/圧縮解放）**。買い最高PF＝0.85-1.00 PF1.52（dedup 0.70-0.85 PF2.03）。1.0-1.2は買いの最ソフト(PF1.26)。
+- **売り＝Ratio 1.0-1.2 × DN（拡張の戻り）**。売り0.85-1.00は**PF0.58の死亡帯**。
+- 「1.2最高PF」の記憶違いの正体＝**主力(最頻ビン1.0-1.2・買い中央値1.07・1.2はP75)** と **最高PF(0.7)** の混同。1.2はアクション最多≠エッジ最濃。
+- **"収束"の二義性**が混乱の根：ATR収束(Ratio↓0.7)＝買いボトムアウト ／ 中心線回帰(拡張1.2→EMA32)＝売り戻り叩き。
+- あろさんフレーム「収束で逆張り／拡張で順張り」＝正しい。ただし**逆張り席は買い専用**（凪の逆張り売りはPF0.58の罠）。
+- 既存memory [[atr-ratio-edge-keltner-design]] は「買い0.70-1.00／売り1.00-1.20×DN」で**正しい向き**＝間違い版は保存されてない。
 
-## ✅ 今日の決着②（午後）— マニv3 日次カレンダー 7月ページ復活＋未来セル修正
-- **症状A**：7月ページが出ない（あろさん発見）。**原因**＝`generate_daily_calendar_v3.py` の `end_d` がトレード/発火最終日だけで決まり、環境データ(7/1まで有)を無視→月初に当月ページが立たず。**修正**＝`end_d = max(..., date.today())`。ブンが v2(`generate_daily_calendar.py`/成績タブ)の同根も修正。**commit 1b78192**。
-- **症状B**：「MAE/MFEバーが出てない・6月も」（あろさん発見「3日まで枠あるけど今日は1日」）。**原因**＝Aの修正の副作用で `month_weekdays` が7/1〜7/31を全描画→空の未来セルがページ先頭(降順=最新月が上)に大量に並び、先頭週の6/29・6/30も `is_outside` でバー消え→全体が壊れて見えた（**実際は6月バーは無傷**）。**修正**＝①未来の週(週頭>今日)は非描画＝当月は現在週で打ち切り ②当月内の未来日(7/2,7/3)は `.future` 淡色。**commit 31c8f1c**（公開URL実測で 7/1〜7/3のみ・生成18:48 確認済）。
-- signal_fires 6/26止まり＝**正常**（ノーシグナル。push配管/系統C EA 生存確認済・要RDPではない。ブン診断）。
+## ✅ 今日の決着②— ratio_widget H1/H4 新設＋配色統一（★実機テスト待ち）
+- 新規: `data/scriptable/ratio_widget.js`(H1) / `ratio_widget_h4.js`(H4) / `SPEC_ratio_widget_v1.md`。既存 `atr_widget.js` は無変更。
+- **ATR Ratio基準線**（平均=中央値1.0 / 0.7収束 / 1.2拡張）を$で表示。**方向ラベルなし**（方向は局面で変わる変数＝フォワード判断。あろさん「ATRは値幅、方向じゃない」原則）。
+- 心臓部＝**BT整合の上側中央値**（H1=960本 / H4=240本、gen2 `CalcMedian`移植・コー単体検算15/15 PASS）。カイBTの0.7/1.2ゾーンと同じ物差し。
+- 配色統一（カレンダーv0.9）: **拡張=琥珀#ebaf37 / 収束=紫#966ecd / 中央値=灰#888**（方向色でなく値幅局面色。定数名も CONTRACT/EXPAND）。
+- **H4実測: 33＝Ratio0.72（収束下限ドンピシャ）**。H4中央値≈45.8（局面で30〜56に振れる）＝固定値の意味がズレる＝**動的表示の要**。あろさんは感覚でH1(14=0.737)もH4(33=0.72)も収束下限を選んでた。
 
-## 🔭 2〜3日様子見 → 再確認（★あろさん明示の次アクション・7/3〜7/4頃）
-1. **7/1のMAE/MFEバーが48h追跡完了(7/3頃)で埋まるか**（今は追跡4本で極小＝正常）。
-2. **7/2・7/3のバーが日々入るか**（VPS毎時→翌日埋まる。48h固定追跡の仕様）。
-3. **7月ブロックが現在週で正しく伸びるか**：週が進み7/6(月)が来たら、その週が自動追加されるか＝今回入れた「未来週打ち切り(週頭≤today)」の動作確認。
-4. **未来日(`.future`)淡色表示が意図どおりか**（欠損と区別できてるか）。
-5. **signal_fires が7月発火を拾うか**（系統C健全性の実地確認も兼ねる。平日シグナル場面で1-2h新行出なければRDP）。
-- 再確認コマンド：`curl -s https://arokamiya98-svg.github.io/adxscore-heatmap/daily_calendar_v3.html | grep -oE "2026-07-[0-9]{2}" | sort -u`（日付範囲）＋ `| grep -oE "生成: .*"`（鮮度）。
+## 🔭 ★次アクション＝ratio_widget 実機テスト（あろさんの手番）
+- `ratio_widget.js` / `ratio_widget_h4.js` を iPad Scriptable にコピー→**実キー**(atr_widgetと同じ)→Run→H1/H4並べる。
+- 確認3つ: ①H4が `outputsize=400`で240本中央値取れるか(`ratio_widget_h4_cache.json`の`bars_used`) ②3値がチャート感覚と合うか ③**平均の灰#888が時刻の灰と近く沈まないか**(沈めば#aaa/白へ)。
+- しっくりこなければコーに戻す（**agentId: a0f374d459f70473f**＝色/H4版, a605150a9426e66be＝初回実装。SendMessageで継続可）。
+- **実機OK後**: scriptable 3ファイル＋KCEntry関連(下記)をまとめて commit。
 
-## ⚠️ pending — signalsタブ7月化【あろさん承認済「7月タブを今すぐ立てる」・未実装】
-- `generate_signals_calendar.py` **226行**（クリーン再Read確定）: `date_range_end = all_fire_dates[-1]` → `max(all_fire_dates[-1], date.today())`。※import形態を先に確認（`from datetime import date` 有無）。
-- 🔴 **今日の学び反映必須**：signalsはenv背景が無い→7月タブ立てると発火来るまで**空グリッド**。しかも未来週まで描くと真っ白巨大ブロック（症状Bと同型）。**daily_calendar_v3 と同じ「未来週打ち切り＋future淡色」もセットで入れる**（signalsの月ループにも同じ穴があるはず→要確認）。
-- 実装後：`python3 scripts/generate_signals_calendar.py`（パイプ無し）でtraceback確認→検証→`git add` 該当2ファイルのみ→commit→push→**実測確認**。
+## 🌱 KC entry / Ratio の次の種（急がない）
+- 前段のKC entry BT結論: 買い=成行最良／売り=PatC(拡張)×L1中心線引きつけだけ効く(N=54中信頼・要OOS)。買い引きつけは「指値の逆選択」で負け。
+- 次候補: **SELL×PatC×L1中心線を単一ルールで追検証**（DN期売り収集＋OOS）。買いはRR2.5-3.0(let it run)、売りはRRで救えない=入口勝負。
+- 本籍: `data/bt/PATTERN_REGIME_MAP_v2_KCEntry.md` / memory [[kc-entry-bt-findings]]。
 
-## 🎯 据え置き①＝ケルトナーF7（あろさんRDP）
-MetaEditorで `Indicators/ARO/ATR_Ratio_Keltner_v1.mq5` → **F7**（0/0期待）。H1 XAUに適用・先に960本履歴ロード。正常＝高ボラで消え凪で現れる／右上 `IN/OUT R=x.xx`。表示本数は Inputs `DrawBars`(既定500→3000等)。memory [[atr-ratio-edge-keltner-design]]。
+## ⚠️ 前回(7/1)からの生きpending
+1. **★7/3〜4頃 マニv3再確認**: 7/1のMAE/MFEバーが48h完了で埋まるか / 7/2・7/3バー日々入るか / 7月ブロックが7/6(月)来て現在週で伸びるか / 未来日`.future`淡色 / signal_fires 7月発火拾うか。コマンド `curl -s https://arokamiya98-svg.github.io/adxscore-heatmap/daily_calendar_v3.html | grep -oE "2026-07-[0-9]{2}" | sort -u`。
+2. **signalsタブ7月化**（承認済・未実装）: `generate_signals_calendar.py` L~226 `date_range_end=all_fire_dates[-1]`→`max(..., date.today())`。**未来週打ち切り＋future淡色もセット**（同型の穴・要確認）。パイプ無し実行→検証→該当2ファイルのみcommit。
+3. **ケルトナーF7**（あろさんRDP）: MetaEditor `Indicators/ARO/ATR_Ratio_Keltner_v1.mq5`→F7(0/0)。H1 XAU・先に960本履歴。表示本数は Inputs `DrawBars`。
+4. **(C) D1週次サンプリングEA化**（本命）: 手動WAVELOGをVPS毎時肩代わり。`FractalWaveLog_D1_weekly.csv`は`.gitignore`→push経路設計要。memory [[vps-daily-automation-ea-design]]。
+5. 掃除: `run_daily_calendar.sh`の`|tail`エラー隠蔽（ブン・pipefail検討）／`archive*.md`・`FX*`未commit／配色v0.9横展開。
 
-## 📌 据え置き②（本命）
-- **(C) D1週次サンプリングEA化**：手動WAVELOGをVPS毎時肩代わり。`ARO_FractalWaveLog_D1_v3_2.mq5` weekly出力精読→軽量EA→コー実装＋ブン配置→検証。`FractalWaveLog_D1_weekly.csv`は`.gitignore`→VPS焼くならgit追跡/push経路設計要。memory [[vps-daily-automation-ea-design]]。
-- 系統A watch本物Snapshotテスト（GO pending）／legacy `auto_sync_daily.sh` アーカイブ／配色v0.9横展開／`archive*.md`・`FX*`未commit掃除／`generate_trades_calendar.py` 死にコード掃除。
-- ✅ hourly launchd 自走順調。VPS schtasks `DataPool_AM` Last Result:0 で毎時往復健全。
-
-## 👥 チーム
-コー=mq5/HTML ／ カイ=BT ／ マニ=振り返り ／ ブン=VPS/動脈/自動化 ／ おぱ=番人+マネージャー
-
-## 🔧 別荘 運用フロー
-push前 `git pull --rebase` / RDPは「切断」/ コー実装は MetaEditor **F7必須**（.ex5不可）/ `signals/`が正本
+## 👥 チーム / 別荘作法
+コー=mq5/HTML ／ カイ=BT ／ マニ=振り返り ／ ブン=VPS/動脈 ／ おぱ=番人+マネージャー。push前 `git pull --rebase` / RDP切断 / コー実装F7必須 / `signals/`正本。
 
 ---
-*直近＝マニv3の7月ページ＆バー表示を2〜3日様子見(7/3〜4頃再確認)。その後 signalsタブ7月化(未来セル対策込み)→ケルトナーF7→(C)D1週次EA化。今日の学び＝成功表示を鵜呑みにせず実測(push=rev-parse/cat-file/curl、生成=パイプ無し直実行)。*
+*直近＝ratio_widget H1/H4 実機テスト待ち（あろさんの手番）。OKでcommit。並行して7/3〜4マニv3再確認。今日の芯＝ATR Ratio札を実データで確定（買い0.7押し目／売り1.2×DN拡張、"収束"の二義性）。*
