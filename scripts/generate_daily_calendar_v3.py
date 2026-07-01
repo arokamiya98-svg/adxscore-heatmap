@@ -526,7 +526,11 @@ n_drill_trade_days = len(drill_trades_by_date)
 # v3 設計判断(2): 発火389全件描画のため、期間は発火CSV全期間との合算に拡張
 all_fire_cell_dates = sorted(fires_by_cell.keys())
 start = min(all_dates[0], all_fire_cell_dates[0]).replace(day=1)
-end_d = max(all_dates[-1], all_fire_cell_dates[-1])
+# 2026-07-01 fix: 月ブロックの終端に date.today() を含める。トレード/発火の最終日だけで
+#   end_d を決めると、月初にトレード0・発火0の当月ページが立たない（環境データ
+#   daily_agg/mfe_mae が当月まで来ていても期間計算では未使用だった）。
+#   → 今日までは必ず月ブロックを立てる（ノートレード月の「景色」も認識対象）。
+end_d = max(all_dates[-1], all_fire_cell_dates[-1], date.today())
 end = (end_d.replace(day=28) + timedelta(days=4)).replace(day=1)
 
 # ============================================================

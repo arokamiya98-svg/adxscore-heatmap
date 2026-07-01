@@ -349,7 +349,11 @@ for r in trade_rows:
 all_dates = sorted(trade_by_date.keys())
 # トレード期間 + 前後マージン
 start = all_dates[0].replace(day=1)
-end_d = all_dates[-1]
+# 2026-07-01 fix: 月ブロック終端に date.today() を含める。トレード最終日だけで
+#   end_d を決めると、月初にトレード0の当月ページが立たない（env背景の
+#   daily_aggregate は当月まで来ていても期間計算では未使用だった）。v3と同根の穴。
+#   → 今日までは必ず月ブロックを立てる（ノートレード月のenv景色も認識対象）。
+end_d = max(all_dates[-1], date.today())
 end = (end_d.replace(day=28) + timedelta(days=4)).replace(day=1)
 
 # ============================================================
