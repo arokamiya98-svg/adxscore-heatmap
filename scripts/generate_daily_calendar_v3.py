@@ -1180,6 +1180,10 @@ h1 { font-size: 14px; color: #5a9adf; margin: 0 0 4px; letter-spacing: .08em; }
   overflow: hidden;
 }
 .cell.outside { opacity: 0.15; }
+/* v3 fix (2026-07-01): 未来日=まだ来ていない日。欠損(暗い空セル)と区別して
+   「これから」を淡色で示す。当月に入った直後の 7/2,7/3 等がこれに該当。 */
+.cell.future { opacity: 0.32; filter: saturate(0.45); }
+.cell.future .day-hdr span { color: #4a6a8a; }
 
 /* 日付ヘッダ */
 .cell .day-hdr {
@@ -1994,6 +1998,12 @@ for m_start in reversed(list(month_iter(start, end))):  # v3: 最新月を先頭
         html.append('</details>')
         _in_past_fold = False
     weeks_list = month_weekdays(m_start.year, m_start.month)
+    # v3 fix (2026-07-01): 未来の週は描画しない。当月に入った直後、まだ来ていない週
+    #   （例: 7/6〜7/31）を空セルで並べると「バーが出ていない＝壊れている」ように見える
+    #   （あろさん指摘: 枠は3日まであるのに今日はまだ1日）。週頭(月曜)が今日以前の週だけ残す。
+    #   過去月は全週が該当するため無影響。当月のみ現在週で打ち切られる。
+    _today = date.today()
+    weeks_list = [w for w in weeks_list if w and w[0] <= _today]
     month_trades = [t for d, ts in trade_by_date.items() if d.year==m_start.year and d.month==m_start.month for t in ts]
     pl_sum = sum(t["pl"] for t in month_trades)
     n_win = sum(1 for t in month_trades if t["pl"]>0)
@@ -2031,6 +2041,7 @@ for m_start in reversed(list(month_iter(start, end))):  # v3: 最新月を先頭
         html.append('<div class="week-cells">')
         for d in week_days:
             is_outside = d.month != m_start.month
+            is_future = d > date.today()  # v3 fix (2026-07-01): 今日より先＝未来（まだ来てない）
             rec = get_rec(d)
             h4 = h4_bg_style(rec)
             h1 = h1_bg_style(rec)
@@ -2039,6 +2050,7 @@ for m_start in reversed(list(month_iter(start, end))):  # v3: 最新月を先頭
 
             classes = ["cell"]
             if is_outside: classes.append("outside")
+            if is_future: classes.append("future")  # 未来日=淡色（欠損ではなく「これから」）
             if phase == "凪離脱": classes.append("leave-warn")
 
             trades = trade_by_date.get(d, [])
