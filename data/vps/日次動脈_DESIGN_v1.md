@@ -301,6 +301,7 @@ schtasks /Create /TN "ADXSCORE_DataPool_PM" /TR "C:\Users\Administrator\adxscore
 - **FXベースラインskip（要対策）**: watcherは起動時に「今ある最新FX」をベースライン記録（`LAST_FX_SIG` 初期化）し、それ以降に届いたものだけ拾う。watcher停止中/再起動前に置かれた `FX_*.csv` は「既知」扱いでスキップ → `trade_input.csv` が更新されない → 系統Aエンリッチが自動で走らない。Step1/watcherと同根の「停止中取りこぼし」系。対策候補: 起動時に「最新FX vs trade_input の最終トレード日」を突合し、未処理なら初回処理する。
 - **Step1恒久対応（`dafbbf2`）**: Mac の `run_daily_calendar.sh` Step1 は daily/ を「受信確認のみ」（上書きしない）。欠損時は `git pull` を促して停止。
 - **docs auto-publish のM化**: `docs/*.html` は生成時刻が毎回変わり実行毎にM化（実データ差分なし）＝auto-publishで正規commit、検証時は `git checkout docs/` で破棄可。
+- **git push無限ハング → 動脈56h沈黙（2026-07-05 恒久対応済・12.6）**: pushが網/認証で固まると `IgnoreNew` により毎時起動が全部無視される。ログが「Applied autostash」で途切れて以降エントリ皆無ならこれ。診断: `git rev-list --count origin/main..main`（未push commit残）＋ vps_pool.log の途切れ＋ schtasks LastRunTime。
 
 ### 12.2 watcher 同根地雷の解消（`d5c7a06` 完了・2026-06-20）
 
@@ -340,6 +341,16 @@ FX_*.csv（iPhone書出し）
 - **④ 方向の素直さ**: 6/19（下落日）buy_mfe(8.28) < buy_mae(89.45)、sell優位が素直に出た＝14:00局所谷拾い問題の解消を確認。bars_traced は 6/19=21・6/18=44(partial)・6/17以前=48(フル)＝48h未経過の正常グラデーション。
 
 **残課題**: ②のServerToJst固定オフセット（12.4に追加・優先度低・表示用なら放置可）。aggregateにD1始値列が無く列レベルの直接突合ができない点は、必要なら系統B EAにd1_open列追加で厳密照合可（要設計判断＝メインおぱ案件）。
+
+### 12.6 push無限ハング恒久対応（2026-07-05・初発症 7/3 00:00〜7/5 08:00 の56h停止）
+
+**事象**: 7/3 00:00 の毎時実行が commit 成功後の `git push` で無限ハング（Credential Manager=対話UI待ち or 網）。タスクは `MultipleInstances=IgnoreNew`＋実行上限72h だったため、ハングインスタンスが居座り毎時起動が56時間無視された。7/5 朝のRDPログインで偶然解放→08:00 の実行が取り残しcommitをrebase回収し全量push。**EAはフル上書きで焼き続けるためデータ欠損ゼロ**（遅配のみ）。
+
+**恒久対応（2ヶ所）**:
+1. `vps_data_pool_push.sh`: ①`GIT_TERMINAL_PROMPT=0`＋`GCM_INTERACTIVE=never`（対話ハング根絶）②pull/pushを `timeout 120s` で包む（pullタイムアウト時は `rebase --abort` で掃除）③「未push commitが残っていれば変更ゼロでも回収push」（push失敗後の取り残し対策。旧実装は次のデータ変化まで放置＝週末跨ぎで月曜まで遅配しうる）
+2. schtasks `ADXSCORE_DataPool_AM`: `ExecutionTimeLimit` 72h→**30分**（万一固まっても次の毎時前に強制終了）
+
+**思想**: 「固まって黙る」より「即failして次の毎時に回収させる」。回収の前提＝EAのフル上書き焼き＋未pushカウント判定。診断入口は12.1の同名地雷エントリ参照。
 
 ---
 

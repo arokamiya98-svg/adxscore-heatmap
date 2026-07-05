@@ -10,8 +10,17 @@
 #              "/c/Users/Administrator/adxscore-heatmap/scripts/vps_data_pool_push.sh"
 # 注意  : 運ぶのは ②(ADX_Weekly_Above_v4 / H4PhaseAuto_weekly・UTF-16) と ③(daily/) のみ。
 #         ①手描き波形(FractalWaveLog) は Mac聖域＝絶対に add しない。
+# 詰まり対策(2026-07-05): git push が網/認証で無限ハング→IgnoreNewと相まって
+#         動脈が56h沈黙した（7/3 00:00〜7/5 08:00）。対話プロンプト禁止＋
+#         git通信にタイムアウト＝固まる代わりに即failし、次の毎時起動が
+#         フル上書き済みCSVと未pushコミットごと回収する設計に倒す。
 # ============================================================
 set -uo pipefail
+
+# git を対話不能に（Credential Manager のUI待ちハング防止）
+export GIT_TERMINAL_PROMPT=0
+export GCM_INTERACTIVE=never
+GIT_TIMEOUT=120   # git pull / push の上限秒（超えたら殺して次の毎時に回す）
 
 REPO="/c/Users/Administrator/adxscore-heatmap"
 MT5_FILES="/c/Users/Administrator/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77C8CF37AD8BF550E51FF075/MQL5/Files"
@@ -76,20 +85,28 @@ done
 log "copied: ③daily=$copied/3 ②agg=$agg_copied/2"
 
 # 2. 変更が無ければ無駄commitしない（②③両方を見る）
-if [ -z "$(git status --porcelain mt5_data/daily/ "${AGG_PATHS[@]}")" ]; then
+#    ただし commit済み・push未達 の取り残しがあれば、変更ゼロでも回収しに行く
+unpushed=$(git rev-list --count origin/main..main 2>/dev/null || echo 1)
+if [ -z "$(git status --porcelain mt5_data/daily/ "${AGG_PATHS[@]}")" ] && [ "$unpushed" = "0" ]; then
   log "no change → skip"; exit 0
 fi
 
 # 3. 合流（Mac watcherと同main）。--autostash で念のため安全に
-if ! git pull --rebase --autostash origin main >>"$LOG" 2>&1; then
-  log "ERROR: pull --rebase 失敗 → 手動介入要"; exit 2
+#    タイムアウト時は中途rebaseを掃除してから次の毎時に回す
+if ! timeout "$GIT_TIMEOUT" git pull --rebase --autostash origin main >>"$LOG" 2>&1; then
+  git rebase --abort >/dev/null 2>&1 || true
+  log "ERROR: pull --rebase 失敗/タイムアウト → 次回毎時で再試行"; exit 2
 fi
 
 # 4. ②(mt5_data/直下)＋③(daily/) を add（①手描きwavelogには触らない）→ commit → push
+#    commit対象が無くても未pushコミットが残っていれば push は実行する
 git add mt5_data/daily/ "${AGG_PATHS[@]}"
-git commit -q -m "data: VPS pool update $(ts)" || { log "commit skip"; exit 0; }
-if git push -q origin main >>"$LOG" 2>&1; then
+git commit -q -m "data: VPS pool update $(ts)" || log "commit なし（未push分の回収のみ）"
+if [ "$(git rev-list --count origin/main..main 2>/dev/null || echo 1)" = "0" ]; then
+  log "push対象なし → skip"; exit 0
+fi
+if timeout "$GIT_TIMEOUT" git push -q origin main >>"$LOG" 2>&1; then
   log "OK push 完了 (③daily=$copied ②agg=$agg_copied)"
 else
-  log "WARN push 失敗（次回起動でフル上書き済みCSVごと回収）"; exit 3
+  log "WARN push 失敗/タイムアウト（次回起動でフル上書き済みCSVと未pushコミットごと回収）"; exit 3
 fi
