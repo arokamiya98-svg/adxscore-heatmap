@@ -1,0 +1,17 @@
+{
+  "updated": "2026-07-09",
+  "generated_at": "2026-07-10 08:04",
+  "adx22": 31.0,
+  "adx_state": "BEAR",
+  "di_plus": 13.1,
+  "di_minus": 22.7,
+  "di_spread": -9.5,
+  "spread_range_5d": {
+    "min": -10.4,
+    "max": -2.0
+  },
+  "spread_label": "揺らぎ",
+  "atr_ratio": 1.04,
+  "atr_cross_dir": "UP",
+  "atr_cross_days": 22
+}

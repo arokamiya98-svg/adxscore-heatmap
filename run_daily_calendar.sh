@@ -110,9 +110,26 @@ if [ -f "$V3_HTML" ]; then
 fi
 echo ""
 
-# ── Step 2.6: 自動 publish (docs/ のカレンダー3枚のみ) ─────
+# ── Step 2.55: D1環境札 JSON 生成 (docs/d1_env.json) ───────
+# Scriptable d1_env_widget 用（SPEC: data/scriptable/SPEC_d1_env_widget_v1.md §2/§3）
+# 入力 = daily/daily_aggregate.csv（VPS正本・読み取りのみ）。
+# 生成失敗してもカレンダー3枚のpublishは止めない（前回JSONのまま継続）。
+echo "▶ Step 2.55: D1環境札 JSON 生成 (generate_d1_env_json.py)"
+if python3 scripts/generate_d1_env_json.py; then
+  :
+else
+  echo "  ⚠️ d1_env.json 生成失敗 — 前回JSONのまま publish 継続"
+fi
+echo ""
+
+# ── Step 2.6: 自動 publish (docs/ のカレンダー3枚 + d1_env.json) ─
 # 失敗 (オフライン等) してもパイプラインは止めない
 PUBLISH_FILES="docs/trades_calendar.html docs/signals_calendar.html docs/daily_calendar_v3.html"
+# d1_env.json は存在する時だけホワイトリストに追加
+# （未生成時に git add が失敗して既存3枚のpublishを道連れにしないため）
+if [ -f docs/d1_env.json ]; then
+  PUBLISH_FILES="$PUBLISH_FILES docs/d1_env.json"
+fi
 if [ "$DO_PUBLISH" = true ] && [ -f docs/trades_calendar.html ]; then
   if ! git diff --quiet -- $PUBLISH_FILES 2>/dev/null \
      || [ -n "$(git status --porcelain $PUBLISH_FILES 2>/dev/null)" ]; then
