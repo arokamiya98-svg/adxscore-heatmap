@@ -8,8 +8,10 @@
 # 前景ジョブに落とす。watch対象はローカルファイルの mtime のみ（git を触らない）。
 #
 # 2モード:
-#   ./update_mani.sh           単発: iCloud→imports橋渡し → prepare(trade_input生成+MT5配置)
-#                              → [MT5 Snapshot 手動ゲート] → merge → generate → publish
+#   ./update_mani.sh           単発: iCloud→imports橋渡し → prepare(trade_input生成+MT5配置・毎回)
+#                              → enriched鮮度チェック（trade_id/entry/exit 署名比較）
+#                              → 同期済: merge → generate → publish
+#                              → 未同期: [MT5 Snapshot 手動ゲート] 案内でexit → Snapshot後もう一度叩く
 #   ./update_mani.sh --watch   前景watch: FX_*.csv 新着 → prepare → MT5配置 →「Snapshot回して」
 #                              → trades_enriched.csv 更新検知 → merge → generate → publish
 #                              → 1回成功で自動exit（Ctrl+C でも終了）
@@ -88,12 +90,23 @@ do_prepare() {
        --output "$DEST/trade_input.csv" 2>&1 | tail -3; then
     cp "$DEST/trade_input.csv" "$MT5_FILES/trade_input.csv"
     echo "[$(ts)] ✅ trade_input.csv を MT5 Files/ へ配置"
-    echo "[$(ts)] 👉 MT5 で Trade_Snapshot_Builder を実行してください（環境再取得→trades_enriched.csv 出力）"
     return 0
   else
     echo "[$(ts)] ⚠️ prepare_trade_input.py 失敗"
     return 1
   fi
+}
+
+# ── enriched 鮮度判定: MT5側 trades_enriched.csv が trade_input.csv と同期しているか ──
+# trade_id/entry_jst/exit_jst の署名比較。新規トレード追加だけでなく、
+# 既存トレードの決済反映（exit追記）の未取込も検知する。
+# 「ファイルが存在するだけで同期済み扱い」だった旧ロジックの恒久対応（2026-07-09）。
+enriched_is_current() {
+  [ -f "$MT5_FILES/trades_enriched.csv" ] || return 1
+  local sig_input sig_enriched
+  sig_input=$(awk -F, 'NR>1 && $1!="" {gsub(/\r/,""); print $1"|"$2"|"$3}' "$DEST/trade_input.csv" 2>/dev/null | sort)
+  sig_enriched=$(awk -F, 'NR>1 && $1!="" {gsub(/\r/,""); print $1"|"$2"|"$3}' "$MT5_FILES/trades_enriched.csv" 2>/dev/null | sort)
+  [ -n "$sig_input" ] && [ "$sig_input" = "$sig_enriched" ]
 }
 
 # ── merge: MT5出力 trades_enriched.csv → mt5_dataへ → enriched-full マージ ──
@@ -175,16 +188,18 @@ if [ "$MODE" = "single" ]; then
     exit 1
   fi
 
-  if [ -f "$MT5_FILES/trades_enriched.csv" ]; then
-    # 既に enriched があれば prepare をスキップして merge→generate へ進める
-    echo "[$(ts)] trades_enriched.csv が既に存在 → prepare をスキップして merge へ"
+  # 常に prepare（trade_input 再生成 → MT5配置）。enriched の鮮度はこの後の署名比較で判定
+  do_prepare "$INPUT_CSV" || exit 1
+
+  if enriched_is_current; then
+    echo "[$(ts)] trades_enriched.csv は trade_input と同期済み → merge へ"
     do_merge "$INPUT_CSV"
     do_generate_publish
   else
-    do_prepare "$INPUT_CSV" || exit 1
     echo ""
-    echo "[$(ts)] ⏸ 手動ゲート: MT5 で Trade_Snapshot_Builder を実行 → trades_enriched.csv が出たら"
-    echo "             もう一度 './update_mani.sh' を叩く（または '--watch' で自動検知）。"
+    echo "[$(ts)] ⏸ 手動ゲート: MT5側 trades_enriched.csv が trade_input より古い（新規/決済の未反映あり）。"
+    echo "             MT5 で Trade_Snapshot_Builder を実行 → もう一度 './update_mani.sh' を叩く"
+    echo "             （または '--watch' で自動検知）。"
     exit 0
   fi
 
@@ -227,6 +242,7 @@ while true; do
     sleep "$WRITE_SETTLE"
     if do_prepare "$cur_fx"; then
       prepared_input="$cur_fx"
+      echo "[$(ts)] 👉 MT5 で Trade_Snapshot_Builder を実行してください（環境再取得→trades_enriched.csv 出力）"
     fi
   fi
 
