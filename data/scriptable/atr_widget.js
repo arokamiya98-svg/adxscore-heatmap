@@ -6,6 +6,9 @@
 // 実装指示: data/scriptable/コー_impl_spec.md
 // 2026-06-23: readJsonSafe/checkWeeklyReset を壊れ state 耐性化
 //   （state.json の "null" 固着 → 毎回 line107 で死ぬ問題の根治・自己修復）
+// 2026-06-25: 保存先を iCloud → local() + writeJson を try/catch 化
+//   （ウィジェット背景更新時の "Failed writing to disk"(line58) 根治。書き込み側は
+//    readJsonSafe と違い無防備で、失敗が例外のまま画面に出ていた）
 //---------------------------------------------------
 
 const CONFIG = {
@@ -28,7 +31,10 @@ const CONFIG = {
   refresh_interval_min: 15,
 };
 
-const FM = FileManager.iCloud();
+// ウィジェット背景更新時に iCloud 書き込みが "Failed writing to disk" で落ちるため local。
+// 端末1台運用で同期不要 → ローカル完結が安定（local では isFileDownloaded は常に true、
+// readJsonSafe の download 分岐は不発で無害）。
+const FM = FileManager.local();
 const STATE_PATH  = FM.joinPath(FM.documentsDirectory(), "atr_widget_state.json");
 const CONFIG_PATH = FM.joinPath(FM.documentsDirectory(), "atr_widget_config.json");
 const CACHE_PATH  = FM.joinPath(FM.documentsDirectory(), "atr_widget_cache.json");
@@ -55,7 +61,13 @@ async function readJsonSafe(path, fallback) {
 }
 
 function writeJson(path, obj) {
-  FM.writeString(path, JSON.stringify(obj, null, 2));
+  // readJsonSafe と対称に握る。書き込み失敗（ロック中の保護・容量・I/O）でも
+  // ウィジェットを落とさず、次回更新で追いつかせる。
+  try {
+    FM.writeString(path, JSON.stringify(obj, null, 2));
+  } catch (e) {
+    console.warn(`writeJson failed for ${path}: ${e}`);
+  }
 }
 
 async function loadState() {
