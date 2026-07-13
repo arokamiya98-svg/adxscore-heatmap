@@ -50,9 +50,14 @@
 //|                                                                  |
 //|  作成日: 2026-07-13                                               |
 //|  作成: おぱ（Trade_Snapshot_Builder v1.32 をベースに）            |
+//|                                                                  |
+//|  v1.1 (2026-07-13 PM): h1_ema32 列を末尾に追加（70列目）          |
+//|    - KC中心線（ATR_Ratio_Keltner_v1 と同じ H1 EMA32）の           |
+//|      エントリー時点値。バンド内外の幾何位置分析用                 |
+//|      （pos = (entry_price - h1_ema32) / バンド幅 は Mac側で計算） |
 //+------------------------------------------------------------------+
 #property copyright "aro strategy lab"
-#property version   "1.0"
+#property version   "1.1"
 #property script_show_inputs
 #property strict
 
@@ -74,6 +79,7 @@ input int     H1_ATR_Short         = 16;
 input int     H1_ATR_Long          = 32;
 input int     H1_ADX_Period        = 32;
 input int     H1_ATR_Median_Weeks  = 8;       // ATR ratio 中央値ウィンドウ
+input int     H1_EMA_Period        = 32;      // KC中心線（ATR_Ratio_Keltner_v1 と同一）
 
 input group "=== H4 指標周期 ==="
 input int     H4_ATR_Short         = 8;
@@ -144,7 +150,7 @@ struct PosAgg
 struct SymHandles
 {
    string sym;
-   int hATR_S_H1; int hATR_L_H1; int hADX_H1;
+   int hATR_S_H1; int hATR_L_H1; int hADX_H1; int hEMA_H1;
    int hATR_S_H4; int hATR_L_H4; int hADX_H4;
    int hATR_S_D1; int hATR_L_D1; int hADX_D1;
    bool ok;
@@ -234,6 +240,8 @@ struct AccountRow
    double   it_mfe_usd;
    double   it_mae_usd;
    int      it_bars;
+   //--- [70] KC中心線 (v1.1) ---
+   double   h1_ema32;
    //--- 環境スナップショットが取れたか（列には出さない・空欄制御用）---
    bool     env_ok;
 };
@@ -581,6 +589,7 @@ bool EnrichEnvironment(const PosAgg &p, AccountRow &row)
    row.d1_atr22 = 0; row.d1_atr42 = 0; row.d1_ratio = 0;
    row.d1_adx22 = 0; row.d1_dip = 0; row.d1_din = 0;
    row.d1_cross_bars = -1; row.d1_phase = "NA";
+   row.h1_ema32 = 0;
 
    int hi = GetSymHandles(p.symbol);
    if(hi < 0) return false;
@@ -606,6 +615,7 @@ bool EnrichEnvironment(const PosAgg &p, AccountRow &row)
    //--- H1 ---
    row.h1_atr16 = GetBufValue(g_handles[hi].hATR_S_H1, 0, sh_h1);
    row.h1_atr32 = GetBufValue(g_handles[hi].hATR_L_H1, 0, sh_h1);
+   row.h1_ema32 = GetBufValue(g_handles[hi].hEMA_H1,   0, sh_h1);
    row.h1_adx32 = GetBufValue(g_handles[hi].hADX_H1,   0, sh_h1);
    row.h1_dip   = GetBufValue(g_handles[hi].hADX_H1,   1, sh_h1);
    row.h1_din   = GetBufValue(g_handles[hi].hADX_H1,   2, sh_h1);
@@ -666,6 +676,7 @@ int GetSymHandles(const string sym)
    h.hATR_S_H1 = iATR(sym, PERIOD_H1, H1_ATR_Short);
    h.hATR_L_H1 = iATR(sym, PERIOD_H1, H1_ATR_Long);
    h.hADX_H1   = iADX(sym, PERIOD_H1, H1_ADX_Period);
+   h.hEMA_H1   = iMA(sym, PERIOD_H1, H1_EMA_Period, 0, MODE_EMA, PRICE_CLOSE);
    h.hATR_S_H4 = iATR(sym, PERIOD_H4, H4_ATR_Short);
    h.hATR_L_H4 = iATR(sym, PERIOD_H4, H4_ATR_Long);
    h.hADX_H4   = iADX(sym, PERIOD_H4, H4_ADX_Period);
@@ -673,7 +684,8 @@ int GetSymHandles(const string sym)
    h.hATR_L_D1 = iATR(sym, PERIOD_D1, D1_ATR_Long);
    h.hADX_D1   = iADX(sym, PERIOD_D1, D1_ADX_Period);
    h.ok = (h.hATR_S_H1 != INVALID_HANDLE && h.hATR_L_H1 != INVALID_HANDLE &&
-           h.hADX_H1   != INVALID_HANDLE && h.hATR_S_H4 != INVALID_HANDLE &&
+           h.hADX_H1   != INVALID_HANDLE && h.hEMA_H1   != INVALID_HANDLE &&
+           h.hATR_S_H4 != INVALID_HANDLE &&
            h.hATR_L_H4 != INVALID_HANDLE && h.hADX_H4   != INVALID_HANDLE &&
            h.hATR_S_D1 != INVALID_HANDLE && h.hATR_L_D1 != INVALID_HANDLE &&
            h.hADX_D1   != INVALID_HANDLE);
@@ -700,6 +712,7 @@ void ReleaseAllHandles()
       if(g_handles[i].hATR_S_H1 != INVALID_HANDLE) IndicatorRelease(g_handles[i].hATR_S_H1);
       if(g_handles[i].hATR_L_H1 != INVALID_HANDLE) IndicatorRelease(g_handles[i].hATR_L_H1);
       if(g_handles[i].hADX_H1   != INVALID_HANDLE) IndicatorRelease(g_handles[i].hADX_H1);
+      if(g_handles[i].hEMA_H1   != INVALID_HANDLE) IndicatorRelease(g_handles[i].hEMA_H1);
       if(g_handles[i].hATR_S_H4 != INVALID_HANDLE) IndicatorRelease(g_handles[i].hATR_S_H4);
       if(g_handles[i].hATR_L_H4 != INVALID_HANDLE) IndicatorRelease(g_handles[i].hATR_L_H4);
       if(g_handles[i].hADX_H4   != INVALID_HANDLE) IndicatorRelease(g_handles[i].hADX_H4);
@@ -995,7 +1008,9 @@ void WriteHeaderUtf8(int fh)
       "h1_trace_ok,"
       "h1_mfe_usd_48h,h1_mfe_bar_idx_48h,h1_mae_usd_48h,h1_mae_bar_idx_48h,h1_bars_traced_48h,"
       // [65-69] in-trade MFE/MAE
-      "intrade_trace_ok,intrade_tf,intrade_mfe_usd,intrade_mae_usd,intrade_bars";
+      "intrade_trace_ok,intrade_tf,intrade_mfe_usd,intrade_mae_usd,intrade_bars,"
+      // [70] KC中心線 (v1.1)
+      "h1_ema32";
    WriteUtf8String(fh, line + "\n");
 }
 
@@ -1107,6 +1122,8 @@ void WriteRow(int fh, const AccountRow &row)
    {
       line += ",,";
    }
+   //--- [70] KC中心線 (v1.1) ---
+   line += "," + (row.env_ok && row.h1_ema32 > 0 ? DoubleToString(row.h1_ema32, 3) : "");
 
    WriteUtf8String(fh, line + "\n");
 }
