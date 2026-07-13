@@ -14062,11 +14062,11 @@
     "tier": "D",
     "h4_phase_auto": "BU",
     "h4_cross_dir": "BU",
-    "h4_atr_diff": 5.1534,
+    "h4_atr_diff": 5.3934,
     "adx_score": 1.3,
-    "h1_avg_adx": 16.86,
+    "h1_avg_adx": 17.49,
     "h4_pct20": 0.0,
     "h4_pct25": 0.0,
-    "h1_pct20": 0.0
+    "h1_pct20": 10.0
   }
 ]
