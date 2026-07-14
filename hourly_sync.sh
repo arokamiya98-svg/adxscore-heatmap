@@ -43,11 +43,15 @@ AGG_TARGETS=(
   "ADX_Weekly_Above_v4.csv"
 )
 
-# 日次カレンダー publish 対象（run_daily_calendar.sh と同一。--no-publish で publish を当方に集約）
+# 日次カレンダー publish 対象（--no-publish で publish を当方に集約）
+# ⚠️ 同根の穴: このリストは run_daily_calendar.sh Step2.6 の PUBLISH_FILES と
+#    手動同期。あちらに公開物を足したら必ずここにも足す（2026-07-14 d1_env.json
+#    置き去り事故: 生成は毎時走るのに公開されず widget が7/9のまま5日停滞）。
 PUBLISH_FILES_DAILY=(
   "docs/trades_calendar.html"
   "docs/signals_calendar.html"
   "docs/daily_calendar_v3.html"
+  "docs/d1_env.json"
 )
 
 GIT_FETCH_TIMEOUT=15
