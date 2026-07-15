@@ -35,20 +35,23 @@
 //|    2) H1チャートに適用。960本(=H1で約40日)以上の履歴が要る         |
 //|       （足りないとゲート判定不可で最新側も消えることがある）        |
 //|                                                                  |
-//|  ■ 通知（v1.10 追加 / v1.20 でPush主役化）                         |
+//|  ■ 通知（v1.10 追加 / v1.20 Push主役化 / v1.30 タッチ＝エッジ検出）|
 //|    上/下バンドそれぞれ独立ON/OFF（Alert_Upper / Alert_Lower）。     |
-//|    条件: バー高値≧上バンド ▲ / バー安値≦下バンド ▼（タッチ）。     |
-//|    ・発火は1バー1回（同一バー内で連打しない）                       |
+//|    v1.30: 「バンド外に居る状態」でなく「内側→接触の遷移」で発火。   |
+//|    ・現在値(tick)がバンドに触れた瞬間に1回だけ通知                  |
+//|    ・以降は価格がバンド内側へ ReArm_Dist($)戻るまで再武装しない     |
+//|      ＝外側に居座っても毎バー再発火しない（旧版はこれがクロス       |
+//|      オーバー的な連打の原因）。境界チャタリングもこれで抑止         |
+//|    ・保険で同一バー内は最大1回/側                                   |
 //|    ・Ratioゲートで消えているバーは鳴らさない（土俵外は沈黙）        |
 //|    ・チャート適用/パラメータ変更直後の再計算では鳴らさない          |
-//|    ・v1.20: 主経路=スマホPush通知(SendNotification)。VPS無人運用    |
-//|      ではAlert()ポップアップは開くまで見えず無意味なため既定OFF     |
-//|      （Alert_Popup=trueで復活可）。Push要件: MT5 ツール→オプション  |
-//|      →通知タブで MetaQuotes ID 設定＋通知有効化。発火は履歴として   |
-//|      エキスパートログ(Print)にも常時残す。                          |
+//|    ・主経路=スマホPush通知(SendNotification)。Alert()ポップアップ   |
+//|      は既定OFF（VPS無人では開くまで見えない）。Push要件: MT5        |
+//|      ツール→オプション→通知タブの MetaQuotes ID＋有効化。発火と     |
+//|      Push成否はエキスパートログ(Print)に常時残す。                  |
 //+------------------------------------------------------------------+
 #property copyright "aro strategy lab"
-#property version   "1.20"
+#property version   "1.30"
 #property indicator_chart_window
 #property indicator_buffers 3
 #property indicator_plots   3
@@ -103,6 +106,7 @@ input double          RatioUpper       = 1.40;          // 表示上限（高ボ
 input group "=== 通知（バンドタッチ→スマホPush）==="
 input bool            Alert_Upper      = true;          // 上バンドタッチで通知 ▲
 input bool            Alert_Lower      = true;          // 下バンドタッチで通知 ▼
+input double          ReArm_Dist       = 3.0;           // 再武装距離$（内側へ戻る深さ。次のタッチ許可条件）
 input bool            Alert_Popup      = false;         // Alert()ポップアップも出す（VPS無人では不要）
 
 input group "=== 表示・負荷 ==="
@@ -118,7 +122,8 @@ input color           Color_Center     = C'120,120,120';// 中心線色
 double BufUpper[], BufLower[], BufCenter[];
 int    hEMA, hATR_Ratio, hATR_Width;
 string LabelName = "ARK_INFO";
-datetime g_lastAlertUpper = 0, g_lastAlertLower = 0;   // 1バー1回の発火記録
+datetime g_lastAlertUpper = 0, g_lastAlertLower = 0;   // 1バー1回の発火記録（保険）
+bool     g_upTouched = false, g_dnTouched = false;     // タッチ滞在中フラグ（エッジ検出用）
 
 //+------------------------------------------------------------------+
 int OnInit()
@@ -244,20 +249,24 @@ int OnCalculate(const int rates_total,
       BufCenter[i] = c;
    }
 
-   //--- アラート（最新バーのみ判定・1バー1回）
+   //--- 通知（現在値のエッジ検出＝内側→接触の遷移だけ拾う）
    if(Alert_Upper || Alert_Lower)
    {
-      ArraySetAsSeries(time, false);
-      ArraySetAsSeries(high, false);
-      ArraySetAsSeries(low,  false);
+      ArraySetAsSeries(time,  false);
+      ArraySetAsSeries(close, false);
+      int last = rates_total - 1;
       if(prev_calculated == 0)
       {
-         // 適用直後/パラメータ変更直後の再計算では鳴らさない
-         g_lastAlertUpper = time[rates_total-1];
-         g_lastAlertLower = time[rates_total-1];
+         // 適用直後/パラメータ変更直後は鳴らさず、現在の位置関係で初期化
+         // （既に外側に居るなら「タッチ滞在中」から開始＝居座り発火を防ぐ）
+         g_lastAlertUpper = time[last];
+         g_lastAlertLower = time[last];
+         bool bandOK = (BufUpper[last] != EMPTY_VALUE && BufLower[last] != EMPTY_VALUE);
+         g_upTouched = bandOK && (close[last] >= BufUpper[last]);
+         g_dnTouched = bandOK && (close[last] <= BufLower[last]);
       }
       else
-         CheckAlerts(time, high, low, rates_total-1);
+         CheckAlerts(time, close, last);
    }
 
    if(ShowRatioLabel)
@@ -267,31 +276,49 @@ int OnCalculate(const int rates_total,
 }
 
 //+------------------------------------------------------------------+
-//| バンドタッチアラート                                               |
-//|   ゲートで消えているバー（EMPTY_VALUE）は鳴らさない                |
+//| バンドタッチ通知（エッジ検出）                                     |
+//|   発火: 非タッチ状態 → 現在値がバンド接触 の遷移の瞬間だけ          |
+//|   再武装: バンド内側へ ReArm_Dist($) 戻ったら次のタッチを許可       |
+//|   ゲートで消えているバー（EMPTY_VALUE）は判定ごと凍結              |
 //+------------------------------------------------------------------+
-void CheckAlerts(const datetime &time[], const double &high[],
-                 const double &low[], int last)
+void CheckAlerts(const datetime &time[], const double &close[], int last)
 {
    if(last < 0) return;
    if(BufUpper[last] == EMPTY_VALUE || BufLower[last] == EMPTY_VALUE) return;
 
    string tf = StringSubstr(EnumToString(_Period), 7);   // "PERIOD_H1" → "H1"
+   double px = close[last];                              // 進行中バーの現在値
 
-   if(Alert_Upper && time[last] != g_lastAlertUpper && high[last] >= BufUpper[last])
+   if(Alert_Upper)
    {
-      g_lastAlertUpper = time[last];
-      string msg = StringFormat("[ATR-R Keltner] %s %s ▲上バンドタッチ High %.1f >= %.1f",
-                                _Symbol, tf, high[last], BufUpper[last]);
-      Notify(msg);
+      if(!g_upTouched && px >= BufUpper[last])
+      {
+         g_upTouched = true;
+         if(time[last] != g_lastAlertUpper)   // 保険: 同一バー内は1回まで
+         {
+            g_lastAlertUpper = time[last];
+            Notify(StringFormat("[ATR-R Keltner] %s %s ▲上バンドタッチ %.1f (band %.1f)",
+                                _Symbol, tf, px, BufUpper[last]));
+         }
+      }
+      else if(g_upTouched && px <= BufUpper[last] - ReArm_Dist)
+         g_upTouched = false;                 // 内側へ十分戻った → 再武装
    }
 
-   if(Alert_Lower && time[last] != g_lastAlertLower && low[last] <= BufLower[last])
+   if(Alert_Lower)
    {
-      g_lastAlertLower = time[last];
-      string msg = StringFormat("[ATR-R Keltner] %s %s ▼下バンドタッチ Low %.1f <= %.1f",
-                                _Symbol, tf, low[last], BufLower[last]);
-      Notify(msg);
+      if(!g_dnTouched && px <= BufLower[last])
+      {
+         g_dnTouched = true;
+         if(time[last] != g_lastAlertLower)
+         {
+            g_lastAlertLower = time[last];
+            Notify(StringFormat("[ATR-R Keltner] %s %s ▼下バンドタッチ %.1f (band %.1f)",
+                                _Symbol, tf, px, BufLower[last]));
+         }
+      }
+      else if(g_dnTouched && px >= BufLower[last] + ReArm_Dist)
+         g_dnTouched = false;
    }
 }
 
