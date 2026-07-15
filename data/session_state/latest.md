@@ -7,6 +7,12 @@
 2. **pendingクローズ: 「7/11 push空白18時間」は正常だった**: pool.log精査で、スクリプトは毎時間起動して全部「no change → skip」＝EA出力が変化しない時間帯だっただけ。種明かし=**2026-07-11は金曜でなく土曜**（前回引き継ぎの曜日ラベルが1日ズレ）。つまり週末クローズの無変化。異常なし・恒久対応不要。
 3. **VPS残置の未コミット変更を回収**: `2069332` ATR_Ratio_Keltner **v1.30**（バンドタッチ通知をエッジ検出化: 内側→接触の遷移のみ発火・`ReArm_Dist`再武装・居座り連打抑止）／ `087aa96` agents md 4本のパスをMac絶対→repo相対化（VPS両対応）。push済み・main クリーン。
 
+## ✅ Mac側フォローアップ（同日夕方・おぱ — DXY札 全区間開通）
+
+1. **Mac受信詰まりの発見と修理**: `.git/refs/remotes/origin/main 2`（Finder/iCloud系の複製・7/13生まれ）が居座り、**18:10便のhourly_syncがfetch失敗**していた。迷子refと `.git/index 2` を除去→fetch復旧。⚠️ 同型地雷: `.git` 配下に「 2」付き複製が生まれたらfetchが死ぬ。診断= hourly_sync.log の「git fetch 失敗」連発 + `find .git -name "* 2"`。
+2. **EA値の物差し検証 合格**: dxy_env.csv の過去行 × Mac実測 `DXY_ADX_Timeseries_v1.csv` を同一バー突合 → **server 17:00バー（JST日末）で平均絶対差0.00**＝分析と同一物差しを確認。7/14行の spread -2.04（Mac朝実測+9.8と別値）は日中の実変動でバグではない。
+3. **d1_env.json に dxy ブロック生成・公開済み**: 初回値 `2026-07-15 拮抗 +0.6 USD_UP (5d -3.9~7.8)`。残るは **iPhone widget js貼り替え**（あろさん手・キー不要）のみ。
+
 ## ⚠️ 生きpending（前回からの継続分）
 
 1. **W28ヒートマップ欠落**（D1手描き線→D1スクリプト再実行→run_pipeline.sh 待ち・Mac側）。H4_XAU系も7/6のまま。
