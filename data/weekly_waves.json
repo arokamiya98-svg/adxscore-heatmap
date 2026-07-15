@@ -14060,13 +14060,13 @@
     "h4_atr_cross": "DOWN 0bar前",
     "h4_ma46_side": "BELOW",
     "tier": "D",
-    "h4_phase_auto": "PD",
-    "h4_cross_dir": "PD",
-    "h4_atr_diff": -0.0145,
+    "h4_phase_auto": "BU",
+    "h4_cross_dir": "BU",
+    "h4_atr_diff": 0.1332,
     "adx_score": 1.6,
-    "h1_avg_adx": 21.09,
+    "h1_avg_adx": 21.0,
     "h4_pct20": 0.0,
     "h4_pct25": 0.0,
-    "h1_pct20": 45.1
+    "h1_pct20": 44.2
   }
 ]
