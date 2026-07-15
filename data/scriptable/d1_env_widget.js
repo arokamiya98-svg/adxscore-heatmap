@@ -5,7 +5,7 @@
 // 仕様: data/scriptable/SPEC_d1_env_widget_v1.md
 // 姉妹: data/scriptable/atr_widget.js / ratio_widget.js（既存＝一切触らない。実装パターンのみ踏襲）
 // 2026-07-15: DXY環境札（迷い検出札）行を追加
-//   仕様: data/scriptable/SPEC_dxy_env_card_v1.md / 指示書: コー_impl_dxy_card_v1.md
+//   仕様: data/scriptable/SPEC_dxy_env_card_v1.md / 指示書: コー_impl_dxy_card_v2_vps.md
 //
 // データルート（確定値ルート）:
 //   VPS EA → daily_aggregate.csv → generate_d1_env_json.py（ブン）
@@ -14,10 +14,14 @@
 //     （D1は日足境界ズレ・二重平滑誤差が大きい＝「確定情報＞計算予測」の対象）。
 //     確定値が取れない時はキャッシュ表示 🔌、それも無ければ止まる。
 //
-// DXY環境札ルート（2026-07-15 追加・D1札とは独立）:
-//   Twelve Data /time_series (DXY 1h×1500) → JS内 Wilder ADX(56)/DI± → 深さ4段階ラベル
-//   失敗時は dxy_env_cache.json のキャッシュ表示（atr_widget と同パターン）。
-//   D1行の表示ロジックには一切影響しない（公開レグ障害でもDXY札は生きる・SPEC §3）。
+// DXY環境札ルート（2026-07-15 v2: VPSルートへ切替・SPEC「ルート決定の経緯」参照）:
+//   VPS EA（XAUUSD_DailyBatch_EA_v1）が iADX("USDIndex",H1,56) 確定バー値を
+//   dxy_env.csv へ毎時出力 → generate_d1_env_json.py が d1_env.json の "dxy"
+//   ブロックにマージ → 本ウィジェットは既にfetch済みの d1_env.json を整形表示するだけ。
+//   ★Twelve fetch / JS内Wilder計算 / dxy_env_cache.json / APIキーは全廃
+//     （TwelveにDXY指数が存在しない・Yahoo代替はラベル一致率33%で不合格）。
+//   深さラベル判定は generator 側で一元化＝widget内で再判定しない。
+//   dxyキー無し → 「DXY ─ 取得待ち」/ dxy.date が2営業日以上古い → 行に ⚠。
 //   ★深さ閾値 2/5/10 は D1環境札の 5/10/16 とは別の物差し（混同禁止・SPEC §2）
 //
 // ★重大原則（SPEC §4 禁止事項）:
@@ -36,21 +40,15 @@ const CONFIG = {
   //   火曜まで更新無し=4日で⚠️）。週末を跨ぐ動脈停止の検知には十分。
   stale_days: 3,
 
-  // 表示更新ヒント: 60分（DXY札のTwelve Dataコール予算節約・指示書§7。
-  //   D1確定値は1日1回変化なので 30→60分への引き上げは実害なし）
+  // 表示更新ヒント: 60分（d1_env.json は動脈が毎時publish＝これ以上の頻度は不要）
   refresh_interval_min: 60,
 
   // ---- DXY環境札（迷い検出札）----
-  // SPEC: data/scriptable/SPEC_dxy_env_card_v1.md
+  // SPEC: data/scriptable/SPEC_dxy_env_card_v1.md（VPSルート確定版）
+  // データは d1_env.json の "dxy" ブロック（深さ判定は generator 一元化）
+  // → widget側の設定は鮮度閾値のみ
   dxy: {
-    api_key: "<TWELVE_DATA_API_KEY>",   // ★実キーは端末側であろさんが投入（リポジトリはPUBLIC＝置かない）
-    symbol: "DXY",              // プラン都合で変える可能性あり→設定化
-    interval: "1h",
-    outputsize: 1500,           // ADX(56) Wilder収束用（終端値のみ使用・先頭側は捨て駒）
-    adx_period: 56,
-    thresholds: [2, 5, 10],     // 拮抗/揺らぎ/優勢/一方通行 の境界（|DI+−DI−|・D1札の閾値とは別物差し）
-    cache_file: "dxy_env_cache.json",
-    cache_stale_hours: 24,      // キャッシュ表示がこれを超えたら ⚠ を添える
+    stale_business_days: 2,   // dxy.date がこれ以上（営業日）古い → 行に ⚠
   },
 };
 
@@ -59,8 +57,6 @@ const CONFIG = {
 // キャッシュは専用ファイルに分離（既存 atr/ratio の state/cache とは混ぜない）。
 const FM = FileManager.local();
 const CACHE_PATH = FM.joinPath(FM.documentsDirectory(), "d1_env_widget_cache.json");
-// DXY札キャッシュも同流儀（atr_widget は 2026-06-25 に iCloud→local() へ根治済み → local に合わせる）
-const DXY_CACHE_PATH = FM.joinPath(FM.documentsDirectory(), CONFIG.dxy.cache_file);
 
 // ---------------- ファイル I/O（atr_widget.js から踏襲）----------------
 // downloadFileFromiCloud は Promise を返すので await 必須
@@ -92,9 +88,6 @@ function writeJson(path, obj) {
 async function loadCache() { return await readJsonSafe(CACHE_PATH, null); }
 function saveCache(c) { writeJson(CACHE_PATH, c); }
 
-async function loadDxyCache() { return await readJsonSafe(DXY_CACHE_PATH, null); }
-function saveDxyCache(c) { writeJson(DXY_CACHE_PATH, c); }
-
 // ---------------- データ取得 ----------------
 // docs/d1_env.json（SPEC §3 スキーマ）を fetch。壊れた応答は throw してキャッシュ側に倒す。
 async function fetchEnvJson() {
@@ -115,225 +108,48 @@ async function fetchEnvJson() {
 }
 
 // ---------------- DXY環境札（迷い検出札）----------------
-// SPEC: data/scriptable/SPEC_dxy_env_card_v1.md / 指示書: コー_impl_dxy_card_v1.md
+// SPEC: data/scriptable/SPEC_dxy_env_card_v1.md / 指示書: コー_impl_dxy_card_v2_vps.md
 // 本質は方向札ではなく「迷い検出札」: |DI+−DI−| の深さ4段階（拮抗/揺らぎ/優勢/一方通行）。
 // ★ラベル層。点数化・順風/向かい風の自動判定はしない（SPEC §8 見送り事項）。
+// v2: データは既にfetch済みの d1_env.json の "dxy" ブロック。
+//     depth_label は JSON の値をそのまま使う（判定ロジックは generator 一元化）。
 
-// Twelve Data の datetime（timezone=UTC 指定 → "YYYY-MM-DD HH:MM:SS"）を明示UTCでパース
-function parseUtcMs(dt) {
-  const s = String(dt);
-  const iso = s.includes("T") ? s : s.replace(" ", "T") + "Z";
-  const t = Date.parse(iso);
-  return isNaN(t) ? null : t;
+// dxy.date（"YYYY-MM-DD"）が今日から threshold 営業日以上古い → true（行に ⚠）
+// 営業日カウント: date の翌日〜今日のうち月〜金の日数。
+// 例) 金曜データを月曜に見る = 1営業日 → セーフ / 火曜まで更新無し = 2営業日 → ⚠
+function isDxyStaleBusinessDays(dateStr, threshold) {
+  const p = parseUpdated(dateStr);
+  if (!p) return true;   // 解釈不能は警告側に倒す（isStale と同思想）
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let count = 0;
+  const cur = new Date(p.y, p.m - 1, p.d);
+  cur.setDate(cur.getDate() + 1);
+  // 上限60日ガード（日付異常でも回り続けない。60日超過は count が threshold を超えて確定済み）
+  for (let i = 0; i < 60 && cur.getTime() <= today.getTime(); i++) {
+    const wd = cur.getDay();
+    if (wd !== 0 && wd !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count >= threshold;
 }
 
-// DXY 1h×1500本を取得 → 古い順・土日除外・確定バーのみに整形（atr_widget fetchOHLC の流儀）
-async function fetchDxySeries() {
-  const c = CONFIG.dxy;
-  // 実キー未投入（プレースホルダーのまま）→ 即 throw してキャッシュ/取得待ちパスへ
-  // （無効キーで10秒の無駄なネットワーク待ちをしない）
-  if (typeof c.api_key !== "string" || c.api_key.startsWith("<")) {
-    throw new Error("DXY: api_key未設定（プレースホルダー）");
-  }
-
-  const params = [
-    `symbol=${encodeURIComponent(c.symbol)}`,
-    `interval=${encodeURIComponent(c.interval)}`,
-    `outputsize=${c.outputsize}`,
-    `timezone=UTC`,
-    `apikey=${encodeURIComponent(c.api_key)}`,
-    `format=JSON`,
-  ].join("&");
-
-  const req = new Request(`https://api.twelvedata.com/time_series?${params}`);
-  req.timeoutInterval = 10;   // 指示書§2指定。※atr_widget は回線都合で25sに伸ばした経緯あり
-                              //   → キャッシュ落ちが頻発するようならここを 25 に引き上げる
-  const json = await req.loadJSON();
-
-  if (json === null || typeof json !== "object") {
-    throw new Error("DXY: not an object");
-  }
-  if (json.status === "error") {
-    throw new Error(`Twelve Data: ${json.message || "unknown"}`);
-  }
-  if (!Array.isArray(json.values)) {
-    throw new Error("Twelve Data: values missing");
-  }
-
-  // values は新しい順 → 古い順に反転。土日バーは除外
-  // （休場中の薄い/TR=0バーで平滑が汚れる問題への対応・atr_widget と同じ）
-  let candles = json.values.slice().reverse()
-    .filter(v => {
-      const t = parseUtcMs(v.datetime);
-      if (t === null) return false;
-      const day = new Date(t).getUTCDay();
-      return day !== 0 && day !== 6;  // 0=日, 6=土 を除外（UTC基準）
-    })
-    .map(v => ({
-      datetime: v.datetime,
-      high:  parseFloat(v.high),
-      low:   parseFloat(v.low),
-      close: parseFloat(v.close),
-    }));
-
-  // 確定バーのみ: 最新バーが現在UTC時のバー（形成中）なら捨てる。パース不能も安全側で捨てる
-  if (candles.length > 0) {
-    const lastT = parseUtcMs(candles[candles.length - 1].datetime);
-    const hourStartUtc = Math.floor(Date.now() / 3600000) * 3600000;
-    if (lastT === null || lastT >= hourStartUtc) {
-      candles = candles.slice(0, -1);
-    }
-  }
-  return candles;
-}
-
-// 標準 Wilder ADX/DI±（candles: 古い順・atr_widget calculateWilderATR と同じ配列向き/初期化流儀）
-function calculateWilderADX(candles, period) {
-  // ADX初期化に period本のDX が要る → 最低 2*period+1 本（1500本取得なら余裕）
-  if (!Array.isArray(candles) || candles.length < period * 2 + 1) return null;
-
-  // 1. TR / +DM / -DM（i=1 から。tr[j] は candles[j+1] に対応）
-  const tr = [], dmP = [], dmM = [];
-  for (let i = 1; i < candles.length; i++) {
-    const h = candles[i].high, l = candles[i].low, pc = candles[i - 1].close;
-    tr.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)));
-    const up = h - candles[i - 1].high;
-    const dn = candles[i - 1].low - l;
-    dmP.push((up > dn && up > 0) ? up : 0);
-    dmM.push((dn > up && dn > 0) ? dn : 0);
-  }
-
-  // 2. 初期値 = 最初の period本の単純和 → 以後 Wilder平滑 X = X - X/period + x
-  let smTR = 0, smDMP = 0, smDMM = 0;
-  for (let j = 0; j < period; j++) { smTR += tr[j]; smDMP += dmP[j]; smDMM += dmM[j]; }
-
-  const spreadSeries = [];   // {datetime, spread} DI定義バーごと（5dレンジ用）
-  const dxInit = [];
-  let adx = null;
-  let diP = 0, diM = 0;
-
-  for (let j = period - 1; j < tr.length; j++) {
-    if (j >= period) {
-      smTR  = smTR  - smTR  / period + tr[j];
-      smDMP = smDMP - smDMP / period + dmP[j];
-      smDMM = smDMM - smDMM / period + dmM[j];
-    }
-    // 3. DI+ = 100 * SmoothedDM+ / SmoothedTR（DI- 同様）
-    diP = (smTR > 0) ? 100 * smDMP / smTR : 0;
-    diM = (smTR > 0) ? 100 * smDMM / smTR : 0;
-    // 4. DX = 100 * |DI+ - DI-| / (DI+ + DI-) → ADX（初期は period本平均、以後 Wilder平滑）
-    const diSum = diP + diM;
-    const dx = (diSum > 0) ? 100 * Math.abs(diP - diM) / diSum : 0;
-    if (adx === null) {
-      dxInit.push(dx);
-      if (dxInit.length === period) {
-        adx = dxInit.reduce((a, b) => a + b, 0) / period;
-      }
-    } else {
-      adx = (adx * (period - 1) + dx) / period;
-    }
-    spreadSeries.push({ datetime: candles[j + 1].datetime, spread: diP - diM });
-  }
-
-  // 5. 使用するのは終端（最終確定バー）の値のみ。先頭側は収束用で表示に使わない
+// DXY札: d1_env.json の "dxy" ブロックを表示用に整形するだけ（fetch も計算もしない）。
+// dxy キー無し / 必須フィールド欠け → null（「DXY ─ 取得待ち」表示）
+function getDxy(env) {
+  if (!env || typeof env !== "object") return null;
+  const d = env.dxy;
+  if (!d || typeof d !== "object") return null;
+  if (typeof d.di_spread !== "number" || !isFinite(d.di_spread)) return null;
+  if (typeof d.depth_label !== "string") return null;
   return {
-    adx56: adx,
-    di_plus: diP,
-    di_minus: diM,
-    spread: diP - diM,          // 6. 符号付き（+ = USD_UP）
-    spreadSeries: spreadSeries,
-    lastDatetime: candles[candles.length - 1].datetime,
+    spread: d.di_spread,                 // 符号付き小数1桁（+ = USD_UP・generator丸め済み）
+    depth_label: d.depth_label,          // generator 判定値をそのまま（再判定しない）
+    range5d: (d.spread_range_5d && typeof d.spread_range_5d === "object")
+      ? d.spread_range_5d : null,
+    date: d.date,
+    stale: isDxyStaleBusinessDays(d.date, CONFIG.dxy.stale_business_days),
   };
-}
-
-// 深さラベル（SPEC §2）: <2 拮抗 / 2-5 揺らぎ / 5-10 優勢 / ≥10 一方通行
-// ★D1環境札の閾値（<5/5-10/10-16/≥16）とは別の物差し。混同しない
-function dxyDepthLabel(spreadRounded) {
-  const a = Math.abs(spreadRounded);
-  const t = CONFIG.dxy.thresholds;
-  if (a < t[0]) return "拮抗";
-  if (a < t[1]) return "揺らぎ";
-  if (a < t[2]) return "優勢";
-  return "一方通行";
-}
-
-// 5dレンジ: spread系列をUTC日付でグループ → 土日除外（fetch段階で除外済＋二重ガード）
-// → 各営業日の最終バーspread → 直近5営業日の min/max
-function calcDxyRange5d(spreadSeries) {
-  const lastByDay = {};
-  const dayOrder = [];
-  for (const p of spreadSeries) {
-    const day = String(p.datetime).slice(0, 10);
-    if (!(day in lastByDay)) dayOrder.push(day);
-    lastByDay[day] = p.spread;   // 古い順走査 → 最後の代入 = その日の最終バー
-  }
-  const bizDays = dayOrder.filter(day => {
-    const t = Date.parse(day + "T00:00:00Z");
-    if (isNaN(t)) return false;
-    const wd = new Date(t).getUTCDay();
-    return wd !== 0 && wd !== 6;
-  });
-  const recent = bizDays.slice(-5);
-  if (recent.length === 0) return null;
-  const vals = recent.map(d => lastByDay[d]);
-  return { min: Math.min(...vals), max: Math.max(...vals) };
-}
-
-// キャッシュ鮮度: fetched_at が hours 超過 → true（解釈不能は警告側に倒す＝isStale と同思想）
-function isDxyCacheOlderThan(fetchedAt, hours) {
-  const t = Date.parse(String(fetchedAt || ""));
-  if (isNaN(t)) return true;
-  return (Date.now() - t) > hours * 3600000;
-}
-
-// DXY札の取得〜判定一式。★絶対に throw しない（D1行の描画に影響させない）
-// 戻り値: { data: <キャッシュschema>|null, fromCache: bool, stale: bool }
-async function getDxy() {
-  try {
-    const candles = await fetchDxySeries();
-    const r = calculateWilderADX(candles, CONFIG.dxy.adx_period);
-    if (!r || !isFinite(r.spread)) {
-      throw new Error("DXY: 計算不能（バー不足/欠損値）");
-    }
-
-    // 表示値=小数1桁に丸めてから判定（数値とラベルの見た目矛盾防止・d1_env生成器と同規約）
-    const spreadRounded = Math.round(r.spread * 10) / 10;
-    const label = dxyDepthLabel(spreadRounded);
-    const data = {
-      fetched_at: new Date().toISOString(),
-      adx56: r.adx56,
-      di_plus: r.di_plus,
-      di_minus: r.di_minus,
-      spread: spreadRounded,
-      depth_label: label,
-      di_dir: spreadRounded > 0 ? "UP" : (spreadRounded < 0 ? "DOWN" : "FLAT"),
-      range5d: calcDxyRange5d(r.spreadSeries),
-    };
-
-    // 検収ログ（指示書§3: date, adx56, di+, di-, spread, label）
-    console.log(
-      `[DXY] date=${r.lastDatetime}` +
-      ` adx56=${r.adx56 == null ? "null" : r.adx56.toFixed(2)}` +
-      ` di+=${r.di_plus.toFixed(2)} di-=${r.di_minus.toFixed(2)}` +
-      ` spread=${spreadRounded.toFixed(1)} label=${label}` +
-      ` 5d=${data.range5d ? `${data.range5d.min.toFixed(1)}~${data.range5d.max.toFixed(1)}` : "null"}`
-    );
-
-    saveDxyCache(data);
-    return { data: data, fromCache: false, stale: false };
-  } catch (e) {
-    // 失敗 → キャッシュがあれば表示（24h超は⚠）。無ければ「取得待ち」へ
-    console.warn(`DXY failed: ${e}`);
-    const cached = await loadDxyCache();
-    if (cached && typeof cached.spread === "number" && typeof cached.depth_label === "string") {
-      return {
-        data: cached,
-        fromCache: true,
-        stale: isDxyCacheOlderThan(cached.fetched_at, CONFIG.dxy.cache_stale_hours),
-      };
-    }
-    return { data: null, fromCache: false, stale: false };
-  }
 }
 
 // ---------------- 日付・鮮度 ----------------
@@ -440,7 +256,8 @@ function dxyRowColor(d) {
 }
 
 // ヘアライン区切り + DXY行を widget 末尾に追加（既存D1行のレイアウトは変更しない）
-function addDxySection(widget, dxy) {
+// d = getDxy() の戻り値（整形済み or null）
+function addDxySection(widget, d) {
   widget.addSpacer(5);
   const sep = widget.addStack();
   sep.size = new Size(0, 1);          // 高さ1pt・幅は内側spacerで全幅に伸ばす
@@ -452,8 +269,8 @@ function addDxySection(widget, dxy) {
   row.layoutHorizontally();
   row.centerAlignContent();
 
-  if (!dxy || !dxy.data) {
-    // キャッシュも無い初回失敗（or APIキー未投入）→ グレーで取得待ち
+  if (!d) {
+    // d1_env.json に dxy キー無し（VPS側 dxy_env.csv 未着 等）→ グレーで取得待ち
     const waitText = row.addText("DXY ─ 取得待ち");
     waitText.font = Font.systemFont(11);
     waitText.textColor = COLOR_RANGE;
@@ -462,7 +279,6 @@ function addDxySection(widget, dxy) {
     return;
   }
 
-  const d = dxy.data;
   const mainText = row.addText(dxyRowText(d));
   // 一方通行のみ semibold（「方向色濃」の視覚強調。※印が「過信しない」を併記）
   mainText.font = (d.depth_label === "一方通行")
@@ -472,11 +288,11 @@ function addDxySection(widget, dxy) {
   mainText.lineLimit = 1;
   mainText.minimumScaleFactor = 0.6;   // small幅で "(5d ...)" まで出す保険
 
-  if (dxy.fromCache) {
+  if (d.stale) {
     row.addSpacer(3);
-    // fetch失敗中＝キャッシュ表示の注記。24h超は⚠（D1札の鮮度警告と同じ視覚言語）
-    const note = row.addText(dxy.stale ? "⚠(キャッシュ)" : "(キャッシュ)");
-    note.font = Font.systemFont(8);
+    // dxy.date が2営業日以上古い＝DXYレグ停滞の鮮度警告（D1札の⚠と同じ視覚言語）
+    const note = row.addText("⚠");
+    note.font = Font.systemFont(9);
     note.textColor = COLOR_DIM;
     note.lineLimit = 1;
   }
@@ -595,8 +411,8 @@ function buildWidget(env, flags, dxy) {
   return widget;
 }
 
-// fetch失敗かつキャッシュ無し: 確定値ルートが完全に取れない → 止まる（Twelve Data には落ちない）
-// ※DXY行はここでも出す（D1公開レグ障害でもDXY札は生きる・SPEC §3 の設計理由）
+// fetch失敗かつキャッシュ無し: 確定値ルートが完全に取れない → 止まる（外部APIには落ちない）
+// ※DXY行の枠はここでも出す（v2: DXYも d1_env.json 相乗りなので、この場合は「取得待ち」表示）
 function buildErrorWidget(message, dxy) {
   const widget = new ListWidget();
   widget.backgroundColor = COLOR_BG;
@@ -619,9 +435,6 @@ function buildErrorWidget(message, dxy) {
 
 // ---------------- メイン ----------------
 async function main() {
-  // DXY札の取得を先に開始（D1 fetch と並列・getDxy は throw しない設計 → allSettled 不要）
-  const dxyPromise = getDxy();
-
   let env = null;
   let offline = false;
 
@@ -638,7 +451,8 @@ async function main() {
     }
   }
 
-  const dxy = await dxyPromise;
+  // DXY札: fetch済み env（or キャッシュ）の dxy ブロックを整形（追加fetchなし）
+  const dxy = getDxy(env);
 
   let widget;
   if (env) {

@@ -5,6 +5,7 @@ generate_d1_env_json.py
 D1環境札 Widget 用 JSON 生成（SPEC: data/scriptable/SPEC_d1_env_widget_v1.md §3）
 
 入力: mt5_data/daily/daily_aggregate.csv（UTF-8-sig・VPS正本・読み取りのみ）
+      mt5_data/daily/dxy_env.csv（UTF-8-sig・VPS正本・読み取りのみ・欠落許容）
 出力: docs/d1_env.json
 
 生成ロジック（SPEC §3 の表に準拠）:
@@ -15,6 +16,17 @@ D1環境札 Widget 用 JSON 生成（SPEC: data/scriptable/SPEC_d1_env_widget_v1
   atr_ratio       : 最新 d1_atr22_42_ratio
   atr_cross_dir   : ratio >= 1.0 → "UP"（拡張）/ < 1.0 → "DOWN"（収束）
   atr_cross_days  : 1.0跨ぎの直近位置からの営業日数。範囲内に跨ぎ無し → 99
+
+DXY環境札ブロック（SPEC: data/scriptable/SPEC_dxy_env_card_v1.md §4・2026-07-15 追加）:
+  dxy.date            : dxy_env.csv 採用行（営業日フィルタ後の最新行）の日付
+  dxy.adx56           : 最新 dxy_adx56（小数1桁）
+  dxy.di_spread       : 最新 dxy_di_spread（符号付き小数1桁・+ = USD_UP）
+  dxy.di_dir          : dxy_di_dir をそのまま（"USD_UP"/"USD_DN"・EAが正本）
+  dxy.depth_label     : |spread| 丸め後の段階  <2 拮抗 / 2〜5 揺らぎ / 5〜10 優勢 / ≥10 一方通行
+                        ★D1の spread_label（5/10/16）とは別の物差し（混同禁止）
+  dxy.spread_range_5d : 土日除外後系列の直近5行の di_spread min/max（小数1桁）
+  ※ dxy_env.csv 欠落 / 全行パース不能 → "dxy" キー自体を出さない
+    （widget側は「取得待ち」表示）。既存D1部の出力は一切変えない。
 
 実装メモ（2026-07-10 ブン）:
   ⚠️ 土曜行の除外 — daily_aggregate.csv には土曜行が混ざる（VPS EA は
@@ -38,6 +50,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DAILY_AGG = ROOT / "mt5_data" / "daily" / "daily_aggregate.csv"
+DXY_CSV = ROOT / "mt5_data" / "daily" / "dxy_env.csv"
 OUT_JSON = ROOT / "docs" / "d1_env.json"
 
 CROSS_DAYS_CAP = 99  # 跨ぎ無し/超長期は 99 固定（widget側で "99+" 表示）
@@ -73,6 +86,65 @@ def spread_label(abs_spread):
     if abs_spread < 16:
         return "優勢"
     return "一方通行"
+
+
+def dxy_depth_label(abs_spread):
+    """DXY |spread| の深さラベル（SPEC_dxy_env_card_v1 §2・HFM USDIndex実測）。
+
+    ★D1環境札の spread_label（5/10/16）とは別スケール。混同しない。
+    判定は表示値（小数1桁丸め後）で行う（数値とラベルの見た目矛盾防止）。
+    """
+    if abs_spread < 2:
+        return "拮抗"
+    if abs_spread < 5:
+        return "揺らぎ"
+    if abs_spread < 10:
+        return "優勢"
+    return "一方通行"
+
+
+def build_dxy_block(path):
+    """dxy_env.csv → d1_env.json の "dxy" ブロック dict を返す。
+
+    ファイル欠落 / 全行パース不能 / 読込例外 → None（キー省略＝グレースフル）。
+    営業日フィルタ（weekday>=5 除外・土曜行地雷はD1と同根）と
+    「表示値で分類」規約は D1 部と同じものを踏襲する。
+    """
+    if not path.exists():
+        return None
+
+    rows = []
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            for r in csv.DictReader(f):
+                try:
+                    d = datetime.strptime(r["date"], "%Y-%m-%d").date()
+                    spread = float(r["dxy_di_spread"])
+                    adx56 = float(r["dxy_adx56"])
+                except (KeyError, ValueError, TypeError):
+                    continue
+                if d.weekday() >= 5:  # 土日行=金曜バー由来の複製 → 除外
+                    continue
+                rows.append({"date": d, "spread": spread, "adx56": adx56, "row": r})
+    except OSError:
+        return None
+    if not rows:
+        return None
+
+    latest = rows[-1]
+    di_spread = round(latest["spread"], 1)
+
+    # 直近5営業日（除外後系列の末尾5行）の spread レンジ
+    last5 = [r["spread"] for r in rows[-5:]]
+
+    return {
+        "date": latest["date"].isoformat(),
+        "adx56": round(latest["adx56"], 1),
+        "di_spread": di_spread,
+        "di_dir": latest["row"].get("dxy_di_dir", "").strip(),
+        "depth_label": dxy_depth_label(abs(di_spread)),
+        "spread_range_5d": {"min": round(min(last5), 1), "max": round(max(last5), 1)},
+    }
 
 
 def atr_cross_days(ratios):
@@ -133,6 +205,11 @@ def main():
         "atr_cross_days": atr_cross_days([r["ratio"] for r in rows]),
     }
 
+    # DXY環境札ブロック（欠落時はキー省略・既存D1部の出力は不変）
+    dxy = build_dxy_block(DXY_CSV)
+    if dxy is not None:
+        out["dxy"] = dxy
+
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
@@ -141,6 +218,11 @@ def main():
     print(f"  🏷  d1_env.json: {out['updated']} {out['adx_state']} ADX{out['adx22']} "
           f"DI{out['di_spread']:+.1f}({out['spread_label']}) "
           f"ATR {out['atr_cross_dir']} {out['atr_cross_days']}日 → {OUT_JSON.relative_to(ROOT)}")
+    if dxy is not None:
+        print(f"  💵 dxy: {dxy['date']} {dxy['di_dir']} ADX{dxy['adx56']} "
+              f"DI{dxy['di_spread']:+.1f}({dxy['depth_label']})")
+    else:
+        print("  💵 dxy: dxy_env.csv 無し/読取不能 → dxyキー省略（widgetは取得待ち表示）")
     return 0
 
 

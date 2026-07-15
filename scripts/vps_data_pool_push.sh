@@ -27,7 +27,10 @@ MT5_FILES="/c/Users/Administrator/AppData/Roaming/MetaQuotes/Terminal/D0E8209F77
 POOL="$REPO/mt5_data/daily"
 MT5DATA="$REPO/mt5_data"
 LOG="$REPO/vps_pool.log"
-DAILY_FILES=( "signal_fires.csv" "daily_aggregate.csv" "daily_mfe_mae_48h.csv" )
+DAILY_FILES=( "signal_fires.csv" "daily_aggregate.csv" "daily_mfe_mae_48h.csv" "dxy_env.csv" )
+# dxy_env.csv: DXY環境札（系統B EA v1.10 出力・2026-07-15追加）。EA差替え前は
+# 「WARN: 未生成」が出るが正常（デプロイ後に自己回復）。git add側は
+# mt5_data/daily/ 丸ごとなので、追加箇所はこのコピー用リストだけ。
 # ② 自動集計（2026-06-26 VPS書き移行）。UTF-16のまま mt5_data/ 直下へコピー（daily/ ではない）。
 # EA出力名: ADX_Weekly_Above_EA_v1→ADX_Weekly_Above_v4.csv / ARO_H4PhaseAuto_EA_v1→H4PhaseAuto_weekly.csv
 AGG_FILES=( "ADX_Weekly_Above_v4.csv" "H4PhaseAuto_weekly.csv" )
@@ -82,7 +85,7 @@ for f in "${AGG_FILES[@]}"; do
     log "WARN: 未生成 $f（②EA未アタッチ?）"
   fi
 done
-log "copied: ③daily=$copied/3 ②agg=$agg_copied/2"
+log "copied: ③daily=$copied/${#DAILY_FILES[@]} ②agg=$agg_copied/${#AGG_FILES[@]}"
 
 # 2. 変更が無ければ無駄commitしない（②③両方を見る）
 #    ただし commit済み・push未達 の取り残しがあれば、変更ゼロでも回収しに行く

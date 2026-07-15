@@ -26,11 +26,18 @@
 //|    - 推定値・補完値の混入禁止                                     |
 //|    - 12h/24h/36h セグメント値の「評価ラベル化」禁止              |
 //|                                                                  |
+//|  v1.10 (2026-07-15): DXY環境札（迷い検出札）出力を追加            |
+//|    - iADX("USDIndex", H1, 56) の最終確定バー(shift=1) を          |
+//|      dxy_env.csv（UTF-8 BOM・1日1行・毎時再生成）へ出力           |
+//|    - 失敗時は DXY 部のみスキップ（XAU側 2 CSV を道連れにしない・  |
+//|      0値行禁止・次の毎時で自己回復）                              |
+//|    - SPEC: data/scriptable/SPEC_dxy_env_card_v1.md               |
+//|                                                                  |
 //|  作成日: 2026-06-18                                              |
 //|  作成: コー                                                       |
 //+------------------------------------------------------------------+
 #property copyright "aro strategy lab"
-#property version   "1.00"
+#property version   "1.10"
 #property strict
 
 //+==================================================================+
@@ -76,12 +83,20 @@ input group "=== MFE/MAE ==="
 //    DST は D1 足境界が処理 → 固定時刻の server 変換ハードコードは不要。    ---
 input int     H1_Trace_Bars_48h        = 48;         // H1 48本 = 48時間相当
 
+input group "=== DXY環境札 (SPEC_dxy_env_card_v1) ==="
+input string  DXY_Symbol               = "USDIndex";  // HFM USDIndex（分析と同一物差し）
+input int     DXY_ADX_Period           = 56;          // iADX(USDIndex, H1, 56)
+input string  Dxy_Output_File          = "dxy_env.csv";
+
 //+==================================================================+
 //| グローバル: 指標ハンドル（Aggregate専用, hAgg_ 接頭辞）           |
 //+==================================================================+
 int hAgg_ATR_S_H1 = INVALID_HANDLE, hAgg_ATR_L_H1 = INVALID_HANDLE, hAgg_ADX_H1 = INVALID_HANDLE;
 int hAgg_ATR_S_H4 = INVALID_HANDLE, hAgg_ATR_L_H4 = INVALID_HANDLE, hAgg_ADX_H4 = INVALID_HANDLE;
 int hAgg_ATR_S_D1 = INVALID_HANDLE, hAgg_ATR_L_D1 = INVALID_HANDLE, hAgg_ADX_D1 = INVALID_HANDLE;
+
+//--- DXY環境札用（初期化時に1回生成・失敗しても XAU側は道連れにしない）---
+int hDxy_ADX = INVALID_HANDLE;
 
 //+==================================================================+
 //| グローバル: 出力カウンタ                                          |
@@ -93,6 +108,9 @@ int g_mfe_rows_written = 0;
 int g_mfe_rows_skipped = 0;
 int g_mfe_rows_partial = 0;   // 48本フル追跡できなかった行
 
+int g_dxy_rows_written = 0;
+int g_dxy_rows_skipped = 0;   // 非営業日・確定バー無し・値<=0（0値行禁止）
+
 //+==================================================================+
 //| グローバル: EA制御                                                |
 //+==================================================================+
@@ -103,9 +121,10 @@ bool g_first_run = false;
 //+==================================================================+
 int OnInit()
 {
-   Print("==== XAUUSD_DailyBatch_EA v1.00 OnInit ====");
+   Print("==== XAUUSD_DailyBatch_EA v1.10 OnInit ====");
    PrintFormat("Symbol(chart): %s, Allowed: %s", _Symbol, Allowed_Symbol);
-   PrintFormat("Agg_Output: %s / Mfe_Output: %s", Agg_Output_File, Mfe_Output_File);
+   PrintFormat("Agg_Output: %s / Mfe_Output: %s / Dxy_Output: %s",
+               Agg_Output_File, Mfe_Output_File, Dxy_Output_File);
    PrintFormat("Lookback_Days: %d", Lookback_Days);
 
    //--- シンボル制約: XAUUSD以外で起動拒否 ---
@@ -123,6 +142,9 @@ int OnInit()
       Print("[FATAL] 指標ハンドル初期化に失敗。終了。");
       return(INIT_FAILED);
    }
+
+   //--- DXYハンドル初期化（失敗しても INIT_FAILED にしない = XAU側を道連れにしない）---
+   Dxy_InitHandle();
 
    //--- 初回は短く（ready待ち）---
    g_first_run = true;
@@ -157,6 +179,9 @@ void OnTimer()
    //--- 2本のCSVを再生成 ---
    Agg_GenerateCsv();
    Mfe_GenerateCsv();
+
+   //--- DXY環境札CSV（失敗時はDXY部だけスキップ・XAU側に影響しない）---
+   Dxy_GenerateCsv();
 }
 
 //+==================================================================+
@@ -166,13 +191,16 @@ void OnDeinit(const int reason)
 {
    EventKillTimer();
    Agg_ReleaseHandles();
-   PrintFormat("==== XAUUSD_DailyBatch_EA v1.00 OnDeinit (reason=%d) ====", reason);
+   if(hDxy_ADX != INVALID_HANDLE) IndicatorRelease(hDxy_ADX);
+   PrintFormat("==== XAUUSD_DailyBatch_EA v1.10 OnDeinit (reason=%d) ====", reason);
 }
 
 //+==================================================================+
 //| HandlesReady                                                     |
 //|   9ハンドルすべて BarsCalculated>0 になったら true。              |
 //|   旧 OnStart の Sleep(2000) ゲートの代替。                        |
+//|   ※ hDxy_ADX は含めない（DXY未readyでXAU側を遅延させない。        |
+//|      DXY側の ready 判定は Dxy_GenerateCsv 冒頭で個別に行う）      |
 //+==================================================================+
 bool HandlesReady()
 {
@@ -1050,6 +1078,158 @@ void Mfe_WriteRow(int fh,
    line += DoubleToString(sell_mfe_36, 3) + ",";
    line += DoubleToString(sell_mae_36, 3);
    WriteUtf8String(fh, line + "\n");
+}
+
+//+##################################################################+
+//|                                                                  |
+//|  DXY環境札パート（v1.10 追加 / SPEC_dxy_env_card_v1.md）          |
+//|                                                                  |
+//|  出力: dxy_env.csv (UTF-8 BOM・他daily系と同方式)                 |
+//|    列: date,dxy_adx56,dxy_di_plus,dxy_di_minus,                  |
+//|        dxy_di_spread,dxy_di_dir                                  |
+//|  更新機構: daily_aggregate と同じ「毎時フル再生成」               |
+//|    （Lookback_Days 遡り・1日1行・当日行は最終確定バーで毎時更新） |
+//|  防御: 履歴未ロード/空バッファ/値<=0 → その行/その回をスキップ    |
+//|    （0値行禁止・ログのみ・次の毎時で自己回復）。                  |
+//|    ready前・ハンドル無効時は既存 dxy_env.csv を truncate しない。 |
+//+##################################################################+
+
+//+==================================================================+
+//| Dxy_InitHandle                                                   |
+//|   SymbolSelect で気配値登録の保険 → iADX ハンドルを1回生成。      |
+//|   失敗しても false ログのみ（XAU側の INIT を止めない）。          |
+//+==================================================================+
+void Dxy_InitHandle()
+{
+   //--- 気配値登録の保険（板に無いと iADX が失敗するため）---
+   if(!SymbolSelect(DXY_Symbol, true))
+      PrintFormat("[WARN] [Dxy] SymbolSelect(%s) 失敗 err=%d "
+                  "(シンボル名が板に無い?) → DXY出力はスキップされます.",
+                  DXY_Symbol, GetLastError());
+
+   hDxy_ADX = iADX(DXY_Symbol, PERIOD_H1, DXY_ADX_Period);
+   if(hDxy_ADX == INVALID_HANDLE)
+      PrintFormat("[WARN] [Dxy] iADX(%s,H1,%d) ハンドル生成失敗 err=%d "
+                  "→ DXY出力のみスキップ（XAU側 2 CSV は継続）.",
+                  DXY_Symbol, DXY_ADX_Period, GetLastError());
+   else
+      PrintFormat("[INFO] [Dxy] iADX(%s,H1,%d) handle OK.",
+                  DXY_Symbol, DXY_ADX_Period);
+}
+
+//+==================================================================+
+//| Dxy_GenerateCsv                                                  |
+//|   Agg_GenerateCsv と同じ流儀の毎時フル再生成。                    |
+//|   ready前チェックを FileOpen より先に行い、書けない回は           |
+//|   既存ファイルを壊さない（truncate回避）。                        |
+//+==================================================================+
+void Dxy_GenerateCsv()
+{
+   //--- ハンドル無効（OnInitで生成失敗）→ DXY部まるごとスキップ ---
+   if(hDxy_ADX == INVALID_HANDLE)
+   {
+      if(Verbose) Print("[SKIP] [Dxy] handle invalid → DXY出力スキップ.");
+      return;
+   }
+
+   //--- 計算未完（履歴未ロード等）→ 今回はスキップ（次の毎時で自己回復）---
+   if(BarsCalculated(hDxy_ADX) <= 0)
+   {
+      if(Verbose) Print("[SKIP] [Dxy] BarsCalculated<=0 (履歴未ロード?) → 今回のDXY出力スキップ.");
+      return;
+   }
+
+   g_dxy_rows_written = 0;
+   g_dxy_rows_skipped = 0;
+
+   Print("==== [Dxy] dxy_env generate ====");
+
+   //--- 出力 CSV オープン (UTF-8 BOM・他daily系と同方式) ---
+   int fout = FileOpen(Dxy_Output_File, FILE_WRITE|FILE_BIN, ',');
+   if(fout == INVALID_HANDLE)
+   {
+      PrintFormat("[ERR] [Dxy] 出力CSV open失敗: %s err=%d（XAU側は影響なし）",
+                  Dxy_Output_File, GetLastError());
+      return;
+   }
+   WriteUtf8Bom(fout);
+   WriteUtf8String(fout, "date,dxy_adx56,dxy_di_plus,dxy_di_minus,dxy_di_spread,dxy_di_dir\n");
+
+   //--- メインループ: Agg と同じ JST日回し（古い日 → 今日）---
+   datetime now_server = TimeTradeServer();
+   datetime now_jst    = ServerToJst(now_server);
+   datetime today_jst_midnight = Agg_TruncateToDayJst(now_jst);
+
+   for(int d = Lookback_Days - 1; d >= 0; d--)
+   {
+      datetime day_jst_midnight = today_jst_midnight - (datetime)(d * 86400);
+      Dxy_ProcessDay(fout, day_jst_midnight);
+   }
+
+   FileClose(fout);
+
+   Print("==== [Dxy] dxy_env Complete ====");
+   PrintFormat("  written = %d / skipped = %d", g_dxy_rows_written, g_dxy_rows_skipped);
+   PrintFormat("  Output: %s/MQL5/Files/%s",
+               TerminalInfoString(TERMINAL_DATA_PATH), Dxy_Output_File);
+}
+
+//+==================================================================+
+//| Dxy_ProcessDay                                                   |
+//|   1日分: その日 (JST 00:00〜24:00) の最終「確定」H1バーの         |
+//|   ADX/DI+/DI- を1行書く。                                        |
+//|     - 当日は iBarShift が進行中バー(shift=0)を返すため shift=1    |
+//|       （最終確定バー）へ繰り上げ → 毎時、当日行が更新されていく   |
+//|     - 範囲内に確定バー無し（土日・休場・週明け直後）→ skip       |
+//|     - CopyBuffer 失敗 / 値<=0 → skip（0値行禁止）                |
+//+==================================================================+
+void Dxy_ProcessDay(int fout, datetime day_jst_midnight)
+{
+   datetime range_start_srv = JstToServer(day_jst_midnight);
+   datetime range_end_srv   = JstToServer(day_jst_midnight + 86400);
+
+   //--- その日の最終バー（当日は進行中バーが返る）---
+   int sh = iBarShift(DXY_Symbol, PERIOD_H1, range_end_srv - 1, false);
+   if(sh < 0)
+   {
+      g_dxy_rows_skipped++;
+      return;
+   }
+   if(sh == 0) sh = 1;   // 進行中バーは使わない → 最終確定バー(shift=1)へ
+
+   //--- 確定バーがその日の範囲内にあるか（無ければ非営業日 or 当日確定バー未発生）---
+   datetime t_bar = iTime(DXY_Symbol, PERIOD_H1, sh);
+   if(t_bar == 0 || t_bar < range_start_srv || t_bar >= range_end_srv)
+   {
+      g_dxy_rows_skipped++;
+      return;
+   }
+
+   //--- ADX/DI 取得（空バッファ・値<=0 は 0値行禁止 → skip）---
+   double adx = Agg_GetBufValue(hDxy_ADX, 0, sh);   // 汎用ヘルパ流用（handle/buf/shift）
+   double dip = Agg_GetBufValue(hDxy_ADX, 1, sh);
+   double din = Agg_GetBufValue(hDxy_ADX, 2, sh);
+   if(adx <= 0 || dip <= 0 || din <= 0)
+   {
+      g_dxy_rows_skipped++;
+      if(Verbose)
+         PrintFormat("[SKIP] [Dxy] %s 値取得不能 (adx=%.2f dip=%.2f din=%.2f) → 0値行禁止で書かない",
+                     FormatJstDate(day_jst_midnight), adx, dip, din);
+      return;
+   }
+
+   double spread = dip - din;
+   string dir    = (spread > 0) ? "USD_UP" : "USD_DN";
+
+   string line = FormatJstDate(day_jst_midnight) + ",";
+   line += DoubleToString(adx,    2) + ",";
+   line += DoubleToString(dip,    2) + ",";
+   line += DoubleToString(din,    2) + ",";
+   line += DoubleToString(spread, 2) + ",";   // 符号付き小数2桁
+   line += dir;
+   WriteUtf8String(fout, line + "\n");
+
+   g_dxy_rows_written++;
 }
 
 //+##################################################################+
