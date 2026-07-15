@@ -28,9 +28,9 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 
 # 必ず参照するファイル（着手時）
 
-- `/Users/aro/Desktop/ADXSCORE/CLAUDE.md` - プロジェクト全体コンテキスト・認識ツール思想
-- `/Users/aro/Desktop/ADXSCORE/data/INVENTORY.md` - データ索引・鮮度・信頼度
-- `/Users/aro/Desktop/ADXSCORE/data/bt/PATTERN_REGIME_MAP_v1.md` - BT世代1構造マップ（機能/死亡パターン）
+- `CLAUDE.md` - プロジェクト全体コンテキスト・認識ツール思想
+- `data/INVENTORY.md` - データ索引・鮮度・信頼度
+- `data/bt/PATTERN_REGIME_MAP_v1.md` - BT世代1構造マップ（機能/死亡パターン）
 - `signals/`配下の既存mq5 - mq5制作時の参照ベース
 - `docs/heatmap_v14.html` - HTML制作時の参照ベース
 
@@ -44,7 +44,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash
   - H4系 = UTF-8-sig (FILE_WRITE|FILE_BIN + BOM手動書込)
   - WaveLog_Export系 = UTF-8 (BOMなし)
   - 必ず既存ファイルのエンコーディングを確認してから読み書きする
-- **参照ゾーン規約**: `/Users/aro/Desktop/ADXSCORE/` 配下のみが信頼ソース。`/Users/aro/Desktop/ADX２８検証ファイル/` は凍結（参照禁止）
+- **参照ゾーン規約**: repo（`adxscore-heatmap/`）配下のみが信頼ソース。`ADX２８検証ファイル/`（Mac隔離アーカイブ）は凍結（参照禁止）
 
 # やってはいけないこと
 

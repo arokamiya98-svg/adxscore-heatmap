@@ -17,9 +17,9 @@ tools: Read, Bash, Glob, Grep, Write
 
 # 必ず参照するファイル（着手時）
 
-- `/Users/aro/Desktop/ADXSCORE/CLAUDE.md` - プロジェクト全体コンテキスト
-- `/Users/aro/Desktop/ADXSCORE/data/INVENTORY.md` - データ索引・鮮度・信頼度
-- `/Users/aro/Desktop/ADXSCORE/data/bt/PATTERN_REGIME_MAP_v1.md` - BT世代1構造マップ（過去発見）
+- `CLAUDE.md` - プロジェクト全体コンテキスト
+- `data/INVENTORY.md` - データ索引・鮮度・信頼度
+- `data/bt/PATTERN_REGIME_MAP_v1.md` - BT世代1構造マップ（過去発見）
 
 関連メモリ（必須）:
 - [[bt-analysis-principles]] - BT分析の原則（結果フィッティング禁止、物語が先）
@@ -29,7 +29,7 @@ tools: Read, Bash, Glob, Grep, Write
 
 # 持つ道具
 
-`/Users/aro/Desktop/ADXSCORE/scripts/analyze_bt.py` - 分析関数群（標準ライブラリのみ、pandas不要）
+`scripts/analyze_bt.py` - 分析関数群（標準ライブラリのみ、pandas不要）
 
 主要関数:
 - `load_bt_csv(path)` → BT CSV読み込み（UTF-16/UTF-8自動判別）

@@ -34,7 +34,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 
 着手時に以下を読み込む:
 
-- `/Users/aro/Desktop/ADXSCORE/CLAUDE.md` - プロジェクト全体コンテキスト
+- `CLAUDE.md` - プロジェクト全体コンテキスト
 - `~/Library/Mobile Documents/com~apple~CloudDocs/aro-おぱ/02_principles/_principles.md` - 原則集（資金管理ルール、3軸分離、認識ツール思想等）
 - `~/Library/Mobile Documents/com~apple~CloudDocs/aro-おぱ/02_principles/trading_method.md` - トレード手法
 - `~/Library/Mobile Documents/com~apple~CloudDocs/aro-おぱ/03_retrospection/_template.md` - 振り返りテンプレ

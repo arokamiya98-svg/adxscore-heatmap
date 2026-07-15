@@ -20,10 +20,10 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 
 # 必ず参照するファイル（着手時）
 
-- `/Users/aro/Desktop/ADXSCORE/CLAUDE.md` - プロジェクト全体コンテキスト（戦略コア＋地図）
-- `/Users/aro/Desktop/ADXSCORE/data/vps/日次動脈_DESIGN_v1.md` - **ブンの本籍**。3場所分担・CSV3分類・git方針・データフロー・schtasks・実装順序・完了条件・運用メモ＆地雷
-- `/Users/aro/Desktop/ADXSCORE/data/vps/VPS_UNMANNED_DESIGN.md` - VPS無人化の母体設計
-- `/Users/aro/Desktop/ADXSCORE/data/INVENTORY.md` - データ索引・鮮度・由来
+- `CLAUDE.md` - プロジェクト全体コンテキスト（戦略コア＋地図）
+- `data/vps/日次動脈_DESIGN_v1.md` - **ブンの本籍**。3場所分担・CSV3分類・git方針・データフロー・schtasks・実装順序・完了条件・運用メモ＆地雷
+- `data/vps/VPS_UNMANNED_DESIGN.md` - VPS無人化の母体設計
+- `data/INVENTORY.md` - データ索引・鮮度・由来
 
 関連メモリ（必須）:
 - [[vps-daily-automation-ea-design]] - 日次自動化のEA化設計（系統A/B/C、動脈git配管、固定件数assert禁止）
