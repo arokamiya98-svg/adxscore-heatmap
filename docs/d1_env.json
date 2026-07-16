@@ -1,6 +1,6 @@
 {
   "updated": "2026-07-16",
-  "generated_at": "2026-07-16 13:10",
+  "generated_at": "2026-07-16 14:10",
   "adx22": 32.5,
   "adx_state": "BEAR",
   "di_plus": 8.6,
@@ -17,11 +17,11 @@
   "dxy": {
     "date": "2026-07-16",
     "adx56": 9.4,
-    "di_spread": -2.1,
+    "di_spread": -4.4,
     "di_dir": "USD_DN",
     "depth_label": "揺らぎ",
     "spread_range_5d": {
-      "min": -2.1,
+      "min": -4.4,
       "max": 7.8
     }
   }
