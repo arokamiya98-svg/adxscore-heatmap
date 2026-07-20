@@ -1,17 +1,17 @@
 {
   "updated": "2026-07-21",
-  "generated_at": "2026-07-21 07:17",
-  "adx22": 34.6,
+  "generated_at": "2026-07-21 08:10",
+  "adx22": 34.7,
   "adx_state": "BEAR",
-  "di_plus": 9.7,
-  "di_minus": 20.5,
-  "di_spread": -10.8,
+  "di_plus": 8.8,
+  "di_minus": 18.7,
+  "di_spread": -9.9,
   "spread_range_5d": {
     "min": -14.6,
-    "max": -10.8
+    "max": -9.9
   },
-  "spread_label": "優勢",
-  "atr_ratio": 0.92,
+  "spread_label": "揺らぎ",
+  "atr_ratio": 0.9,
   "atr_cross_dir": "DOWN",
   "atr_cross_days": 7,
   "dxy": {
