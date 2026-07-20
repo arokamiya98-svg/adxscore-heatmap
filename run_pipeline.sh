@@ -18,8 +18,12 @@ set -e
 cd "$(dirname "$0")"
 
 OPEN_BROWSER=true
+DO_PUSH=true
 for arg in "$@"; do
-  if [ "$arg" = "--no-open" ]; then OPEN_BROWSER=false; fi
+  case "$arg" in
+    --no-open) OPEN_BROWSER=false ;;
+    --no-push) DO_PUSH=false ;;   # 案B′: hourly_sync が毎時1回に集約してpush
+  esac
 done
 
 echo ""
@@ -66,9 +70,13 @@ fi
 echo ""
 
 # ── Step 5: GitHub Pages 自動push ────────────────────────
-echo "▶ Step 5: GitHub Pages に自動push"
-cd "$(dirname "$0")"
-if git rev-parse --git-dir > /dev/null 2>&1; then
+# 案B′(2026-07-21): hourly_sync 経由(--no-push)では commit/push しない
+# ＝hourly_sync Step4 が日次分と合わせて毎時1コミット1pushに集約。
+# 手動実行時は従来どおり自前で push（非対話+低速検知ガード付き=案C）。
+if [ "$DO_PUSH" = false ]; then
+  echo "▶ Step 5: push集約モード（--no-push）→ commit/push は hourly_sync が実施"
+elif git rev-parse --git-dir > /dev/null 2>&1; then
+  echo "▶ Step 5: GitHub Pages に自動push"
   # ② 自動集計（ADX_Weekly_Above_v4 / H4PhaseAuto_weekly）は 2026-06-26 VPS書き移行で add 除外。
   #   VPSが毎時EAで書き push する → Mac は受信のみ＝ここで push すると二重書きになる。
   #   Mac が push するのは自分の生成物（heatmap_v14.html / weekly_waves.json）。
@@ -76,7 +84,9 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
   git add docs/heatmap_v14.html data/weekly_waves.json \
           mt5_data/ADX_Weekly_Above_v3.csv
   git commit -m "weekly update $(date '+%Y-%m-%d')" 2>/dev/null || echo "  (変更なし)"
-  git push origin main && echo "🚀 GitHub Pages 更新完了！" || echo "⚠️  push 失敗（手動で git push してね）"
+  # 非対話（認証UI待ちハング防止）+ 低速検知（1KB/s未満30秒で中断）= VPS側と同じ思想
+  GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push origin main \
+    && echo "🚀 GitHub Pages 更新完了！" || echo "⚠️  push 失敗（手動で git push してね）"
 else
   echo "⚠️  git リポジトリ未設定（スキップ）"
 fi

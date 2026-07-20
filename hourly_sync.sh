@@ -44,15 +44,26 @@ AGG_TARGETS=(
 )
 
 # 日次カレンダー publish 対象（--no-publish で publish を当方に集約）
-# ⚠️ 同根の穴: このリストは run_daily_calendar.sh Step2.6 の PUBLISH_FILES と
-#    手動同期。あちらに公開物を足したら必ずここにも足す（2026-07-14 d1_env.json
-#    置き去り事故: 生成は毎時走るのに公開されず widget が7/9のまま5日停滞）。
-PUBLISH_FILES_DAILY=(
-  "docs/trades_calendar.html"
-  "docs/signals_calendar.html"
-  "docs/daily_calendar_v3.html"
-  "docs/d1_env.json"
-)
+# 正本 = data/vps/publish_list.txt（案D 2026-07-21: run_daily_calendar Step2.6 と共有。
+# 旧・手動二重管理の同根穴を閉鎖＝7/14 d1_env.json 置き去り事故の恒久対応）
+PUBLISH_LIST="data/vps/publish_list.txt"
+PUBLISH_FILES_DAILY=()
+if [ -f "$PUBLISH_LIST" ]; then
+  while IFS= read -r _line; do
+    _line="${_line%%#*}"
+    _line="$(echo "$_line" | xargs 2>/dev/null || true)"
+    [ -n "$_line" ] && PUBLISH_FILES_DAILY+=("$_line")
+  done < "$PUBLISH_LIST"
+fi
+# リスト欠損/空のフォールバック（publishを止めない）
+if [ ${#PUBLISH_FILES_DAILY[@]} -eq 0 ]; then
+  PUBLISH_FILES_DAILY=(
+    "docs/trades_calendar.html"
+    "docs/signals_calendar.html"
+    "docs/daily_calendar_v3.html"
+    "docs/d1_env.json"
+  )
+fi
 
 GIT_FETCH_TIMEOUT=15
 GIT_PULL_TIMEOUT=45
@@ -60,7 +71,10 @@ GIT_PUSH_TIMEOUT=30
 
 LOCKDIR="/tmp/adxscore_hourly_sync.lock"
 
-ts() { date +"%H:%M:%S"; }
+ts() { date +"%m-%d %H:%M:%S"; }
+
+# fetch連続失敗カウンタ（案A: 3回連続でMac通知。/tmpは再起動リセット=許容）
+FAIL_COUNT_FILE="/tmp/adxscore_hourly_fetch_fails"
 
 # ── ポータブル timeout（auto_sync_daily.sh から流用・同一実装）──
 # run_to <秒> <コマンド...> : 最大<秒>で実行、超過で TERM→2s後 KILL。戻り値=コマンドrc。
@@ -88,10 +102,27 @@ trap 'rmdir "$LOCKDIR" 2>/dev/null || true' EXIT INT TERM
 
 echo "[$(ts)] ── hourly_sync 開始 ──────────────────────────"
 
+# ── Step 0: 自己修復ガード（監査 2026-07-21 案A / FM-1対応）────
+# Finder系の日付保存コピーで .git 内に「名前 2」複製が混入すると
+# git fetch が fatal: bad object で即死する（7/15・7/21 の2回実績）。
+# 発生源（手作業由来）は止められないため、毎時ここで無害化する。
+STRAYS=$(find .git -type f -name "* 2*" 2>/dev/null || true)
+if [ -n "$STRAYS" ]; then
+  while IFS= read -r s; do
+    [ -n "$s" ] || continue
+    rm -f "$s" 2>/dev/null || true
+    echo "[$(ts)] 🧹 自己修復: .git内の複製を除去 → $s"
+  done <<< "$STRAYS"
+fi
+# KILLで中断されたgitのロック残骸も掃除（1時間以上残留＝生きてるgitではない）
+find .git -maxdepth 1 -name "*.lock" -mmin +60 -delete 2>/dev/null || true
+find .git/refs -name "*.lock" -mmin +60 -delete 2>/dev/null || true
+
 # ── Step 1: VPS受信（git fetch → pull）run_to で囲う ───────────
 # 失敗/timeout はログして続行（次の毎時で自己回復）。
 echo "[$(ts)] git fetch origin main（timeout ${GIT_FETCH_TIMEOUT}s）"
 if run_to "$GIT_FETCH_TIMEOUT" git fetch origin main --quiet; then
+  echo 0 > "$FAIL_COUNT_FILE" 2>/dev/null || true
   LOCAL_HEAD=$(git rev-parse HEAD 2>/dev/null || echo local)
   REMOTE_HEAD=$(git rev-parse origin/main 2>/dev/null || echo remote)
   if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
@@ -105,7 +136,13 @@ if run_to "$GIT_FETCH_TIMEOUT" git fetch origin main --quiet; then
     echo "[$(ts)] origin/main 変更なし（pull不要）"
   fi
 else
-  echo "[$(ts)] ⚠️ git fetch 失敗/timeout（続行・次の毎時で自己回復）"
+  # 連続失敗カウント → 3回で通知（無音停止の防止＝FM-7対応。以降は24回ごと=1日1回）
+  N=$(cat "$FAIL_COUNT_FILE" 2>/dev/null | tr -dc '0-9'); N=${N:-0}; N=$((N+1))
+  echo "$N" > "$FAIL_COUNT_FILE" 2>/dev/null || true
+  echo "[$(ts)] ⚠️ git fetch 失敗/timeout（${N}回連続・続行）"
+  if [ "$N" -eq 3 ] || [ $((N % 24)) -eq 0 ]; then
+    osascript -e "display notification \"git fetch が${N}回連続失敗。診断: find .git -name '* 2*'\" with title \"ADXSCORE hourly_sync\" sound name \"Basso\"" 2>/dev/null || true
+  fi
 fi
 
 DID_DAILY=false
@@ -123,9 +160,10 @@ if [ -n "$CSV_LATEST" ]; then
     HTML_MTIME=0
   fi
   if [ "$CSV_MTIME" -gt "$HTML_MTIME" ]; then
-    echo "[$(ts)] ▶ 日次: daily/CSV > 生成HTML → run_daily_calendar.sh --no-open --no-publish"
+    echo "[$(ts)] ▶ 日次: daily/CSV > 生成HTML → run_daily_calendar.sh --no-open --no-publish（timeout 600s）"
     rc=0
-    ./run_daily_calendar.sh --no-open --no-publish > /tmp/_hourly_rdc.txt 2>&1 || rc=$?
+    # 案C: 呼び出しにも上限。kill はラッパーに当たる（孤児gitのロック残骸は Step0 が翌時掃除）
+    run_to 600 bash -c './run_daily_calendar.sh --no-open --no-publish > /tmp/_hourly_rdc.txt 2>&1' || rc=$?
     grep -E "(OK 出力|トレード日数|期間|日次CSV|完了|Error|Traceback|❌|失敗|未受信)" /tmp/_hourly_rdc.txt | head -10 || true
     if [ "$rc" -eq 0 ]; then
       echo "[$(ts)] ✅ 日次カレンダー再生成完了"
@@ -177,9 +215,11 @@ if [ "$WEEKLY_NEWER" = false ]; then
   done
 fi
 if [ "$WEEKLY_NEWER" = true ]; then
-  echo "[$(ts)] ▶ 週次: $WEEKLY_REASON > weekly_waves.json → run_pipeline.sh --no-open"
+  echo "[$(ts)] ▶ 週次: $WEEKLY_REASON > weekly_waves.json → run_pipeline.sh --no-open --no-push（timeout 600s）"
   rc=0
-  ./run_pipeline.sh --no-open > /tmp/_hourly_pipe.txt 2>&1 || rc=$?
+  # 案B′: --no-push で weekly の commit/push を当方 Step4 に集約（毎時1コミット1push）
+  # 案C: 呼び出しにも上限（kill はラッパーに当たる・ロック残骸は Step0 が翌時掃除）
+  run_to 600 bash -c './run_pipeline.sh --no-open --no-push > /tmp/_hourly_pipe.txt 2>&1' || rc=$?
   grep -E "(Step|完了|iCloud|GitHub|push|更新|⚠️|Error|Traceback)" /tmp/_hourly_pipe.txt | head -15 || true
   if [ "$rc" -eq 0 ]; then
     echo "[$(ts)] ✅ 週次パイプライン完了"
@@ -193,8 +233,8 @@ else
 fi
 
 # ── Step 4: publish push（変更分だけ・run_to 付き・push前 pull）─
-# 日次は --no-publish で当方に集約。週次(run_pipeline.sh)は内蔵で既にpush済の可能性が
-# あるが、その場合ここは差分なしで no-op になる（二重push防止）。
+# 案B′(2026-07-21): 日次=--no-publish・週次=--no-push で commit/push をここに全集約
+# ＝毎時1コミット1push（旧: 毎時2〜3push が衝突窓とコミット洪水の源だった）。
 PUBLISH_FILES=("${PUBLISH_FILES_DAILY[@]}")
 # 週次成果物も拾う（run_pipeline.sh が push 済なら git status は clean → no-op）
 PUBLISH_FILES+=("docs/heatmap_v14.html" "data/weekly_waves.json")

@@ -124,11 +124,21 @@ echo ""
 
 # ── Step 2.6: 自動 publish (docs/ のカレンダー3枚 + d1_env.json) ─
 # 失敗 (オフライン等) してもパイプラインは止めない
-PUBLISH_FILES="docs/trades_calendar.html docs/signals_calendar.html docs/daily_calendar_v3.html"
-# d1_env.json は存在する時だけホワイトリストに追加
-# （未生成時に git add が失敗して既存3枚のpublishを道連れにしないため）
-if [ -f docs/d1_env.json ]; then
-  PUBLISH_FILES="$PUBLISH_FILES docs/d1_env.json"
+# 正本 = data/vps/publish_list.txt（案D 2026-07-21: hourly_sync と共有・二重管理閉鎖）。
+# 存在するファイルだけ採用（未生成物が git add を道連れにしない従来ガードを一般化）。
+PUBLISH_LIST="data/vps/publish_list.txt"
+PUBLISH_FILES=""
+if [ -f "$PUBLISH_LIST" ]; then
+  while IFS= read -r _line; do
+    _line="${_line%%#*}"
+    _line="$(echo "$_line" | xargs 2>/dev/null || true)"
+    [ -n "$_line" ] && [ -f "$_line" ] && PUBLISH_FILES="$PUBLISH_FILES $_line"
+  done < "$PUBLISH_LIST"
+fi
+# リスト欠損/空のフォールバック（publishを止めない）
+if [ -z "$PUBLISH_FILES" ]; then
+  PUBLISH_FILES="docs/trades_calendar.html docs/signals_calendar.html docs/daily_calendar_v3.html"
+  [ -f docs/d1_env.json ] && PUBLISH_FILES="$PUBLISH_FILES docs/d1_env.json"
 fi
 if [ "$DO_PUBLISH" = true ] && [ -f docs/trades_calendar.html ]; then
   if ! git diff --quiet -- $PUBLISH_FILES 2>/dev/null \

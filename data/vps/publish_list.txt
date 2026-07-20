@@ -1,0 +1,14 @@
+# ============================================================
+# publish_list.txt — 日次publish対象の正本（監査 2026-07-21 案D）
+# ============================================================
+# hourly_sync.sh と run_daily_calendar.sh の両方がこのリストを読む。
+# 公開物を足す時はここに1行足すだけ（二重管理の同根穴を閉じる恒久対応。
+# 7/14 d1_env.json 置き去り事故の再発防止）。
+# 書式: 1行1パス（リポジトリルート相対）。# 以降はコメント。空行OK。
+# 注意: 週次成果物(heatmap_v14.html / weekly_waves.json)はここに書かない
+#       （hourly_sync が自分で追加する。run_daily_calendar の管轄外のため）。
+# ============================================================
+docs/trades_calendar.html
+docs/signals_calendar.html
+docs/daily_calendar_v3.html
+docs/d1_env.json
