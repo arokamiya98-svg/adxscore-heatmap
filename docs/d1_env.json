@@ -1,6 +1,6 @@
 {
   "updated": "2026-07-21",
-  "generated_at": "2026-07-21 20:10",
+  "generated_at": "2026-07-21 21:10",
   "adx22": 33.1,
   "adx_state": "BEAR",
   "di_plus": 13.4,
@@ -16,8 +16,8 @@
   "atr_cross_days": 7,
   "dxy": {
     "date": "2026-07-21",
-    "adx56": 7.3,
-    "di_spread": -0.6,
+    "adx56": 7.1,
+    "di_spread": -0.2,
     "di_dir": "USD_DN",
     "depth_label": "拮抗",
     "spread_range_5d": {
