@@ -14104,11 +14104,11 @@
     "tier": "D",
     "h4_phase_auto": "収束底",
     "h4_cross_dir": "PD",
-    "h4_atr_diff": -3.0221,
+    "h4_atr_diff": -5.867,
     "adx_score": 1.0,
-    "h1_avg_adx": 14.0,
+    "h1_avg_adx": 14.16,
     "h4_pct20": 0.0,
     "h4_pct25": 0.0,
-    "h1_pct20": 10.5
+    "h1_pct20": 12.1
   }
 ]
