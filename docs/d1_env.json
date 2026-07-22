@@ -1,28 +1,28 @@
 {
   "updated": "2026-07-22",
-  "generated_at": "2026-07-22 12:13",
-  "adx22": 30.7,
+  "generated_at": "2026-07-22 13:12",
+  "adx22": 30.8,
   "adx_state": "BULL",
-  "di_plus": 19.2,
+  "di_plus": 19.7,
   "di_minus": 17.1,
-  "di_spread": 2.1,
+  "di_spread": 2.6,
   "spread_range_5d": {
     "min": -14.6,
-    "max": 2.1
+    "max": 2.6
   },
   "spread_label": "拮抗",
-  "atr_ratio": 0.9,
+  "atr_ratio": 0.91,
   "atr_cross_dir": "DOWN",
   "atr_cross_days": 8,
   "dxy": {
     "date": "2026-07-22",
-    "adx56": 12.0,
-    "di_spread": 8.6,
+    "adx56": 12.4,
+    "di_spread": 7.3,
     "di_dir": "USD_UP",
     "depth_label": "優勢",
     "spread_range_5d": {
       "min": 2.4,
-      "max": 8.6
+      "max": 7.3
     }
   }
 }
