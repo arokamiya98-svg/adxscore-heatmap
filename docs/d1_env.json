@@ -1,6 +1,6 @@
 {
   "updated": "2026-07-22",
-  "generated_at": "2026-07-22 19:10",
+  "generated_at": "2026-07-22 20:10",
   "adx22": 30.8,
   "adx_state": "BULL",
   "di_plus": 19.7,
@@ -16,8 +16,8 @@
   "atr_cross_days": 8,
   "dxy": {
     "date": "2026-07-22",
-    "adx56": 13.1,
-    "di_spread": 2.6,
+    "adx56": 13.0,
+    "di_spread": 3.1,
     "di_dir": "USD_UP",
     "depth_label": "揺らぎ",
     "spread_range_5d": {
