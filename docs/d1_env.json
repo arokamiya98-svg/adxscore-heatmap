@@ -1,10 +1,10 @@
 {
   "updated": "2026-07-28",
-  "generated_at": "2026-07-28 12:10",
+  "generated_at": "2026-07-28 13:31",
   "adx22": 23.3,
   "adx_state": "BEAR",
   "di_plus": 18.2,
-  "di_minus": 21.6,
+  "di_minus": 21.7,
   "di_spread": -3.4,
   "spread_range_5d": {
     "min": -3.4,
@@ -16,8 +16,8 @@
   "atr_cross_days": 12,
   "dxy": {
     "date": "2026-07-28",
-    "adx56": 13.2,
-    "di_spread": 7.5,
+    "adx56": 13.3,
+    "di_spread": 6.2,
     "di_dir": "USD_UP",
     "depth_label": "優勢",
     "spread_range_5d": {
