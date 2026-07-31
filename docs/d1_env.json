@@ -1,6 +1,6 @@
 {
   "updated": "2026-07-31",
-  "generated_at": "2026-07-31 20:10",
+  "generated_at": "2026-07-31 21:10",
   "adx22": 18.9,
   "adx_state": "RANGE",
   "di_plus": 16.3,
@@ -16,10 +16,10 @@
   "atr_cross_days": 15,
   "dxy": {
     "date": "2026-07-31",
-    "adx56": 8.8,
-    "di_spread": -2.7,
+    "adx56": 8.6,
+    "di_spread": -1.4,
     "di_dir": "USD_DN",
-    "depth_label": "揺らぎ",
+    "depth_label": "拮抗",
     "spread_range_5d": {
       "min": -8.5,
       "max": 10.1
