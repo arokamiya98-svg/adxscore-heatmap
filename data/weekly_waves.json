@@ -14188,11 +14188,11 @@
     "tier": "C",
     "h4_phase_auto": "収束底",
     "h4_cross_dir": "PD",
-    "h4_atr_diff": -5.5736,
+    "h4_atr_diff": -5.015,
     "adx_score": 1.4,
-    "h1_avg_adx": 17.83,
+    "h1_avg_adx": 17.78,
     "h4_pct20": 0.0,
     "h4_pct25": 0.0,
-    "h1_pct20": 8.0
+    "h1_pct20": 7.7
   }
 ]
