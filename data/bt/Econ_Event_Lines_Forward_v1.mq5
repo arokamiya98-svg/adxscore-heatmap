@@ -12,9 +12,12 @@
 //|  注意    : 未来外挿は取引時間ベース→週末跨ぎは数バーずれ得る(許容)。|
 //+------------------------------------------------------------------+
 #property copyright "ARO"
-#property version   "1.00"
+#property version   "1.10"
 #property indicator_chart_window
 #property indicator_plots 0
+// v1.10 (2026-08-12): ブローカー間のイベント名 表記揺れ対策。
+//   分類を完全一致→部分一致(StringFind)に緩め、InpDebugで実名をログ出力。
+//   （VPSブローカーがMacと別提供元だとTier A/Bの細名が一致せず非表示になる問題の対応）
 
 input int      InpDaysAhead     = 3;      // 何日先まで先出しするか（元構想=直近3日）
 input bool     InpShowTierS      = true;  // NFP/CPI/FOMC
@@ -24,23 +27,30 @@ input bool     InpShowLabel      = true;  // 指標名ラベル
 input bool     InpShowValue      = false; // 予想値/前回値（発表前なので Actual は無い）
 input bool     InpForceChartShift= true;  // 右に未来空間を確保（フォワード表示に必須）
 input int      InpRefreshMin     = 30;    // 自動更新間隔（分）
+input bool     InpDebug          = false; // 取得した全イベントの実名をログ出力（診断用）
 
 const string PFX = "FWDEVT_";
 
-//--- EventName → Tier(3=S/2=A/1=B/0=対象外) と グループ名（History版と同一辞書）---
+//--- EventName → Tier(3=S/2=A/1=B/0=対象外) と グループ名 ---
+//    部分一致(StringFind)でブローカー間の表記揺れを吸収。
+//    判定順が重要: ISM を S&P PMI 判定より先に（"ISM…PMI" が PMI に誤分類されないよう）。
 int ClassifyTier(const string nm, string &grp)
 {
-   if(nm=="Nonfarm Payrolls"){ grp="NFP"; return 3; }
-   if(nm=="CPI" || nm=="CPI m/m" || nm=="CPI y/y"){ grp="CPI"; return 3; }
-   if(nm=="Fed Interest Rate Decision"){ grp="FOMC"; return 3; }
-   if(nm=="PPI m/m" || nm=="PPI y/y"){ grp="PPI"; return 2; }
-   if(nm=="Retail Sales m/m" || nm=="Core Retail Sales m/m"){ grp="RETAIL"; return 2; }
-   if(nm=="GDP q/q" || nm=="GDP Price Index q/q" || nm=="GDP Sales q/q"){ grp="GDP"; return 2; }
-   if(nm=="Core PCE Price Index m/m" || nm=="PCE Price Index m/m"){ grp="PCE"; return 2; }
-   if(nm=="ADP Nonfarm Employment Change"){ grp="ADP"; return 2; }
-   if(nm=="S&P Global Manufacturing PMI" || nm=="S&P Global Services PMI" || nm=="S&P Global Composite PMI"){ grp="PMI"; return 2; }
-   if(nm=="ISM Non-Manufacturing PMI"){ grp="ISM-Svc"; return 1; }
-   if(nm=="ISM Manufacturing PMI"){ grp="ISM-Mfg"; return 1; }
+   if(StringFind(nm,"Nonfarm Payrolls")>=0){ grp="NFP"; return 3; }
+   if(StringFind(nm,"CPI")>=0){ grp="CPI"; return 3; }
+   if(StringFind(nm,"Interest Rate Decision")>=0){ grp="FOMC"; return 3; }
+   if(StringFind(nm,"Producer Price")>=0 || StringFind(nm,"PPI")>=0){ grp="PPI"; return 2; }
+   if(StringFind(nm,"Retail Sales")>=0){ grp="RETAIL"; return 2; }
+   if(StringFind(nm,"GDP")>=0){ grp="GDP"; return 2; }
+   if(StringFind(nm,"PCE Price")>=0){ grp="PCE"; return 2; }
+   if(StringFind(nm,"ADP")>=0){ grp="ADP"; return 2; }
+   if(StringFind(nm,"ISM")>=0)
+   {
+      if(StringFind(nm,"Non-Manufacturing")>=0 || StringFind(nm,"Services")>=0){ grp="ISM-Svc"; }
+      else { grp="ISM-Mfg"; }
+      return 1;
+   }
+   if(StringFind(nm,"S&P Global")>=0 && StringFind(nm,"PMI")>=0){ grp="PMI"; return 2; }
    grp=""; return 0;
 }
 
@@ -65,6 +75,9 @@ void BuildLines()
       if(!CalendarEventById(values[i].event_id, ev)) continue;
 
       string grp; int tier = ClassifyTier(ev.name, grp);
+      if(InpDebug)
+         PrintFormat("[FWDEVT-DBG] %s | name=\"%s\" | tier=%d grp=%s",
+            TimeToString(values[i].time, TIME_DATE|TIME_MINUTES), ev.name, tier, grp);
       if(tier==0) continue;
       if(tier==3 && !InpShowTierS) continue;
       if(tier==2 && !InpShowTierA) continue;
