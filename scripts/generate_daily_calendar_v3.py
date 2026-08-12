@@ -403,6 +403,26 @@ PATTERN_COLORS = {
     "PatE": {"BUY": "#FFA500", "SELL": "#FF8C00"},  # Orange / DarkOrange
 }
 PATTERNS = ["PatA", "PatB", "PatC", "PatD", "PatE"]
+
+# ============================================================
+# 経済指標イベント（手動メンテ / 認識用マーカー）
+# ------------------------------------------------------------
+# キー = JST日付 "YYYY-MM-DD"（そのイベントが JST で効く日）。
+# 値 = [(短ラベル, JST時刻表示, tier, ホバー詳細), ...]。
+#   tier: "high"=最重要(CPI/FOMC等) / "mid"=注視(PPI/小売/PMI等)
+# 追加はこの dict に1行足すだけ。色は方向色(青=買/赤=売)と衝突しない
+# ゴールド系で「方向を示唆しない環境イベント」を表す。
+# ▼米国夏時間(EDT=UTC-4)は ET+13h=JST。8:30 ET→21:30 / 9:45 ET→22:45 /
+#   14:00 ET→翌03:00（FOMC議事録は会合3週後の水曜14:00 ET定例）。
+# ▼あろさん基準の「イベント日付」で置く（FOMCは19日枠に「翌3:00」表記）。
+ECON_EVENTS = {
+    "2026-08-12": [("CPI",  "21:30",  "high", "米CPI(7月分) 8:30 ET → JST21:30")],
+    "2026-08-13": [("PPI",  "21:30",  "mid",  "米PPI(7月分) 8:30 ET → JST21:30")],
+    "2026-08-14": [("小売", "21:30",  "mid",  "米小売売上高(7月分) 8:30 ET → JST21:30")],
+    "2026-08-19": [("FOMC", "翌3:00", "high", "FOMC議事録(7/28-29会合) 14:00 ET → JST20日03:00")],
+    "2026-08-21": [("PMI",  "22:45",  "mid",  "S&Pグローバル米フラッシュPMI 9:45 ET → JST22:45")],
+}
+
 FILTER_COLS = [
     ("f1_none_sell", "F1 none_sell"),
     ("f2_patb_midh_sell", "F2 patb_midh_sell"),
@@ -1712,6 +1732,22 @@ h1 { font-size: 14px; color: #5a9adf; margin: 0 0 4px; letter-spacing: .08em; }
 .fire-dot.suppressed { opacity: 0.3; }   /* pass_all=FALSE: 実機なら見えなかった発火 */
 .fire-dot.satfold { text-decoration: underline dotted rgba(200,210,230,0.45); } /* JST土曜分（金曜セル併載） */
 
+/* 経済指標イベント帯（day-hdr 直下 / ゴールド系＝方向色と非衝突の環境マーカー） */
+.cell .econ-row {
+  display: flex; flex-wrap: wrap; gap: 2px; padding: 2px 4px 0;
+}
+.econ-badge {
+  font-size: 9px; line-height: 1.35; white-space: nowrap;
+  padding: 0 4px; border-radius: 3px; letter-spacing: .02em;
+  background: rgba(212,170,60,0.14); color: #d9b463;
+  border: 1px solid rgba(212,170,60,0.45);
+  border-left: 3px solid rgba(212,170,60,0.75);
+}
+.econ-badge.tier-high {
+  background: rgba(230,140,50,0.20); color: #f0bd72; font-weight: 600;
+  border-color: rgba(230,140,50,0.55); border-left-color: rgba(230,140,50,0.9);
+}
+
 /* v3-Step2 B2: 9本フィルター デフォルトON（pass_all=TRUE のみ表示、トグルで全発火） */
 #tab-calendar:not(.show-all-fires) .fire-dot.suppressed { display: none; }
 #tab-calendar:not(.show-all-fires) .fires-row.all-suppressed { display: none; }
@@ -2003,7 +2039,12 @@ for m_start in reversed(list(month_iter(start, end))):  # v3: 最新月を先頭
     #   （あろさん指摘: 枠は3日まであるのに今日はまだ1日）。週頭(月曜)が今日以前の週だけ残す。
     #   過去月は全週が該当するため無影響。当月のみ現在週で打ち切られる。
     _today = date.today()
-    weeks_list = [w for w in weeks_list if w and w[0] <= _today]
+    # v3 (2026-08-12): 未来週抑制は維持しつつ、経済指標イベントを含む週は先出しで残す。
+    #   経済カレンダーは本来「これから来る指標」を見るためのもの＝イベント週は空でも描画価値がある。
+    weeks_list = [
+        w for w in weeks_list
+        if w and (w[0] <= _today or any(d.strftime("%Y-%m-%d") in ECON_EVENTS for d in w))
+    ]
     month_trades = [t for d, ts in trade_by_date.items() if d.year==m_start.year and d.month==m_start.month for t in ts]
     pl_sum = sum(t["pl"] for t in month_trades)
     n_win = sum(1 for t in month_trades if t["pl"]>0)
@@ -2127,6 +2168,17 @@ for m_start in reversed(list(month_iter(start, end))):  # v3: 最新月を先頭
                 ph_cls, ph_lbl = ph_tuple
                 html.append(f'<span class="ph-badge {ph_cls}">{ph_lbl}</span>')
             html.append('</div>')
+
+            # 経済指標イベント帯（outside セルには出さない = 隣月二重描画防止）
+            day_events = ECON_EVENTS.get(d.strftime("%Y-%m-%d"), []) if not is_outside else []
+            if day_events:
+                html.append('<div class="econ-row">')
+                for (_ev_lbl, _ev_time, _ev_tier, _ev_note) in day_events:
+                    html.append(
+                        f'<span class="econ-badge tier-{_ev_tier}" title="{_ev_note}">'
+                        f'{_ev_lbl} {_ev_time}</span>'
+                    )
+                html.append('</div>')
 
             # H4 主役レーン
             # v0.5: トレード日は MAE/MFE 中央主役、スコアは右上小フォントに降格
