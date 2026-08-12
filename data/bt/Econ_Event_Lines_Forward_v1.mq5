@@ -12,12 +12,15 @@
 //|  注意    : 未来外挿は取引時間ベース→週末跨ぎは数バーずれ得る(許容)。|
 //+------------------------------------------------------------------+
 #property copyright "ARO"
-#property version   "1.10"
+#property version   "1.11"
 #property indicator_chart_window
 #property indicator_plots 0
 // v1.10 (2026-08-12): ブローカー間のイベント名 表記揺れ対策。
 //   分類を完全一致→部分一致(StringFind)に緩め、InpDebugで実名をログ出力。
 //   （VPSブローカーがMacと別提供元だとTier A/Bの細名が一致せず非表示になる問題の対応）
+// v1.11 (2026-08-12): VPSで3日先が画面外に落ちる件。CHART_SHIFTはON/OFFのみで
+//   シフト幅%(CHART_SHIFT_SIZE)は別物・既定20%=表示バー本数依存のため、
+//   表示本数から逆算して明示指定＋ズーム時に追従させる。
 
 input int      InpDaysAhead     = 3;      // 何日先まで先出しするか（元構想=直近3日）
 input bool     InpShowTierS      = true;  // NFP/CPI/FOMC
@@ -30,6 +33,21 @@ input int      InpRefreshMin     = 30;    // 自動更新間隔（分）
 input bool     InpDebug          = false; // 取得した全イベントの実名をログ出力（診断用）
 
 const string PFX = "FWDEVT_";
+
+// 未来空間の幅を表示バー本数から逆算して明示指定（ズーム状態に依らずN日分を確保）。
+void UpdateShiftSize()
+{
+   if(!InpForceChartShift) return;
+   int visible = (int)ChartGetInteger(0, CHART_VISIBLE_BARS);
+   long periodSec = PeriodSeconds();
+   if(visible <= 0 || periodSec <= 0) return;
+
+   double barsPerDay = 86400.0 / periodSec;
+   double neededBars = InpDaysAhead * barsPerDay;
+   double pct = neededBars / visible * 100.0;
+   pct = MathMax(10.0, MathMin(50.0, pct));  // CHART_SHIFT_SIZEの許容域
+   ChartSetDouble(0, CHART_SHIFT_SIZE, pct);
+}
 
 //--- EventName → Tier(3=S/2=A/1=B/0=対象外) と グループ名 ---
 //    部分一致(StringFind)でブローカー間の表記揺れを吸収。
@@ -56,6 +74,7 @@ int ClassifyTier(const string nm, string &grp)
 
 void BuildLines()
 {
+   UpdateShiftSize();
    ObjectsDeleteAll(0, PFX);
 
    MqlCalendarValue values[];
@@ -126,6 +145,10 @@ int OnInit()
    return(INIT_SUCCEEDED);
 }
 void OnTimer(){ BuildLines(); }                                    // 定期再描画（過ぎた分を落とす）
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+{
+   if(id == CHARTEVENT_CHART_CHANGE) UpdateShiftSize();  // ズーム/スクロール直後に幅を追従
+}
 void OnDeinit(const int reason){ EventKillTimer(); ObjectsDeleteAll(0, PFX); ChartRedraw(); }
 int OnCalculate(const int rates_total, const int prev_calculated,
                 const datetime &t[], const double &o[], const double &h[],
