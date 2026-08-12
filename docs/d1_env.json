@@ -1,6 +1,6 @@
 {
   "updated": "2026-08-13",
-  "generated_at": "2026-08-13 03:13",
+  "generated_at": "2026-08-13 04:14",
   "adx22": 26.6,
   "adx_state": "BULL",
   "di_plus": 26.8,
@@ -17,12 +17,12 @@
   "dxy": {
     "date": "2026-08-13",
     "adx56": 16.1,
-    "di_spread": 4.2,
+    "di_spread": 5.4,
     "di_dir": "USD_UP",
-    "depth_label": "揺らぎ",
+    "depth_label": "優勢",
     "spread_range_5d": {
       "min": -1.4,
-      "max": 5.3
+      "max": 5.4
     }
   }
 }
