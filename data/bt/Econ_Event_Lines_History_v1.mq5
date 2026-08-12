@@ -14,9 +14,12 @@
 //|            ATRバンド系インジと重ねて見るのが本来の用途。          |
 //+------------------------------------------------------------------+
 #property copyright "ARO"
-#property version   "1.00"
+#property version   "1.10"
 #property indicator_chart_window
 #property indicator_plots 0
+// v1.10 (2026-08-12): 分類をイベント名→**EventID**へ（Forward v1.20と同じ恒久対応）。
+//   端末のUI言語で名前が変わる（VPS=日本語）ため、名前一致は言語依存で壊れる。
+//   IDはMetaQuotes共通。出典: data/bt/Econ_Calendar_US_History.csv の EventID列。
 
 input datetime InpFrom      = D'2024.01.01 00:00'; // 表示開始（重ければ後ろへ）
 input bool     InpShowTierS = true;                // NFP/CPI/FOMC
@@ -28,20 +31,35 @@ input int      InpMaxLines  = 800;                 // 縦線上限（Macの負�
 
 const string PFX = "EEL_";
 
-//--- EventName → Tier(3=S/2=A/1=B/0=対象外) と グループ名 ---
-int ClassifyTier(const string nm, string &grp)
+//--- EventID → Tier(3=S/2=A/1=B/0=対象外) と グループ名（Forward版と同一辞書）---
+int ClassifyTier(const ulong id, string &grp)
 {
-   if(nm=="Nonfarm Payrolls"){ grp="NFP"; return 3; }
-   if(nm=="CPI" || nm=="CPI m/m" || nm=="CPI y/y"){ grp="CPI"; return 3; }
-   if(nm=="Fed Interest Rate Decision"){ grp="FOMC"; return 3; }
-   if(nm=="PPI m/m" || nm=="PPI y/y"){ grp="PPI"; return 2; }
-   if(nm=="Retail Sales m/m" || nm=="Core Retail Sales m/m"){ grp="RETAIL"; return 2; }
-   if(nm=="GDP q/q" || nm=="GDP Price Index q/q" || nm=="GDP Sales q/q"){ grp="GDP"; return 2; }
-   if(nm=="Core PCE Price Index m/m" || nm=="PCE Price Index m/m"){ grp="PCE"; return 2; }
-   if(nm=="ADP Nonfarm Employment Change"){ grp="ADP"; return 2; }
-   if(nm=="S&P Global Manufacturing PMI" || nm=="S&P Global Services PMI" || nm=="S&P Global Composite PMI"){ grp="PMI"; return 2; }
-   if(nm=="ISM Non-Manufacturing PMI"){ grp="ISM-Svc"; return 1; }
-   if(nm=="ISM Manufacturing PMI"){ grp="ISM-Mfg"; return 1; }
+   switch(id)
+   {
+      // ── Tier S ──
+      case 840030016: grp="NFP";  return 3;  // Nonfarm Payrolls
+      case 840030005:                        // CPI m/m
+      case 840030007:                        // CPI y/y
+      case 840030035: grp="CPI";  return 3;  // CPI
+      case 840050014: grp="FOMC"; return 3;  // Fed Interest Rate Decision
+
+      // ── Tier A ──
+      case 840030001:                        // PPI m/m
+      case 840030003: grp="PPI";    return 2;// PPI y/y
+      case 840020010:                        // Retail Sales m/m
+      case 840020011: grp="RETAIL"; return 2;// Core Retail Sales m/m
+      case 840010007: grp="GDP";    return 2;// GDP q/q
+      case 840010001:                        // Core PCE Price Index m/m
+      case 840010003: grp="PCE";    return 2;// PCE Price Index m/m
+      case 840190001: grp="ADP";    return 2;// ADP Nonfarm Employment Change
+      case 840500001:                        // S&P Global Manufacturing PMI
+      case 840500002:                        // S&P Global Services PMI
+      case 840500003: grp="PMI";    return 2;// S&P Global Composite PMI
+
+      // ── Tier B ──
+      case 840040001: grp="ISM-Mfg"; return 1;// ISM Manufacturing PMI
+      case 840040003: grp="ISM-Svc"; return 1;// ISM Non-Manufacturing PMI
+   }
    grp=""; return 0;
 }
 
@@ -61,10 +79,7 @@ void BuildLines()
    int drawn = 0;
    for(int i=0; i<n && drawn<InpMaxLines; i++)
    {
-      MqlCalendarEvent ev;
-      if(!CalendarEventById(values[i].event_id, ev)) continue;
-
-      string grp; int tier = ClassifyTier(ev.name, grp);
+      string grp; int tier = ClassifyTier(values[i].event_id, grp);  // 分類はIDのみで完結（名称参照不要）
       if(tier==0) continue;
       if(tier==3 && !InpShowTierS) continue;
       if(tier==2 && !InpShowTierA) continue;

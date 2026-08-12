@@ -12,15 +12,18 @@
 //|  注意    : 未来外挿は取引時間ベース→週末跨ぎは数バーずれ得る(許容)。|
 //+------------------------------------------------------------------+
 #property copyright "ARO"
-#property version   "1.11"
+#property version   "1.20"
 #property indicator_chart_window
 #property indicator_plots 0
-// v1.10 (2026-08-12): ブローカー間のイベント名 表記揺れ対策。
-//   分類を完全一致→部分一致(StringFind)に緩め、InpDebugで実名をログ出力。
-//   （VPSブローカーがMacと別提供元だとTier A/Bの細名が一致せず非表示になる問題の対応）
-// v1.11 (2026-08-12): VPSで3日先が画面外に落ちる件。CHART_SHIFTはON/OFFのみで
-//   シフト幅%(CHART_SHIFT_SIZE)は別物・既定20%=表示バー本数依存のため、
-//   表示本数から逆算して明示指定＋ズーム時に追従させる。
+// v1.10 (2026-08-12): イベント名の表記揺れ対策で分類を部分一致(StringFind)へ。InpDebug追加。
+// v1.11 (2026-08-12): CHART_SHIFTはON/OFFのみでシフト幅%(CHART_SHIFT_SIZE)は別物・
+//   既定20%=表示バー本数依存のため、表示本数から逆算して明示指定＋ズーム時に追従。
+// v1.20 (2026-08-12): ★分類をイベント名→**EventID**へ変更（VPS実測で確定した恒久対応）。
+//   VPSはMT5のUIが日本語＝カレンダーAPIが日本語名を返す（"小売売上高前月比"等）。
+//   英単語ベースの名前判定は全滅し、"CPI"/"PPI"等の英字略語だけが偶然マッチしていた
+//   （＝「TierSしか出ない」の正体）。加えて "クリーブランドFed中央値CPI前月比" が
+//   TierS扱いで誤描画されていた。IDはMetaQuotes共通でUI言語に非依存＝両方を同時に解消。
+//   ID出典: data/bt/Econ_Calendar_US_History.csv の EventID列。
 
 input int      InpDaysAhead     = 3;      // 何日先まで先出しするか（元構想=直近3日）
 input bool     InpShowTierS      = true;  // NFP/CPI/FOMC
@@ -49,26 +52,37 @@ void UpdateShiftSize()
    ChartSetDouble(0, CHART_SHIFT_SIZE, pct);
 }
 
-//--- EventName → Tier(3=S/2=A/1=B/0=対象外) と グループ名 ---
-//    部分一致(StringFind)でブローカー間の表記揺れを吸収。
-//    判定順が重要: ISM を S&P PMI 判定より先に（"ISM…PMI" が PMI に誤分類されないよう）。
-int ClassifyTier(const string nm, string &grp)
+//--- EventID → Tier(3=S/2=A/1=B/0=対象外) と グループ名 ---
+//    IDはMetaQuotesカレンダー共通＝端末のUI言語に依存しない。
+//    IDは data/bt/Econ_Calendar_US_History.csv（EventID列）から採取。
+int ClassifyTier(const ulong id, string &grp)
 {
-   if(StringFind(nm,"Nonfarm Payrolls")>=0){ grp="NFP"; return 3; }
-   if(StringFind(nm,"CPI")>=0){ grp="CPI"; return 3; }
-   if(StringFind(nm,"Interest Rate Decision")>=0){ grp="FOMC"; return 3; }
-   if(StringFind(nm,"Producer Price")>=0 || StringFind(nm,"PPI")>=0){ grp="PPI"; return 2; }
-   if(StringFind(nm,"Retail Sales")>=0){ grp="RETAIL"; return 2; }
-   if(StringFind(nm,"GDP")>=0){ grp="GDP"; return 2; }
-   if(StringFind(nm,"PCE Price")>=0){ grp="PCE"; return 2; }
-   if(StringFind(nm,"ADP")>=0){ grp="ADP"; return 2; }
-   if(StringFind(nm,"ISM")>=0)
+   switch(id)
    {
-      if(StringFind(nm,"Non-Manufacturing")>=0 || StringFind(nm,"Services")>=0){ grp="ISM-Svc"; }
-      else { grp="ISM-Mfg"; }
-      return 1;
+      // ── Tier S ──
+      case 840030016: grp="NFP";  return 3;  // Nonfarm Payrolls
+      case 840030005:                        // CPI m/m
+      case 840030007:                        // CPI y/y
+      case 840030035: grp="CPI";  return 3;  // CPI
+      case 840050014: grp="FOMC"; return 3;  // Fed Interest Rate Decision
+
+      // ── Tier A ──
+      case 840030001:                        // PPI m/m
+      case 840030003: grp="PPI";    return 2;// PPI y/y
+      case 840020010:                        // Retail Sales m/m
+      case 840020011: grp="RETAIL"; return 2;// Core Retail Sales m/m
+      case 840010007: grp="GDP";    return 2;// GDP q/q
+      case 840010001:                        // Core PCE Price Index m/m
+      case 840010003: grp="PCE";    return 2;// PCE Price Index m/m
+      case 840190001: grp="ADP";    return 2;// ADP Nonfarm Employment Change
+      case 840500001:                        // S&P Global Manufacturing PMI
+      case 840500002:                        // S&P Global Services PMI
+      case 840500003: grp="PMI";    return 2;// S&P Global Composite PMI
+
+      // ── Tier B ──
+      case 840040001: grp="ISM-Mfg"; return 1;// ISM Manufacturing PMI
+      case 840040003: grp="ISM-Svc"; return 1;// ISM Non-Manufacturing PMI
    }
-   if(StringFind(nm,"S&P Global")>=0 && StringFind(nm,"PMI")>=0){ grp="PMI"; return 2; }
    grp=""; return 0;
 }
 
@@ -91,12 +105,13 @@ void BuildLines()
    for(int i=0; i<n; i++)
    {
       MqlCalendarEvent ev;
-      if(!CalendarEventById(values[i].event_id, ev)) continue;
+      bool hasEv = CalendarEventById(values[i].event_id, ev);  // 名前は診断表示用（分類はIDのみで完結）
 
-      string grp; int tier = ClassifyTier(ev.name, grp);
+      string grp; int tier = ClassifyTier(values[i].event_id, grp);
       if(InpDebug)
-         PrintFormat("[FWDEVT-DBG] %s | name=\"%s\" | tier=%d grp=%s",
-            TimeToString(values[i].time, TIME_DATE|TIME_MINUTES), ev.name, tier, grp);
+         PrintFormat("[FWDEVT-DBG] %s | id=%I64u name=\"%s\" | tier=%d grp=%s",
+            TimeToString(values[i].time, TIME_DATE|TIME_MINUTES), values[i].event_id,
+            hasEv ? ev.name : "(名称取得不可)", tier, grp);
       if(tier==0) continue;
       if(tier==3 && !InpShowTierS) continue;
       if(tier==2 && !InpShowTierA) continue;
