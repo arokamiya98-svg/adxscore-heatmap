@@ -1,6 +1,6 @@
 {
   "updated": "2026-08-14",
-  "generated_at": "2026-08-14 14:10",
+  "generated_at": "2026-08-14 22:18",
   "adx22": 27.5,
   "adx_state": "BULL",
   "di_plus": 22.3,
@@ -16,12 +16,12 @@
   "atr_cross_days": 25,
   "dxy": {
     "date": "2026-08-14",
-    "adx56": 12.1,
-    "di_spread": 0.4,
-    "di_dir": "USD_UP",
+    "adx56": 11.7,
+    "di_spread": -0.8,
+    "di_dir": "USD_DN",
     "depth_label": "拮抗",
     "spread_range_5d": {
-      "min": 0.4,
+      "min": -0.8,
       "max": 5.3
     }
   }
