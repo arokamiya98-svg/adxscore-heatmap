@@ -1,11 +1,11 @@
 {
   "updated": "2026-08-18",
-  "generated_at": "2026-08-18 07:10",
-  "adx22": 29.0,
+  "generated_at": "2026-08-18 08:10",
+  "adx22": 29.8,
   "adx_state": "BULL",
-  "di_plus": 24.9,
-  "di_minus": 11.2,
-  "di_spread": 13.8,
+  "di_plus": 22.7,
+  "di_minus": 10.2,
+  "di_spread": 12.6,
   "spread_range_5d": {
     "min": 10.1,
     "max": 17.8
