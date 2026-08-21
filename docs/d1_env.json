@@ -1,14 +1,14 @@
 {
   "updated": "2026-08-21",
-  "generated_at": "2026-08-22 02:17",
+  "generated_at": "2026-08-22 03:19",
   "adx22": 31.4,
   "adx_state": "BULL",
-  "di_plus": 28.1,
+  "di_plus": 28.4,
   "di_minus": 10.1,
-  "di_spread": 18.0,
+  "di_spread": 18.2,
   "spread_range_5d": {
     "min": 9.4,
-    "max": 18.0
+    "max": 18.2
   },
   "spread_label": "一方通行",
   "atr_ratio": 1.02,
