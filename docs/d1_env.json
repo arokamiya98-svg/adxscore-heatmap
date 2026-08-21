@@ -1,9 +1,9 @@
 {
   "updated": "2026-08-21",
-  "generated_at": "2026-08-21 21:18",
+  "generated_at": "2026-08-21 22:33",
   "adx22": 31.4,
   "adx_state": "BULL",
-  "di_plus": 27.7,
+  "di_plus": 27.8,
   "di_minus": 10.1,
   "di_spread": 17.6,
   "spread_range_5d": {
@@ -16,8 +16,8 @@
   "atr_cross_days": 0,
   "dxy": {
     "date": "2026-08-21",
-    "adx56": 25.8,
-    "di_spread": -12.9,
+    "adx56": 26.3,
+    "di_spread": -12.8,
     "di_dir": "USD_DN",
     "depth_label": "一方通行",
     "spread_range_5d": {
