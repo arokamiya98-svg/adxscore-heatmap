@@ -14270,13 +14270,13 @@
     "h4_atr_cross": "DOWN 10bar前",
     "h4_ma46_side": "ABOVE",
     "tier": "A",
-    "h4_phase_auto": "収束底",
+    "h4_phase_auto": "PD",
     "h4_cross_dir": "PD",
-    "h4_atr_diff": -2.6643,
-    "adx_score": 50.8,
-    "h1_avg_adx": 20.31,
-    "h4_pct20": 96.2,
-    "h4_pct25": 7.7,
-    "h1_pct20": 54.1
+    "h4_atr_diff": -0.4098,
+    "adx_score": 50.6,
+    "h1_avg_adx": 20.27,
+    "h4_pct20": 96.3,
+    "h4_pct25": 7.4,
+    "h1_pct20": 52.9
   }
 ]
