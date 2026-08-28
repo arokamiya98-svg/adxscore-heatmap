@@ -14306,7 +14306,7 @@
     "h4_di_plus": null,
     "h4_di_minus": null,
     "h4_di_spread": null,
-    "h4_atr_ratio": 0.7798,
+    "h4_atr_ratio": 0.7528,
     "h4_atr_class": "—",
     "h4_atr_zone3": "凪",
     "h4_atr_cross": "—",
@@ -14314,11 +14314,11 @@
     "tier": "D",
     "h4_phase_auto": "収束底",
     "h4_cross_dir": "PD",
-    "h4_atr_diff": -8.5254,
-    "adx_score": 76.2,
-    "h1_avg_adx": 26.19,
-    "h4_pct20": 100.0,
-    "h4_pct25": 44.0,
-    "h1_pct20": 65.3
+    "h4_atr_diff": -9.5583,
+    "adx_score": 74.0,
+    "h1_avg_adx": 26.12,
+    "h4_pct20": 96.2,
+    "h4_pct25": 42.3,
+    "h1_pct20": 64.6
   }
 ]
