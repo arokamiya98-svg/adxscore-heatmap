@@ -1,17 +1,17 @@
 {
   "updated": "2026-08-28",
-  "generated_at": "2026-08-29 02:11",
-  "adx22": 35.5,
+  "generated_at": "2026-08-29 03:12",
+  "adx22": 35.0,
   "adx_state": "BULL",
   "di_plus": 22.6,
-  "di_minus": 13.5,
-  "di_spread": 9.1,
+  "di_minus": 15.2,
+  "di_spread": 7.3,
   "spread_range_5d": {
-    "min": 9.1,
+    "min": 7.3,
     "max": 21.6
   },
   "spread_label": "揺らぎ",
-  "atr_ratio": 1.07,
+  "atr_ratio": 1.08,
   "atr_cross_dir": "UP",
   "atr_cross_days": 5,
   "dxy": {
