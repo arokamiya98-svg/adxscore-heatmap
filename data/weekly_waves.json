@@ -14306,7 +14306,7 @@
     "h4_di_plus": null,
     "h4_di_minus": null,
     "h4_di_spread": null,
-    "h4_atr_ratio": 1.1451,
+    "h4_atr_ratio": 1.1808,
     "h4_atr_class": "—",
     "h4_atr_zone3": "拡張",
     "h4_atr_cross": "—",
@@ -14314,11 +14314,11 @@
     "tier": "D",
     "h4_phase_auto": "BU",
     "h4_cross_dir": "BU",
-    "h4_atr_diff": 6.0169,
+    "h4_atr_diff": 7.5534,
     "adx_score": 65.9,
     "h1_avg_adx": 25.45,
     "h4_pct20": 83.3,
     "h4_pct25": 36.7,
-    "h1_pct20": 69.0
+    "h1_pct20": 69.3
   }
 ]
