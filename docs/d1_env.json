@@ -1,19 +1,19 @@
 {
-  "updated": "2026-09-04",
-  "generated_at": "2026-09-06 02:13",
-  "adx22": 24.4,
+  "updated": "2026-09-07",
+  "generated_at": "2026-09-07 08:13",
+  "adx22": 22.4,
   "adx_state": "FLAT",
-  "di_plus": 21.3,
-  "di_minus": 21.0,
+  "di_plus": 19.4,
+  "di_minus": 19.1,
   "di_spread": 0.3,
   "spread_range_5d": {
     "min": -6.6,
     "max": 1.6
   },
   "spread_label": "拮抗",
-  "atr_ratio": 1.09,
+  "atr_ratio": 1.07,
   "atr_cross_dir": "UP",
-  "atr_cross_days": 10,
+  "atr_cross_days": 11,
   "dxy": {
     "date": "2026-09-04",
     "adx56": 14.3,
