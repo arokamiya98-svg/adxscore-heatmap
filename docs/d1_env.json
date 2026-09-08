@@ -1,23 +1,23 @@
 {
-  "updated": "2026-09-08",
-  "generated_at": "2026-09-09 00:10",
+  "updated": "2026-09-09",
+  "generated_at": "2026-09-09 01:11",
   "adx22": 20.8,
   "adx_state": "BULL",
   "di_plus": 18.9,
   "di_minus": 17.5,
   "di_spread": 1.5,
   "spread_range_5d": {
-    "min": -6.6,
+    "min": 0.3,
     "max": 1.6
   },
   "spread_label": "拮抗",
   "atr_ratio": 1.04,
   "atr_cross_dir": "UP",
-  "atr_cross_days": 12,
+  "atr_cross_days": 13,
   "dxy": {
     "date": "2026-09-08",
     "adx56": 14.1,
-    "di_spread": -6.5,
+    "di_spread": -5.3,
     "di_dir": "USD_DN",
     "depth_label": "優勢",
     "spread_range_5d": {
