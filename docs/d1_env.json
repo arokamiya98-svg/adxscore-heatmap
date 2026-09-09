@@ -1,7 +1,7 @@
 {
   "updated": "2026-09-09",
-  "generated_at": "2026-09-09 16:19",
-  "adx22": 20.1,
+  "generated_at": "2026-09-09 17:10",
+  "adx22": 20.0,
   "adx_state": "BEAR",
   "di_plus": 16.2,
   "di_minus": 19.5,
@@ -16,12 +16,12 @@
   "atr_cross_days": 13,
   "dxy": {
     "date": "2026-09-09",
-    "adx56": 16.0,
-    "di_spread": -10.2,
+    "adx56": 16.7,
+    "di_spread": -12.7,
     "di_dir": "USD_DN",
     "depth_label": "一方通行",
     "spread_range_5d": {
-      "min": -10.2,
+      "min": -12.7,
       "max": 1.3
     }
   }
