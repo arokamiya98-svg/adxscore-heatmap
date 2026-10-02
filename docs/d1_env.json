@@ -1,23 +1,23 @@
 {
   "updated": "2026-10-02",
-  "generated_at": "2026-10-02 20:10",
-  "adx22": 23.1,
+  "generated_at": "2026-10-03 00:07",
+  "adx22": 21.8,
   "adx_state": "BEAR",
-  "di_plus": 10.5,
-  "di_minus": 18.6,
-  "di_spread": -8.1,
+  "di_plus": 13.8,
+  "di_minus": 17.9,
+  "di_spread": -4.1,
   "spread_range_5d": {
     "min": -13.8,
-    "max": -7.4
+    "max": -4.1
   },
-  "spread_label": "揺らぎ",
-  "atr_ratio": 0.93,
+  "spread_label": "拮抗",
+  "atr_ratio": 0.94,
   "atr_cross_dir": "DOWN",
   "atr_cross_days": 3,
   "dxy": {
     "date": "2026-10-02",
-    "adx56": 26.8,
-    "di_spread": 3.9,
+    "adx56": 24.8,
+    "di_spread": 3.4,
     "di_dir": "USD_UP",
     "depth_label": "揺らぎ",
     "spread_range_5d": {
