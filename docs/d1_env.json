@@ -1,11 +1,11 @@
 {
   "updated": "2026-10-07",
-  "generated_at": "2026-10-07 07:10",
+  "generated_at": "2026-10-07 08:10",
   "adx22": 21.3,
   "adx_state": "BEAR",
-  "di_plus": 11.2,
-  "di_minus": 17.4,
-  "di_spread": -6.1,
+  "di_plus": 10.3,
+  "di_minus": 15.8,
+  "di_spread": -5.6,
   "spread_range_5d": {
     "min": -8.1,
     "max": -4.4
