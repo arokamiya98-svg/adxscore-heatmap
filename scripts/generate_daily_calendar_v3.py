@@ -125,6 +125,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TRADES_DIR = ROOT / "data" / "mani_room" / "raw" / "imports"
 ENRICHED = ROOT / "data" / "mani_room" / "enriched" / "trades_enriched_full.csv"
+# 2026-10-11: セント口座レーン（prepare_cent_input.py 出力）。ドロワーカード+¢マークのみ、
+#   trade_by_date（損益¥集計・勝敗・結果背景）には入れない＝ガチ戦略側の統計を汚さない
+CENT_ENRICHED = ROOT / "data" / "mani_room" / "enriched" / "cent_trades_enriched_full.csv"
 OUT = ROOT / "data" / "trades" / "processed"
 WAVES = ROOT / "data" / "weekly_waves.json"
 # v1.0: 仮想 48h MFE/MAE (JST 14:00 仮想エントリー、C1出力)
@@ -516,6 +519,34 @@ for _er in enriched_map.values():
                 _f(_er.get("h1_mae_usd_36h")), _f(_er.get("h1_mae_usd_48h"))],
         "bars_traced": _f(_er.get("h1_bars_traced_48h")),
     })
+n_cent_trades = 0
+if CENT_ENRICHED.exists():
+    with open(CENT_ENRICHED, encoding="utf-8-sig") as f:
+        for _er in csv.DictReader(f):
+            ej = (_er.get("entry_jst") or "").strip()
+            if not ej:
+                continue  # Builder 未マッチ行
+            ex = (_er.get("exit_jst") or "").strip()
+            exit_disp = (ex[11:16] if ex[:10] == ej[:10] else ex[5:16]) if ex else "—"
+            _pips_raw = _f(_er.get("pips"))
+            drill_trades.append({
+                "tid": _er.get("trade_id", "").strip(),
+                "acct": "cent",
+                "date": ej[:10],
+                "_d": datetime.strptime(ej[:10], "%Y-%m-%d").date(),
+                "entry_time": ej[11:16],
+                "exit_disp": exit_disp,
+                "direction": (_er.get("direction") or "").upper(),
+                "pips": None if _pips_raw is None else _pips_raw / 100.0,
+                "style": "", "star": "", "tag": "", "reason": "",
+                "mfe": [_f(_er.get("h1_mfe_usd_12h")), _f(_er.get("h1_mfe_usd_24h")),
+                        _f(_er.get("h1_mfe_usd_36h")), _f(_er.get("h1_mfe_usd_48h"))],
+                "mae": [_f(_er.get("h1_mae_usd_12h")), _f(_er.get("h1_mae_usd_24h")),
+                        _f(_er.get("h1_mae_usd_36h")), _f(_er.get("h1_mae_usd_48h"))],
+                "bars_traced": _f(_er.get("h1_bars_traced_48h")),
+            })
+            n_cent_trades += 1
+cent_days = {t["_d"] for t in drill_trades if t.get("acct") == "cent"}
 drill_trades.sort(key=lambda t: (t["date"], t["entry_time"]))
 for _t in drill_trades:
     drill_trades_by_date[_t["_d"]].append(_t)
@@ -1740,7 +1771,9 @@ details.past-months[open] > summary .pm-open { display: inline; }
 details.past-months[open] > summary .pm-closed { display: none; }
 
 /* v3-A2: セルクリック → ドロワー（カレンダータブのみ） */
-#tab-calendar .cell.has-fires, #tab-calendar .cell.has-trade { cursor: pointer; }
+#tab-calendar .cell.has-fires, #tab-calendar .cell.has-trade, #tab-calendar .cell.has-cent { cursor: pointer; }
+.cent-mark { font-size: 10px; color: #c8a860; margin-left: 3px; font-weight: 700; }
+.trade-card .tc-acct { font-size: 9.5px; color: #c8a860; border: 1px solid #6a5a3a; border-radius: 3px; padding: 0 4px; }
 #tab-calendar .cell.has-fires:hover, #tab-calendar .cell.has-trade:hover { border-color: #2a5a9a; }
 #tab-calendar .cell.drill-open { border-color: #4a90e2; box-shadow: inset 0 0 0 1px #4a90e2; }
 
@@ -2061,6 +2094,8 @@ for m_start in reversed(list(month_iter(start, end))):  # v3: 最新月を先頭
                 classes.append("has-fires")
             if trades and not is_outside:
                 classes.append("has-trade")
+            if d in cent_days and not is_outside:
+                classes.append("has-cent")
 
             # ツールチップ
             tip_parts = [f"{d:%Y-%m-%d} ({['月','火','水','木','金','土','日'][d.weekday()]})"]
@@ -2123,6 +2158,8 @@ for m_start in reversed(list(month_iter(start, end))):  # v3: 最新月を先頭
             # 日付ヘッダ + フェーズバッジ
             html.append('<div class="day-hdr">')
             html.append(f'<span>{d.day}</span>')
+            if d in cent_days and not is_outside:
+                html.append('<span class="cent-mark" title="セント口座トレードあり">¢</span>')
             if ph_tuple:
                 ph_cls, ph_lbl = ph_tuple
                 html.append(f'<span class="ph-badge {ph_cls}">{ph_lbl}</span>')
@@ -3423,6 +3460,7 @@ html.append(r"""
     if (t.pips !== null && t.pips > 0) { pipsCls = "pos"; pipsTxt = "+" + t.pips.toFixed(1); }
     else if (t.pips !== null && t.pips < 0) { pipsCls = "neg"; pipsTxt = t.pips.toFixed(1); }
     const meta = [];
+    if (t.acct === "cent") meta.push(`<span class="tc-acct">¢ セント</span>`);
     if (t.style) meta.push(`<span>${esc(t.style)}</span>`);
     if (t.star) meta.push(`<span>★${esc(t.star)}</span>`);
     if (t.tag) {
@@ -3476,7 +3514,7 @@ html.append(r"""
   }
 
   // セルクリック（カレンダータブ内、発火 or トレードのある in-month セルのみ）
-  document.querySelectorAll("#tab-calendar .cell.has-fires, #tab-calendar .cell.has-trade").forEach(cell => {
+  document.querySelectorAll("#tab-calendar .cell.has-fires, #tab-calendar .cell.has-trade, #tab-calendar .cell.has-cent").forEach(cell => {
     cell.addEventListener("click", () => renderDrill(cell.dataset.date));
   });
   document.getElementById("drill-close").addEventListener("click", () => {
@@ -3542,6 +3580,7 @@ print(f"[A1-4] 重複描画                : {_dup} 件（期待 0）")
 print(f"[A1-5] pass_all 集計           : TRUE {n_fires_pass} / FALSE {n_fires_supp}（合計 {n_fires_total}）")
 print(f"[A1-6] JST土曜発火の金曜セル併載: {emitted_fold_count} 件（=サーバー金曜深夜、5列レイアウト維持の設計判断）")
 print(f"[A2-1] ドロワー用トレード      : {n_drill_trades} 件 / {n_drill_trade_days} 日（成績側・Mac専管）")
+print(f"[A2-1c] うちセント口座        : {n_cent_trades} 件 / {len(cent_days)} 日（¢・損益集計外）")
 _fire_days_in_cells = set(fires_by_cell.keys())
 _trade_only_days = sorted(str(d) for d in drill_trades_by_date if d not in _fire_days_in_cells)
 print(f"[A2-2] 発火ゼロのトレード日    : {len(_trade_only_days)} 日 {_trade_only_days}（クリック可・ドロワー対応）")
@@ -3555,13 +3594,14 @@ print(f"[B1-1] fireCard 閉じタグ修正    : {'OK（mmSteps(f) + `</div>` 出
 print(f"[B2-1] デフォルト表示ドット数  : {emitted_dot_count - emitted_supp_dot_count} 件（= pass_all のみ {n_fires_pass}）")
 print(f"[B2-2] 全発火表示時ドット数    : {emitted_dot_count} 件（全 {n_fires_total} 件、抑制 {emitted_supp_dot_count} 件は薄表示）")
 print(f"[B2-3] フィルタートグルUI      : {'OK' if 'v3-show-suppressed' in _html_text else 'NG'} / ヘッダー連動 {'OK' if 'v3-fire-summary' in _html_text else 'NG'}")
-print(f"[B3-1] デフォルト表示開始月    : {default_start_month:%Y-%m}（期待 2026-03 = トレードログ基準 / 直近6ヶ月上限）")
+print(f"[B3-1] デフォルト表示開始月    : {default_start_month:%Y-%m}（規則 = トレード初月と直近6ヶ月下限の遅い方）")
 print(f"[B3-2] 折りたたみ過去月        : {past_months[0]:%Y-%m}〜{past_months[-1]:%Y-%m} の {len(past_months)} ヶ月（details 出現 {_html_text.count('class=\"past-months\"')} 箇所、期待 1）")
 
 assert "mmSteps(f) + `</div>`" in _html_text, "B1: fireCard 閉じタグ修正が反映されていない"
 assert emitted_dot_count - emitted_supp_dot_count == n_fires_pass, "B2: デフォルト表示ドット数が pass_all 件数と不一致"
 assert _html_text.count('class="past-months"') == 1, "B3: 過去月 details ラッパーが1個ではない"
-assert default_start_month == date(2026, 3, 1), "B3: デフォルト表示開始月が 2026-03 ではない"
+# 2026-10-11: 固定値 2026-03 は「直近6ヶ月上限」で月が進むと必ず落ちる地雷 → 動的整合性へ
+assert default_start_month == max(_trade_first_month, _six_floor), "B3: デフォルト表示開始月が規則(トレード初月 vs 直近6ヶ月)と不一致"
 
 assert n_fires_total > 0, "CSV件数がゼロ（signal_fires.csv 未受信?）"
 assert emitted_dot_count == n_fires_total, "HTML描画 fire-dot 数がCSV件数と不一致（描画漏れ）"
