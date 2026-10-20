@@ -1,6 +1,6 @@
 {
   "updated": "2026-10-20",
-  "generated_at": "2026-10-20 11:04",
+  "generated_at": "2026-10-20 12:52",
   "adx22": 17.6,
   "adx_state": "RANGE",
   "di_plus": 12.3,
@@ -16,8 +16,8 @@
   "atr_cross_days": 15,
   "dxy": {
     "date": "2026-10-20",
-    "adx56": 10.1,
-    "di_spread": -0.8,
+    "adx56": 9.8,
+    "di_spread": -1.2,
     "di_dir": "USD_DN",
     "depth_label": "拮抗",
     "spread_range_5d": {
