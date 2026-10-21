@@ -1,13 +1,13 @@
 {
   "updated": "2026-10-22",
-  "generated_at": "2026-10-22 06:10",
+  "generated_at": "2026-10-22 07:48",
   "adx22": 18.3,
   "adx_state": "RANGE",
   "di_plus": 11.2,
   "di_minus": 20.1,
-  "di_spread": -8.9,
+  "di_spread": -8.8,
   "spread_range_5d": {
-    "min": -8.9,
+    "min": -8.8,
     "max": -1.7
   },
   "spread_label": "揺らぎ",
