@@ -1,17 +1,17 @@
 {
   "updated": "2026-11-05",
-  "generated_at": "2026-11-05 09:10",
-  "adx22": 28.7,
+  "generated_at": "2026-11-05 10:10",
+  "adx22": 28.5,
   "adx_state": "BEAR",
-  "di_plus": 13.1,
+  "di_plus": 13.8,
   "di_minus": 19.7,
-  "di_spread": -6.6,
+  "di_spread": -5.9,
   "spread_range_5d": {
     "min": -17.1,
-    "max": -6.6
+    "max": -5.9
   },
   "spread_label": "揺らぎ",
-  "atr_ratio": 0.91,
+  "atr_ratio": 0.92,
   "atr_cross_dir": "DOWN",
   "atr_cross_days": 27,
   "dxy": {
