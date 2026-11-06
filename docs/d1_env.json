@@ -1,28 +1,28 @@
 {
   "updated": "2026-11-06",
-  "generated_at": "2026-11-06 13:10",
-  "adx22": 24.8,
-  "adx_state": "FLAT",
+  "generated_at": "2026-11-06 14:14",
+  "adx22": 25.1,
+  "adx_state": "BEAR",
   "di_plus": 18.7,
-  "di_minus": 18.9,
-  "di_spread": -0.2,
+  "di_minus": 20.3,
+  "di_spread": -1.6,
   "spread_range_5d": {
     "min": -15.7,
     "max": 0.8
   },
   "spread_label": "拮抗",
-  "atr_ratio": 0.92,
+  "atr_ratio": 0.93,
   "atr_cross_dir": "DOWN",
   "atr_cross_days": 28,
   "dxy": {
     "date": "2026-11-06",
-    "adx56": 9.4,
-    "di_spread": 9.2,
+    "adx56": 10.2,
+    "di_spread": 11.2,
     "di_dir": "USD_UP",
-    "depth_label": "優勢",
+    "depth_label": "一方通行",
     "spread_range_5d": {
       "min": -9.2,
-      "max": 9.2
+      "max": 11.2
     }
   }
 }
