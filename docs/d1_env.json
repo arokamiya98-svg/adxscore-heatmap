@@ -1,17 +1,17 @@
 {
   "updated": "2026-11-10",
-  "generated_at": "2026-11-10 08:10",
-  "adx22": 23.4,
+  "generated_at": "2026-11-10 09:10",
+  "adx22": 21.7,
   "adx_state": "BULL",
-  "di_plus": 20.9,
-  "di_minus": 19.4,
-  "di_spread": 1.5,
+  "di_plus": 19.1,
+  "di_minus": 17.7,
+  "di_spread": 1.3,
   "spread_range_5d": {
     "min": -7.2,
     "max": 1.5
   },
   "spread_label": "拮抗",
-  "atr_ratio": 0.97,
+  "atr_ratio": 0.95,
   "atr_cross_dir": "DOWN",
   "atr_cross_days": 30,
   "dxy": {
