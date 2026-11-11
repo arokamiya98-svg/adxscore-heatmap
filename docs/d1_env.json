@@ -1,6 +1,6 @@
 {
   "updated": "2026-11-11",
-  "generated_at": "2026-11-11 17:55",
+  "generated_at": "2026-11-11 18:10",
   "adx22": 20.1,
   "adx_state": "BEAR",
   "di_plus": 17.4,
@@ -17,7 +17,7 @@
   "dxy": {
     "date": "2026-11-11",
     "adx56": 13.1,
-    "di_spread": 4.1,
+    "di_spread": 4.6,
     "di_dir": "USD_UP",
     "depth_label": "揺らぎ",
     "spread_range_5d": {
