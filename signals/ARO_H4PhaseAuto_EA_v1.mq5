@@ -42,7 +42,7 @@
 
 //+-----[ 入力パラメータ ]------------------------------------------+
 input group "=== 共通 ==="
-input string   Allowed_Symbol  = "XAUUSD";          // この銘柄以外は起動拒否
+input string   Allowed_Symbol  = "XAUUSDc";         // この銘柄以外は起動拒否（2026-11-20 HFM→Exnessセント移行）
 
 input group "=== EA制御（新規）==="
 input int      Update_Interval_Min = 60;            // 本間隔（ready後の再生成周期, 分）

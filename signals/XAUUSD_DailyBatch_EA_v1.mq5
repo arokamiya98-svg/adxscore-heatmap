@@ -44,7 +44,7 @@
 //| 入力パラメータ                                                    |
 //+==================================================================+
 input group "=== 共通 ==="
-input string  Allowed_Symbol           = "XAUUSD";   // この銘柄以外は起動拒否
+input string  Allowed_Symbol           = "XAUUSDc";  // この銘柄以外は起動拒否（2026-11-20 HFM→Exnessセント移行: XAUUSD→XAUUSDc）
 input int     Lookback_Days            = 120;        // 直近 N 日分を出力（両CSV共通）
 input int     JST_Offset_Hours         = 9;          // JST = UTC+9（固定）
 input bool    Use_Auto_Server_Offset   = true;       // TimeTradeServer-TimeGMT 自動算出
@@ -84,7 +84,7 @@ input group "=== MFE/MAE ==="
 input int     H1_Trace_Bars_48h        = 48;         // H1 48本 = 48時間相当
 
 input group "=== DXY環境札 (SPEC_dxy_env_card_v1) ==="
-input string  DXY_Symbol               = "USDIndex";  // HFM USDIndex（分析と同一物差し）
+input string  DXY_Symbol               = "USDIndex";  // HFM USDIndex（分析と同一物差し）※2026-11-20 HFM→Exnessセント移行: Exnessに該当なし・休止（WARN→DXY出力のみskip、XAU側は継続）
 input int     DXY_ADX_Period           = 56;          // iADX(USDIndex, H1, 56)
 input string  Dxy_Output_File          = "dxy_env.csv";
 

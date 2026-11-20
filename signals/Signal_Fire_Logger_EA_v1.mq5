@@ -61,6 +61,7 @@ input datetime BT_EndTime   = 0;                    // 走査終了（0 = 実行
 input group "=== EA制御（新規）==="
 input int      Update_Interval_Min = 60;            // ready後の再生成周期（分）
 input int      First_Run_Delay_Sec = 15;            // 初回タイマー（ready待ちの短間隔, 秒）
+input string   Allowed_Symbol      = "XAUUSDc";     // この銘柄以外は起動拒否（2026-11-20 HFM→Exnessセント移行で定数→input化。v4パリティ定数ではない）
 
 input group "=== 出力 ==="
 input string   Output_File  = "signal_fires.csv";   // 出力CSV（回帰検証で別名可）
@@ -70,7 +71,6 @@ input bool     Verbose      = true;
 
 //+-----[ 定数: v4 input デフォルト値の固定（input 化禁止）]---------+
 //   出典: signals/ATR_WidthSignal_v4.mq5 L82-163 の input デフォルト
-const string ALLOWED_SYMBOL     = "XAUUSD";
 
 // --- H1 (v4 L83-87) ---
 const int    H1_ATR_SHORT       = 16;
@@ -250,7 +250,7 @@ bool g_first_run = false;
 int OnInit()
 {
    Print("==== Signal_Fire_Logger_EA v1.00 OnInit ====");
-   PrintFormat("Symbol(chart): %s, Allowed: %s", _Symbol, ALLOWED_SYMBOL);
+   PrintFormat("Symbol(chart): %s, Allowed: %s", _Symbol, Allowed_Symbol);
    PrintFormat("Output: %s", Output_File);
    PrintFormat("Scan: %s -> %s (server time)",
                TimeToString(BT_StartTime, TIME_DATE|TIME_MINUTES),
@@ -258,10 +258,10 @@ int OnInit()
                   : TimeToString(BT_EndTime, TIME_DATE|TIME_MINUTES));
 
    //--- シンボル制約: XAUUSD以外で起動拒否（移植元 L245-250）---
-   if(_Symbol != ALLOWED_SYMBOL)
+   if(_Symbol != Allowed_Symbol)
    {
       PrintFormat("[FATAL] チャートシンボル %s ≠ %s. %s チャートで起動してください.",
-                  _Symbol, ALLOWED_SYMBOL, ALLOWED_SYMBOL);
+                  _Symbol, Allowed_Symbol, Allowed_Symbol);
       return(INIT_FAILED);
    }
 

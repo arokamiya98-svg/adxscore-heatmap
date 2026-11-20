@@ -46,7 +46,7 @@
 
 //+-----[ 入力パラメータ ]------------------------------------------+
 input group "=== 共通 ==="
-input string   Allowed_Symbol  = "XAUUSD";          // この銘柄以外は起動拒否（誤アタッチ防止）
+input string   Allowed_Symbol  = "XAUUSDc";         // この銘柄以外は起動拒否（誤アタッチ防止）（2026-11-20 HFM→Exnessセント移行）
 
 input group "=== EA制御（新規）==="
 input int      Update_Interval_Min = 60;            // 本間隔（ready後の再生成周期, 分）
@@ -54,7 +54,7 @@ input int      First_Run_Delay_Sec = 15;            // 初回タイマー（read
 input bool     Verbose         = true;
 
 input group "=== 集計対象（移植元から維持）==="
-input string   InpSymbols      = "XAUUSD";
+input string   InpSymbols      = "XAUUSDc";         // 2026-11-20 HFM→Exnessセント移行
 input datetime InpStartDate    = D'2023.01.01 00:00';   // 移植元の string リテラル "..." を datetime リテラル D'...' に正規化（値は完全同一・暗黙変換 warning 解消）
 input datetime InpEndDate      = D'2027.12.31 23:59';   // 同上（CSV出力・集計ロジックに影響なし）
 input int      InpH1_Period    = 32;
