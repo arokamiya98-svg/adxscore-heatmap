@@ -1,13 +1,13 @@
 {
   "updated": "2026-11-20",
-  "generated_at": "2026-11-20 21:10",
+  "generated_at": "2026-11-21 05:10",
   "adx22": 25.5,
   "adx_state": "BEAR",
   "di_plus": 11.1,
-  "di_minus": 36.1,
-  "di_spread": -25.1,
+  "di_minus": 36.4,
+  "di_spread": -25.3,
   "spread_range_5d": {
-    "min": -25.1,
+    "min": -25.3,
     "max": -8.6
   },
   "spread_label": "一方通行",
