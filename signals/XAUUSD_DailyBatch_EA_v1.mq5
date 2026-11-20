@@ -33,11 +33,23 @@
 //|      0値行禁止・次の毎時で自己回復）                              |
 //|    - SPEC: data/scriptable/SPEC_dxy_env_card_v1.md               |
 //|                                                                  |
+//|  v1.11 (2026-11-20): HFM→Exness移行: DXY源を HFM USDIndex →      |
+//|    合成 DXY_SYNTH（ICE式から SEK を除いた5項・定数50.14348112）   |
+//|    - 合成ロジックは Phase 1 Script                               |
+//|      (data/dxy/DXY_Synth_Timeseries_v1.mq5) と同一。ソースTF=M5固定|
+//|    - OnInit: DXY_SYNTH 無し/範囲不足のみブートストラップ構築，    |
+//|      それ以外は差分のみ                                          |
+//|    - OnTimer: XAU側2CSV → DXY_SYNTH 差分更新 → H1同期待ち →       |
+//|      既存 Dxy_GenerateCsv（スキーマ・UTF-8 BOM 不変）             |
+//|    - 差分更新失敗の回は DXY出力のみ skip（既存 dxy_env.csv 不変） |
+//|    - 指示書: data/scriptable/コー_impl_dxy_card_v3_synth.md §4    |
+//|    - 検証: data/dxy/DXY_SYNTH_VALIDATION_v1.md v2節（採用）       |
+//|                                                                  |
 //|  作成日: 2026-06-18                                              |
 //|  作成: コー                                                       |
 //+------------------------------------------------------------------+
 #property copyright "aro strategy lab"
-#property version   "1.10"
+#property version   "1.11"
 #property strict
 
 //+==================================================================+
@@ -84,9 +96,34 @@ input group "=== MFE/MAE ==="
 input int     H1_Trace_Bars_48h        = 48;         // H1 48本 = 48時間相当
 
 input group "=== DXY環境札 (SPEC_dxy_env_card_v1) ==="
-input string  DXY_Symbol               = "USDIndex";  // HFM USDIndex（分析と同一物差し）※2026-11-20 HFM→Exnessセント移行: Exnessに該当なし・休止（WARN→DXY出力のみskip、XAU側は継続）
-input int     DXY_ADX_Period           = 56;          // iADX(USDIndex, H1, 56)
+input string  DXY_Symbol               = "DXY_SYNTH"; // 2026-11-20 HFM→Exness移行: HFM USDIndex → 合成DXY（下の合成groupで維持）
+input int     DXY_ADX_Period           = 56;          // iADX(DXY_SYNTH, H1, 56)
 input string  Dxy_Output_File          = "dxy_env.csv";
+
+input group "=== 合成DXY (DXY_Symbol == Synth_Symbol の時のみ維持) ==="
+//--- 合成式: Synth_Const × Π Comp_k^Weight_k（SEK項なし・再正規化なし）---
+//    ロジックは Phase 1 Script (DXY_Synth_Timeseries_v1.mq5) と同一。ソースTF=M5固定。
+input string  Synth_Symbol             = "DXY_SYNTH";
+input string  Synth_Path               = "Synth";     // Custom\Synth に作成
+input int     Synth_Digits             = 5;
+input double  Synth_Const              = 50.14348112;
+input string  Comp1_Symbol             = "EURUSDc";
+input double  Comp1_Weight             = -0.576;
+input string  Comp2_Symbol             = "USDJPYc";
+input double  Comp2_Weight             = 0.136;
+input string  Comp3_Symbol             = "GBPUSDc";
+input double  Comp3_Weight             = -0.119;
+input string  Comp4_Symbol             = "USDCADc";
+input double  Comp4_Weight             = 0.091;
+input string  Comp5_Symbol             = "USDCHFc";
+input double  Comp5_Weight             = 0.036;
+input int     Synth_Max_Fill_Hours     = 48;          // 直前値埋めの上限（超えたら埋めない）
+input int     Synth_Warmup_Days        = 120;         // ブートストラップ: Lookback_Days + この日数を構築（ADX56助走）
+input int     Synth_Chunk_Days         = 7;           // 取得・書込の単位（日）
+input int     Synth_Max_Rates_Per_Write = 10000;      // 1回の CustomRates 書込の上限件数
+input int     Synth_Rewrite_Overlap_Min = 5;          // 差分: 最終バーのこの分数前から再合成（5=M5の1本前）
+input int     Synth_Comp_Lag_Max_Min   = 30;          // 差分: 成分間の最新M5時刻ズレ上限（超えたら今回skip）
+input int     Synth_H1_Wait_Sec        = 30;          // 差分後: H1同期・BarsCalculated 待ち上限（秒）
 
 //+==================================================================+
 //| グローバル: 指標ハンドル（Aggregate専用, hAgg_ 接頭辞）           |
@@ -121,7 +158,7 @@ bool g_first_run = false;
 //+==================================================================+
 int OnInit()
 {
-   Print("==== XAUUSD_DailyBatch_EA v1.10 OnInit ====");
+   Print("==== XAUUSD_DailyBatch_EA v1.11 OnInit ====");
    PrintFormat("Symbol(chart): %s, Allowed: %s", _Symbol, Allowed_Symbol);
    PrintFormat("Agg_Output: %s / Mfe_Output: %s / Dxy_Output: %s",
                Agg_Output_File, Mfe_Output_File, Dxy_Output_File);
@@ -142,6 +179,11 @@ int OnInit()
       Print("[FATAL] 指標ハンドル初期化に失敗。終了。");
       return(INIT_FAILED);
    }
+
+   //--- 合成DXY 維持（v1.11）: 無い/範囲不足ならブートストラップ、十分なら差分のみ ---
+   //    失敗しても INIT_FAILED にしない（OnTimer で毎回再試行・XAU側は道連れにしない）
+   if(Synth_IsEnabled())
+      Synth_Ensure();
 
    //--- DXYハンドル初期化（失敗しても INIT_FAILED にしない = XAU側を道連れにしない）---
    Dxy_InitHandle();
@@ -181,6 +223,24 @@ void OnTimer()
    Mfe_GenerateCsv();
 
    //--- DXY環境札CSV（失敗時はDXY部だけスキップ・XAU側に影響しない）---
+   //    v1.11: 合成DXY の差分更新 → H1同期待ち に失敗した回は DXY出力のみ skip
+   //           （FileOpen 前に return ＝ 既存 dxy_env.csv を壊さない）
+   if(Synth_IsEnabled())
+   {
+      if(!Synth_Ensure())
+      {
+         Print("[SKIP] [Dxy] [Synth] 合成DXY 更新失敗 → 今回のDXY出力スキップ（既存 dxy_env.csv 不変・XAU側は出力済）.");
+         return;
+      }
+      //--- OnInit 時に DXY_SYNTH が未構築でハンドル生成に失敗していた場合の再試行 ---
+      if(hDxy_ADX == INVALID_HANDLE)
+         Dxy_InitHandle();
+      if(!Synth_WaitH1Ready())
+      {
+         Print("[SKIP] [Dxy] [Synth] H1 同期/BarsCalculated 待ちタイムアウト → 今回のDXY出力スキップ（既存 dxy_env.csv 不変）.");
+         return;
+      }
+   }
    Dxy_GenerateCsv();
 }
 
@@ -192,7 +252,7 @@ void OnDeinit(const int reason)
    EventKillTimer();
    Agg_ReleaseHandles();
    if(hDxy_ADX != INVALID_HANDLE) IndicatorRelease(hDxy_ADX);
-   PrintFormat("==== XAUUSD_DailyBatch_EA v1.10 OnDeinit (reason=%d) ====", reason);
+   PrintFormat("==== XAUUSD_DailyBatch_EA v1.11 OnDeinit (reason=%d) ====", reason);
 }
 
 //+==================================================================+
@@ -1230,6 +1290,585 @@ void Dxy_ProcessDay(int fout, datetime day_jst_midnight)
    WriteUtf8String(fout, line + "\n");
 
    g_dxy_rows_written++;
+}
+
+//+##################################################################+
+//|                                                                  |
+//|  合成DXY 維持パート（v1.11 追加）                                 |
+//|                                                                  |
+//|  合成ロジックは Phase 1 Script と同一:                            |
+//|    data/dxy/DXY_Synth_Timeseries_v1.mq5                          |
+//|    DXY = Synth_Const × Π Comp_k^Weight_k （5項・SEK除外）         |
+//|    - log空間で和。負の指数の成分は H/L を入替                     |
+//|    - union timeline。欠損は直前Closeで平坦に埋める               |
+//|      ただし 48h超 / 週末跨ぎ / 初足前 は埋めない                  |
+//|    - 1成分でも埋められない時刻は足を作らない（skip）              |
+//|  ソースTF: M5 固定（検証した物差しと同一。VPSのM1は2025-07まで）  |
+//|                                                                  |
+//|  維持:                                                           |
+//|    - ブートストラップ（DXY_SYNTH 無し / 履歴が                    |
+//|      Lookback_Days+Synth_Warmup_Days を覆わない / 最終バーが      |
+//|      その起点より古い）: 全削除 → チャンク毎 CustomRatesReplace   |
+//|    - 差分（通常）: 最終バーの Overlap 分前から最新まで再合成 →    |
+//|      CustomRatesUpdate（形成中バーの上書き含む）。                |
+//|      直前値埋めの状態を Phase 1 と一致させるため、書込起点より    |
+//|      Max_Fill_Hours+1h 前から読み（priming）、書くのは起点以降のみ|
+//+##################################################################+
+#define SYNTH_NCOMP 5
+
+struct SynthCompRates { MqlRates r[]; };
+
+string   g_syn_sym[SYNTH_NCOMP];
+double   g_syn_w[SYNTH_NCOMP];
+bool     g_syn_comp_inited = false;
+bool     g_syn_ready       = false;   // ブートストラップ要否の判定を通過済み（以降は差分のみ）
+int      g_syn_boot_votes  = 0;       // 既存シンボルの読取不能/範囲不足が連続した回数
+#define  SYNTH_BOOT_CONFIRM 3
+
+//--- 直前値埋め用の状態（チャンクを跨いで保持・Build毎にリセット）---
+bool     g_syn_has[SYNTH_NCOMP];
+datetime g_syn_last_t[SYNTH_NCOMP];
+double   g_syn_last_c[SYNTH_NCOMP];
+
+//+==================================================================+
+//| Synth_IsEnabled: DXY_Symbol が合成シンボルを指す時のみ維持する    |
+//+==================================================================+
+bool Synth_IsEnabled()
+{
+   return (DXY_Symbol == Synth_Symbol);
+}
+
+//+==================================================================+
+//| Synth_InitComponents: 成分銘柄・ウェイト設定 + 気配値登録         |
+//+==================================================================+
+bool Synth_InitComponents()
+{
+   g_syn_sym[0] = Comp1_Symbol; g_syn_w[0] = Comp1_Weight;
+   g_syn_sym[1] = Comp2_Symbol; g_syn_w[1] = Comp2_Weight;
+   g_syn_sym[2] = Comp3_Symbol; g_syn_w[2] = Comp3_Weight;
+   g_syn_sym[3] = Comp4_Symbol; g_syn_w[3] = Comp4_Weight;
+   g_syn_sym[4] = Comp5_Symbol; g_syn_w[4] = Comp5_Weight;
+
+   for(int k = 0; k < SYNTH_NCOMP; k++)
+   {
+      if(!SymbolSelect(g_syn_sym[k], true))
+      {
+         PrintFormat("[ERR] [Synth] 成分銘柄 %s を気配値に登録できない err=%d → 合成不可.",
+                     g_syn_sym[k], GetLastError());
+         return false;
+      }
+   }
+
+   string f = StringFormat("[INFO] [Synth] Formula: %s", DoubleToString(Synth_Const, 8));
+   for(int k = 0; k < SYNTH_NCOMP; k++)
+      f += StringFormat(" x %s^%s", g_syn_sym[k], DoubleToString(g_syn_w[k], 3));
+   Print(f + "  (Source TF: M5 fixed)");
+   return true;
+}
+
+//+==================================================================+
+//| Synth_Ensure                                                     |
+//|   初回（g_syn_ready=false）: ブートストラップ要否を判定して       |
+//|     構築 or 差分。成功したら g_syn_ready=true。                   |
+//|   以降: 差分のみ。                                               |
+//|   戻り値 false = 今回 DXY_SYNTH を最新化できなかった（DXY skip）   |
+//+==================================================================+
+bool Synth_Ensure()
+{
+   if(!g_syn_comp_inited)
+   {
+      if(!Synth_InitComponents()) return false;
+      g_syn_comp_inited = true;
+   }
+
+   if(g_syn_ready)
+      return Synth_UpdateDiff();
+
+   //--- ブートストラップ要否判定 ---
+   datetime needed_from = TimeCurrent()
+                        - (datetime)((long)(Lookback_Days + MathMax(0, Synth_Warmup_Days)) * 86400);
+
+   bool is_custom = false;
+   bool exists    = SymbolExist(Synth_Symbol, is_custom);
+   if(exists && !is_custom)
+   {
+      PrintFormat("[ERR] [Synth] %s がブローカー銘柄として存在（カスタムでない）→ 合成不可.", Synth_Symbol);
+      return false;
+   }
+
+   string reason = "";
+   datetime last_t = 0;
+   if(!exists)
+      reason = "symbol not found";
+   else
+   {
+      SymbolSelect(Synth_Symbol, true);
+      if(!Synth_GetLastBar(last_t))
+         reason = "no bars";
+      else if(last_t < needed_from)
+         reason = "last bar older than needed range";
+      else if(!Synth_CoversFrom(needed_from))
+         reason = "history does not reach needed range";
+
+      //--- 既存シンボルの「読めない」は履歴ロード途中の一過性かもしれない。
+      //    ブートストラップは全削除を伴うため、連続 SYNTH_BOOT_CONFIRM 回
+      //    （＝OnInit + 毎時タイマー）同じ判定が続いた時だけ実行する。
+      if(reason == "no bars" || reason == "history does not reach needed range")
+      {
+         g_syn_boot_votes++;
+         if(g_syn_boot_votes < SYNTH_BOOT_CONFIRM)
+         {
+            PrintFormat("[WARN] [Synth] %s: %s (%d/%d) → 一過性の可能性。今回は構築せずDXY skip.",
+                        Synth_Symbol, reason, g_syn_boot_votes, SYNTH_BOOT_CONFIRM);
+            return false;
+         }
+      }
+   }
+   g_syn_boot_votes = 0;
+
+   bool ok;
+   if(reason != "")
+   {
+      PrintFormat("[INFO] [Synth] BOOTSTRAP: reason=%s  build_from=%s  (Lookback_Days=%d + Warmup=%d)",
+                  reason, TimeToString(needed_from, TIME_DATE|TIME_MINUTES),
+                  Lookback_Days, Synth_Warmup_Days);
+      ok = Synth_Bootstrap(needed_from);
+   }
+   else
+   {
+      PrintFormat("[INFO] [Synth] %s exists and covers %s.. (last=%s) → 差分のみ.",
+                  Synth_Symbol, TimeToString(needed_from, TIME_DATE),
+                  TimeToString(last_t, TIME_DATE|TIME_MINUTES));
+      ok = Synth_UpdateDiff();
+   }
+   if(ok) g_syn_ready = true;
+   return ok;
+}
+
+//+==================================================================+
+//| Synth_GetLastBar: DXY_SYNTH の最終バー時刻（M1系列）              |
+//+==================================================================+
+bool Synth_GetLastBar(datetime &last_t)
+{
+   last_t = 0;
+   datetime t[];
+   for(int attempt = 1; attempt <= 10; attempt++)
+   {
+      ResetLastError();
+      if(CopyTime(Synth_Symbol, PERIOD_M1, 0, 1, t) > 0 && t[0] > 0)
+      {
+         last_t = t[0];
+         return true;
+      }
+      Sleep(1000);
+   }
+   return false;
+}
+
+//+==================================================================+
+//| Synth_CoversFrom: needed_from 付近（+7日以内）に H1 バーがあるか   |
+//|   ※ M1 系列は MaxBars に掛かり得るため H1 で判定                 |
+//+==================================================================+
+bool Synth_CoversFrom(datetime needed_from)
+{
+   datetime t[];
+   for(int attempt = 1; attempt <= 10; attempt++)
+   {
+      ResetLastError();
+      if(CopyTime(Synth_Symbol, PERIOD_H1, needed_from, needed_from + 7 * 86400, t) > 0)
+         return true;
+      Sleep(1000);
+   }
+   return false;
+}
+
+//+==================================================================+
+//| Synth_PrepareSymbol: 無ければ作成（プロパティは Phase 1 と同じ）   |
+//+==================================================================+
+bool Synth_PrepareSymbol()
+{
+   bool is_custom = false;
+   if(SymbolExist(Synth_Symbol, is_custom))
+   {
+      if(!is_custom)
+      {
+         PrintFormat("[ERR] [Synth] %s exists as a broker symbol (not custom).", Synth_Symbol);
+         return false;
+      }
+   }
+   else
+   {
+      ResetLastError();
+      if(!CustomSymbolCreate(Synth_Symbol, Synth_Path))
+      {
+         PrintFormat("[ERR] [Synth] CustomSymbolCreate failed err=%d", GetLastError());
+         return false;
+      }
+      PrintFormat("[INFO] [Synth] Custom symbol created: Custom\\%s\\%s", Synth_Path, Synth_Symbol);
+
+      if(!CustomSymbolSetInteger(Synth_Symbol, SYMBOL_DIGITS, Synth_Digits))
+         PrintFormat("[WARN] [Synth] set DIGITS failed err=%d", GetLastError());
+      if(!CustomSymbolSetDouble(Synth_Symbol, SYMBOL_POINT, MathPow(10.0, -Synth_Digits)))
+         PrintFormat("[WARN] [Synth] set POINT failed err=%d", GetLastError());
+      if(!CustomSymbolSetInteger(Synth_Symbol, SYMBOL_CHART_MODE, SYMBOL_CHART_MODE_BID))
+         PrintFormat("[WARN] [Synth] set CHART_MODE failed err=%d", GetLastError());
+      if(!CustomSymbolSetInteger(Synth_Symbol, SYMBOL_TRADE_MODE, SYMBOL_TRADE_MODE_DISABLED))
+         PrintFormat("[WARN] [Synth] set TRADE_MODE failed err=%d", GetLastError());
+      CustomSymbolSetString(Synth_Symbol, SYMBOL_DESCRIPTION, "Synthetic DXY (ICE ex-SEK, 5 pairs)");
+   }
+   SymbolSelect(Synth_Symbol, true);
+   return true;
+}
+
+//+==================================================================+
+//| Synth_Bootstrap: 全削除 → build_from から最新までチャンク Replace  |
+//+==================================================================+
+bool Synth_Bootstrap(datetime build_from)
+{
+   if(!Synth_PrepareSymbol()) return false;
+
+   ResetLastError();
+   int del = CustomRatesDelete(Synth_Symbol, 0, D'3000.01.01 00:00');
+   PrintFormat("[INFO] [Synth] CustomRatesDelete(all): %d bars removed (err=%d)", del, GetLastError());
+   if(del < 0)
+   {
+      Print("[ERR] [Synth] CustomRatesDelete failed → ブートストラップ中止（新旧混在を避ける）.");
+      return false;
+   }
+
+   int written = 0; long skipped = 0;
+   datetime first_out = 0, last_out = 0;
+   if(!Synth_Build(build_from, build_from, true, written, skipped, first_out, last_out))
+      return false;
+
+   PrintFormat("[INFO] [Synth] BOOTSTRAP done: bars=%d skipped(unfillable)=%I64d  %s .. %s",
+               written, skipped,
+               first_out > 0 ? TimeToString(first_out, TIME_DATE|TIME_MINUTES) : "n/a",
+               last_out  > 0 ? TimeToString(last_out,  TIME_DATE|TIME_MINUTES) : "n/a");
+   if(written == 0)
+   {
+      Print("[ERR] [Synth] ブートストラップで合成バー0本.");
+      return false;
+   }
+   return true;
+}
+
+//+==================================================================+
+//| Synth_UpdateDiff: 最終バーの Overlap 分前から最新までを再合成      |
+//|   → CustomRatesUpdate（形成中バーの上書き含む）                   |
+//+==================================================================+
+bool Synth_UpdateDiff()
+{
+   datetime last_t = 0;
+   if(!Synth_GetLastBar(last_t))
+   {
+      Print("[ERR] [Synth] DXY_SYNTH 最終バー取得失敗 → 次回ブートストラップ判定へ戻す.");
+      g_syn_ready = false;
+      return false;
+   }
+
+   //--- 成分の最新M5時刻が揃っているか（1本だけ遅れていると平坦埋めが確定してしまう）---
+   datetime lat[SYNTH_NCOMP];
+   datetime lat_max = 0;
+   for(int k = 0; k < SYNTH_NCOMP; k++)
+   {
+      datetime t[];
+      lat[k] = 0;
+      ResetLastError();
+      if(CopyTime(g_syn_sym[k], PERIOD_M5, 0, 1, t) > 0) lat[k] = t[0];
+      if(lat[k] == 0)
+      {
+         PrintFormat("[ERR] [Synth] 成分 %s の最新M5取得失敗 err=%d → 今回skip.",
+                     g_syn_sym[k], GetLastError());
+         return false;
+      }
+      if(lat[k] > lat_max) lat_max = lat[k];
+   }
+   for(int k = 0; k < SYNTH_NCOMP; k++)
+   {
+      if((long)(lat_max - lat[k]) > (long)Synth_Comp_Lag_Max_Min * 60)
+      {
+         PrintFormat("[ERR] [Synth] 成分 %s の最新M5 %s が他(%s)より %d分超遅れ → 今回skip.",
+                     g_syn_sym[k], TimeToString(lat[k], TIME_DATE|TIME_MINUTES),
+                     TimeToString(lat_max, TIME_DATE|TIME_MINUTES), Synth_Comp_Lag_Max_Min);
+         return false;
+      }
+   }
+
+   datetime write_from = last_t - (datetime)((long)MathMax(0, Synth_Rewrite_Overlap_Min) * 60);
+   datetime prime_from = write_from - (datetime)((long)(MathMax(0, Synth_Max_Fill_Hours) + 1) * 3600);
+
+   int written = 0; long skipped = 0;
+   datetime first_out = 0, last_out = 0;
+   if(!Synth_Build(prime_from, write_from, false, written, skipped, first_out, last_out))
+      return false;
+
+   PrintFormat("[INFO] [Synth] diff update: prev_last=%s write_from=%s -> bars=%d skipped=%I64d new_last=%s (comp M5 latest=%s)",
+               TimeToString(last_t, TIME_DATE|TIME_MINUTES),
+               TimeToString(write_from, TIME_DATE|TIME_MINUTES),
+               written, skipped,
+               last_out > 0 ? TimeToString(last_out, TIME_DATE|TIME_MINUTES) : "n/a",
+               TimeToString(lat_max, TIME_DATE|TIME_MINUTES));
+   return true;
+}
+
+//+==================================================================+
+//| 週末跨ぎ判定（Phase 1 と同一）                                    |
+//|   t_last 以後の最初の土曜12:00 を t_now が越えたか                |
+//+==================================================================+
+bool Synth_CrossesWeekend(datetime t_last, datetime t_now)
+{
+   MqlDateTime dt;
+   TimeToStruct(t_last, dt);
+   datetime day0 = t_last - (datetime)(dt.hour * 3600 + dt.min * 60 + dt.sec);
+   int days_to_sat = (6 - dt.day_of_week + 7) % 7;
+   datetime sat_noon = day0 + (datetime)(days_to_sat * 86400 + 12 * 3600);
+   if(t_last >= sat_noon) sat_noon += 7 * 86400;
+   return (t_now >= sat_noon);
+}
+
+bool Synth_CanFill(int k, datetime t)
+{
+   if(!g_syn_has[k]) return false;
+   if((long)(t - g_syn_last_t[k]) > (long)Synth_Max_Fill_Hours * 3600) return false;
+   if(Synth_CrossesWeekend(g_syn_last_t[k], t)) return false;
+   return true;
+}
+
+//+==================================================================+
+//| Synth_CopyRatesRetry（Phase 1 と同一の待ち方）                    |
+//|   戻り値: 本数 / 0 = データ無し / -1 = 履歴ロード中のまま(4401等)  |
+//|   ※ ブートストラップでは -1 を 0 扱い（Phase 1 と同一挙動）        |
+//+==================================================================+
+int Synth_CopyRatesRetry(const string sym, datetime from, datetime to, MqlRates &arr[])
+{
+   ArraySetAsSeries(arr, false);
+   int err = 0;
+   for(int attempt = 1; attempt <= 3; attempt++)
+   {
+      ResetLastError();
+      int n = CopyRates(sym, PERIOD_M5, from, to, arr);
+      if(n >= 0) return n;
+      err = GetLastError();
+      if(err != 4401 && err != 4066 && attempt >= 2) return 0;   // 休場等で本当に無い
+      Sleep(1000);
+   }
+   return (err == 4401 || err == 4066) ? -1 : 0;
+}
+
+//+==================================================================+
+//| Synth_WriteRates: 分割書込                                       |
+//|   replace_mode=true : CustomRatesReplace（ブートストラップ）      |
+//|   replace_mode=false: CustomRatesUpdate （差分・同時刻は上書き）  |
+//+==================================================================+
+bool Synth_WriteRates(const MqlRates &arr[], int n, bool replace_mode)
+{
+   int maxw = MathMax(100, Synth_Max_Rates_Per_Write);
+   for(int a = 0; a < n; a += maxw)
+   {
+      int cnt = MathMin(maxw, n - a);
+      MqlRates sub[];
+      ArrayResize(sub, cnt);
+      for(int j = 0; j < cnt; j++) sub[j] = arr[a + j];
+
+      int r = -1, err = 0;
+      for(int attempt = 1; attempt <= 2; attempt++)
+      {
+         ResetLastError();
+         if(replace_mode)
+            r = CustomRatesReplace(Synth_Symbol, sub[0].time, sub[cnt - 1].time, sub);
+         else
+            r = CustomRatesUpdate(Synth_Symbol, sub);
+         err = GetLastError();
+         if(r >= 0) break;
+         Sleep(500);
+      }
+      if(r < 0)
+      {
+         PrintFormat("[ERR] [Synth] %s failed: %s..%s n=%d (ret=%d err=%d)",
+                     replace_mode ? "CustomRatesReplace" : "CustomRatesUpdate",
+                     TimeToString(sub[0].time, TIME_DATE|TIME_MINUTES),
+                     TimeToString(sub[cnt - 1].time, TIME_DATE|TIME_MINUTES),
+                     cnt, r, err);
+         return false;
+      }
+   }
+   return true;
+}
+
+//+==================================================================+
+//| Synth_Build: 合成M5構築 → 分割書込（Phase 1 BuildAndWrite 移植）   |
+//|   prime_from から読み、直前値埋めの状態を作る。                    |
+//|   書くのは t >= write_from の足のみ。                             |
+//+==================================================================+
+bool Synth_Build(datetime prime_from, datetime write_from, bool replace_mode,
+                 int &written, long &skipped, datetime &first_out, datetime &last_out)
+{
+   for(int k = 0; k < SYNTH_NCOMP; k++)
+   {
+      g_syn_has[k] = false; g_syn_last_t[k] = 0; g_syn_last_c[k] = 0;
+   }
+   written = 0; skipped = 0; first_out = 0; last_out = 0;
+
+   double lnK = MathLog(Synth_Const);
+   datetime end_time = TimeCurrent() + 3600;
+   long chunk_sec = (long)MathMax(1, Synth_Chunk_Days) * 86400;
+
+   int chunk_no = 0;
+   for(datetime cf = prime_from; cf <= end_time; cf += (datetime)chunk_sec)
+   {
+      if(IsStopped()) { Print("[WARN] [Synth] stopped."); return false; }
+      chunk_no++;
+      datetime ct = cf + (datetime)(chunk_sec - 1);   // 両端含む＝重複なし
+
+      SynthCompRates comp[SYNTH_NCOMP];
+      int n[SYNTH_NCOMP], p[SYNTH_NCOMP];
+      int any = 0;
+      for(int k = 0; k < SYNTH_NCOMP; k++)
+      {
+         n[k] = Synth_CopyRatesRetry(g_syn_sym[k], cf, ct, comp[k].r);
+         if(n[k] < 0)
+         {
+            if(!replace_mode)
+            {
+               PrintFormat("[ERR] [Synth] %s M5 履歴ロード未完 (%s..) → 今回skip.",
+                           g_syn_sym[k], TimeToString(cf, TIME_DATE|TIME_MINUTES));
+               return false;
+            }
+            n[k] = 0;   // ブートストラップは Phase 1 と同一（データ無し扱い）
+         }
+         p[k] = 0;
+         any += n[k];
+      }
+      if(any == 0) continue;
+
+      MqlRates out[];
+      int cap = 0;
+      for(int k = 0; k < SYNTH_NCOMP; k++) cap = MathMax(cap, n[k]);
+      ArrayResize(out, 0, cap + 1024);
+      int on = 0;
+
+      //--- union timeline マージ ---
+      while(true)
+      {
+         datetime t = 0; bool found = false;
+         for(int k = 0; k < SYNTH_NCOMP; k++)
+            if(p[k] < n[k] && (!found || comp[k].r[p[k]].time < t)) { t = comp[k].r[p[k]].time; found = true; }
+         if(!found) break;
+
+         double lnO = lnK, lnH = lnK, lnL = lnK, lnC = lnK;
+         long   vol = 0;
+         bool   ok  = true;
+
+         for(int k = 0; k < SYNTH_NCOMP; k++)
+         {
+            double o = 0, h = 0, l = 0, c = 0;
+            bool real = false;
+            if(p[k] < n[k] && comp[k].r[p[k]].time == t)
+            {
+               MqlRates b = comp[k].r[p[k]];
+               p[k]++;
+               if(b.open > 0 && b.high > 0 && b.low > 0 && b.close > 0)
+               {
+                  o = b.open; h = b.high; l = b.low; c = b.close;
+                  vol += b.tick_volume;
+                  real = true;
+               }
+            }
+            if(real)
+            {
+               g_syn_has[k] = true; g_syn_last_t[k] = t; g_syn_last_c[k] = c;
+            }
+            else if(Synth_CanFill(k, t))
+            {
+               o = h = l = c = g_syn_last_c[k];   // 直前Closeで平坦に埋める
+            }
+            else
+            {
+               ok = false;                        // 週末跨ぎ/48h超/未開始 → この足は作らない
+               continue;                          // 他成分の状態更新は続ける
+            }
+            double w = g_syn_w[k];
+            lnO += w * MathLog(o);
+            lnC += w * MathLog(c);
+            if(w >= 0) { lnH += w * MathLog(h); lnL += w * MathLog(l); }
+            else       { lnH += w * MathLog(l); lnL += w * MathLog(h); }   // 負の指数: H/L 入替
+         }
+         if(t < write_from) continue;             // priming 区間: 状態だけ更新・書かない
+         if(!ok) { skipped++; continue; }
+
+         MqlRates s;
+         s.time  = t;
+         s.open  = NormalizeDouble(MathExp(lnO), Synth_Digits);
+         s.close = NormalizeDouble(MathExp(lnC), Synth_Digits);
+         s.high  = NormalizeDouble(MathExp(lnH), Synth_Digits);
+         s.low   = NormalizeDouble(MathExp(lnL), Synth_Digits);
+         s.high  = MathMax(s.high, MathMax(s.open, s.close));
+         s.low   = MathMin(s.low,  MathMin(s.open, s.close));
+         s.tick_volume = (vol > 0 ? vol : 1);
+         s.spread = 0;
+         s.real_volume = 0;
+
+         ArrayResize(out, on + 1, cap + 1024);
+         out[on++] = s;
+      }
+
+      if(on > 0)
+      {
+         if(first_out == 0) first_out = out[0].time;
+         last_out = out[on - 1].time;
+         if(!Synth_WriteRates(out, on, replace_mode))
+            return false;
+         written += on;
+      }
+
+      if(replace_mode && Verbose && chunk_no % 10 == 0)
+         PrintFormat("[INFO] [Synth] build progress: chunk#%d up to %s, bars=%d",
+                     chunk_no, TimeToString(ct, TIME_DATE), written);
+   }
+   return true;
+}
+
+//+==================================================================+
+//| Synth_WaitH1Ready                                                |
+//|   差分更新後、DXY_SYNTH H1 の同期と iADX の BarsCalculated を待つ  |
+//|   （Phase 1 と同じ作法）。H1 先頭バーが合成最終バーの時間帯まで    |
+//|   来ていることも条件にする。最後に確認ログを1行出す。              |
+//+==================================================================+
+bool Synth_WaitH1Ready()
+{
+   if(hDxy_ADX == INVALID_HANDLE) return false;
+   SymbolSelect(Synth_Symbol, true);
+
+   datetime m_last = 0;
+   Synth_GetLastBar(m_last);
+   datetime expect_head = m_last - (datetime)((long)m_last % 3600);   // 合成最終バーの属するH1
+
+   int bars = 0, calc = 0;
+   bool sync = false;
+   datetime head = 0;
+   bool ready = false;
+   int wait_sec = MathMax(1, Synth_H1_Wait_Sec);
+   for(int attempt = 1; attempt <= wait_sec; attempt++)
+   {
+      datetime t[];
+      if(CopyTime(Synth_Symbol, PERIOD_H1, 0, 1, t) > 0) head = t[0];   // 生成トリガー兼
+      bars = Bars(Synth_Symbol, PERIOD_H1);
+      sync = (bool)SeriesInfoInteger(Synth_Symbol, PERIOD_H1, SERIES_SYNCHRONIZED);
+      calc = BarsCalculated(hDxy_ADX);
+      if(bars > 0 && sync && calc >= bars && head >= expect_head) { ready = true; break; }
+      Sleep(1000);
+   }
+
+   datetime confirmed = iTime(Synth_Symbol, PERIOD_H1, 1);   // Dxy が使う最終確定バー
+   PrintFormat("[INFO] [Dxy] [Synth] H1 check: %s  M5_last=%s  H1_head(forming)=%s  H1_confirmed(shift1)=%s  "
+               "bars=%d calc=%d sync=%s",
+               ready ? "READY" : "NOT READY",
+               TimeToString(m_last, TIME_DATE|TIME_MINUTES),
+               TimeToString(head, TIME_DATE|TIME_MINUTES),
+               TimeToString(confirmed, TIME_DATE|TIME_MINUTES),
+               bars, calc, sync ? "true" : "false");
+   return ready;
 }
 
 //+##################################################################+
