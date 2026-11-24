@@ -1,24 +1,24 @@
 {
-  "updated": "2026-11-20",
-  "generated_at": "2026-11-22 01:18",
-  "adx22": 25.5,
+  "updated": "2026-11-24",
+  "generated_at": "2026-11-24 16:33",
+  "adx22": 28.2,
   "adx_state": "BEAR",
-  "di_plus": 11.1,
-  "di_minus": 36.4,
-  "di_spread": -25.3,
+  "di_plus": 15.1,
+  "di_minus": 27.7,
+  "di_spread": -12.7,
   "spread_range_5d": {
     "min": -25.3,
-    "max": -8.6
+    "max": -12.7
   },
-  "spread_label": "一方通行",
-  "atr_ratio": 1.22,
+  "spread_label": "優勢",
+  "atr_ratio": 1.21,
   "atr_cross_dir": "UP",
-  "atr_cross_days": 8,
+  "atr_cross_days": 10,
   "dxy": {
-    "date": "2026-11-20",
-    "adx56": 15.5,
-    "di_spread": -3.0,
-    "di_dir": "USD_DN",
+    "date": "2026-11-24",
+    "adx56": 11.7,
+    "di_spread": 4.0,
+    "di_dir": "USD_UP",
     "depth_label": "揺らぎ",
     "spread_range_5d": {
       "min": -3.0,
